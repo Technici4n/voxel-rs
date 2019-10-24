@@ -1,13 +1,14 @@
 use anyhow::Result;
-use conrod_core::widget_ids;
 use gfx_core::Device;
 use log::debug;
-use std::path::Path;
+use crate::ui::Ui;
 
 /// Color format of the window's color buffer
 type ColorFormat = gfx::format::Srgba8;
 /// Format of the window's depth buffer
 type DepthFormat = gfx::format::DepthStencil;
+
+const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
 
 /// Wrapper around the game window
 pub struct Window {
@@ -15,37 +16,17 @@ pub struct Window {
     events_loop: glutin::EventsLoop,
     /// A boolean indicating if the game should still be running
     pub running: bool,
+    /// Rendering-related data storage
     gfx: Gfx,
+    /// User interface
     ui: Ui,
 }
 
-/// A wrapper around the winit window that allows us to implement the trait necessary for enabling
-/// the winit <-> conrod conversion functions.
-struct WindowRef<'a>(&'a winit::Window);
-
-/// Implement the `WinitWindow` trait for `WindowRef` to allow for generating compatible conversion
-/// functions.
-impl<'a> conrod_winit::WinitWindow for WindowRef<'a> {
-    fn get_inner_size(&self) -> Option<(u32, u32)> {
-        winit::Window::get_inner_size(&self.0).map(Into::into)
-    }
-    fn hidpi_factor(&self) -> f32 {
-        winit::Window::get_hidpi_factor(&self.0) as _
-    }
-}
-
-conrod_winit::conversion_fns!();
-
-widget_ids!{
-    pub struct Ids {
-        canvas,
-        title,
-    }
-}
-
 impl Window {
+    // TODO: add initial size
+    /// Create a new game window
     pub fn new() -> Result<Self> {
-        // init window and opengl
+        // Init window, OpenGL and gfx
         let events_loop = glutin::EventsLoop::new();
         let (context, device, mut factory, color_buffer, depth_buffer) = {
             let window_builder = glutin::WindowBuilder::new().with_title("voxel-rs".to_owned());
@@ -55,15 +36,9 @@ impl Window {
             gfx_window_glutin::init::<ColorFormat, DepthFormat>(window_builder, context_builder, &events_loop)?
         };
         let encoder = factory.create_command_buffer().into();
-        // init ui;
-        let mut ui = conrod_core::UiBuilder::new([512.0, 512.0])
-            .theme(conrod_core::Theme::default())
-            .build();
-        let ids = Ids::new(ui.widget_id_generator());
 
-        let assets_path = Path::new("assets");
-        let font_path = assets_path.join("fonts/Ubuntu-R.ttf");
-        ui.fonts.insert_from_file(font_path)?;
+        // Init Ui
+        let ui = Ui::new()?;
 
         Ok(Self {
             events_loop,
@@ -76,22 +51,18 @@ impl Window {
                 color_buffer,
                 depth_buffer,
             },
-            ui: Ui {
-                ui,
-                ids,
-            },
+            ui,
         })
     }
 
+    /// Process all incoming events
     pub fn process_events(&mut self) {
         let Self { ref mut events_loop, ref mut running, ref mut gfx, ref mut ui } = self;
         events_loop.poll_events(|event| {
             use glutin::Event::*;
             use glutin::WindowEvent::*;
 
-            if let Some(event) = convert_event(event.clone(), &WindowRef(gfx.context.window())) {
-                ui.ui.handle_event(event);
-            }
+            ui.handle_event(event.clone(), gfx.context.window());
 
             match event {
                 WindowEvent { event: window_event, .. } => match window_event {
@@ -112,13 +83,12 @@ impl Window {
             }
         });
 
-        if ui.ui.global_input().events().next().is_some() {
-            let mut ui_cell = ui.ui.set_widgets();
-            gui(&mut ui_cell, &ui.ids);
-        }
+        ui.build_if_changed();
     }
 
+    /// Render the game
     pub fn render(&mut self) -> Result<()> {
+        // Get the current window dimensions if they are available or stop the game otherwise.
         let (win_w, win_h): (u32, u32) = match self.gfx.context.window().get_inner_size() {
             Some(s) => s.into(),
             None => {
@@ -129,15 +99,22 @@ impl Window {
 
         let dpi_factor = self.gfx.context.window().get_hidpi_factor() as f32;
 
-        if let Some(primitives) = self.ui.ui.draw_if_changed() {
+        // Render the Ui if it changed
+        if let Some(primitives) = self.ui.draw_if_changed() {
             debug!("Redrawing the Ui because it changed");
             let dims = (win_w as f32 * dpi_factor, win_h as f32 * dpi_factor);
             let Gfx { ref context, ref mut device, ref mut factory, ref mut encoder, ref color_buffer, .. } = &mut self.gfx;
+
+            // Create a new Ui renderer and an empty image map
             let mut ui_renderer = conrod_gfx::Renderer::new(factory, color_buffer, context.window().get_hidpi_factor())?;
             let image_map = conrod_core::image::Map::new();
+
+            // Draw the Ui
             ui_renderer.clear(encoder, CLEAR_COLOR);
             ui_renderer.fill(encoder, dims, dpi_factor as f64, primitives, &image_map);
             ui_renderer.draw(factory, encoder, &image_map);
+
+            // Flush and swap buffers
             encoder.flush(device);
             context.swap_buffers()?;
             device.cleanup();
@@ -147,6 +124,7 @@ impl Window {
     }
 }
 
+/// Store for all rendering-related data
 struct Gfx {
     pub context: glutin::WindowedContext<glutin::PossiblyCurrent>,
     pub device: gfx_device_gl::Device,
@@ -154,29 +132,4 @@ struct Gfx {
     pub encoder: gfx::Encoder<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>,
     pub color_buffer: gfx_core::handle::RenderTargetView<gfx_device_gl::Resources, ColorFormat>,
     pub depth_buffer: gfx_core::handle::DepthStencilView<gfx_device_gl::Resources, DepthFormat>,
-}
-
-struct Ui {
-    pub ui: conrod_core::Ui,
-    pub ids: Ids,
-}
-
-const CLEAR_COLOR: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
-
-fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
-    use conrod_core::color::Color;
-    use conrod_core::position::Positionable;
-    use conrod_core::text::Justify;
-    use conrod_core::widget::{self, Widget};
-
-    widget::Canvas::new().scroll_kids_vertically().set(ids.canvas, ui);
-    let title_style = widget::primitive::text::Style {
-        font_size: None,
-        color: Some(Color::Rgba(1.0, 1.0, 1.0, 1.0)),
-        maybe_wrap: None,
-        line_spacing: None,
-        justify: Some(Justify::Center),
-        font_id: None,
-    };
-    widget::Text::new("Welcome to voxel-rs").with_style(title_style).font_size(42).mid_top_of(ids.canvas).set(ids.title, ui);
 }

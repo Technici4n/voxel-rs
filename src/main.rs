@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::info;
 
+mod ui;
 mod window;
 
 fn main() -> Result<()> {
