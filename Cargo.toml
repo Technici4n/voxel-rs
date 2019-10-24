@@ -1,0 +1,19 @@
+[package]
+name = "voxel-rs"
+version = "0.1.0"
+authors = ["Technici4n", "Azercoco"]
+edition = "2018"
+
+[dependencies]
+log = "0.4"
+env_logger = "0.7"
+gfx = "0.18"
+glutin = "0.21"
+gfx_window_glutin = "0.31"
+anyhow = "1.0"
+gfx_device_gl = "0.16"
+gfx_core = "0.9"
+conrod_core = "0.67"
+conrod_gfx = "0.67"
+conrod_winit = "0.67"
+winit = "0.19"
