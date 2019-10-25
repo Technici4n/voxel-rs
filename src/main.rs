@@ -4,6 +4,9 @@ use log::info;
 mod settings;
 mod ui;
 mod window;
+mod chunk;
+mod meshing;
+mod perlin;
 
 fn main() -> Result<()> {
     env_logger::init();
