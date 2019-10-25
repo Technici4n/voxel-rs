@@ -80,12 +80,16 @@ widget_ids!{
 
 // Create the gui
 fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
-    use conrod_core::color::Color;
+    use conrod_core::color::{Color, TRANSPARENT};
     use conrod_core::position::Positionable;
     use conrod_core::text::Justify;
     use conrod_core::widget::{self, Widget};
 
-    widget::Canvas::new().scroll_kids_vertically().set(ids.canvas, ui);
+    let canvas_style = widget::canvas::Style {
+        color: Some(TRANSPARENT),
+        ..widget::canvas::Style::default()
+    };
+    widget::Canvas::new().scroll_kids_vertically().with_style(canvas_style).set(ids.canvas, ui);
     let title_style = widget::primitive::text::Style {
         font_size: None,
         color: Some(Color::Rgba(1.0, 1.0, 1.0, 1.0)),
