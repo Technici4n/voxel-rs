@@ -25,17 +25,17 @@ pub fn perlin(
 
 #[inline(always)]
 fn interpol_cos_1d(a: f64, b: f64, x: f64) -> f64 {
-    let x_2 = x*x;
-    let x_4 = x_2*x_2;
-    return a + (b-a) * (6.0*x*x_4 - 15.0*x_4 + 10.0*x*x_2);
+    let x_2 = x * x;
+    let x_4 = x_2 * x_2;
+    return a + (b - a) * (6.0 * x * x_4 - 15.0 * x_4 + 10.0 * x * x_2);
 }
 
 fn interpol_cos_2d(a: f64, b: f64, c: f64, d: f64, x: f64, y: f64) -> f64 {
-    let x_2 = x*x;
-    let x_4 = x_2*x_2;
-    let v = 6.0*x*x_4 - 15.0*x_4 + 10.0*x*x_2;
-    let m = a + (b-a)*v;
-    let n = c + (d-c)*v;
+    let x_2 = x * x;
+    let x_4 = x_2 * x_2;
+    let v = 6.0 * x * x_4 - 15.0 * x_4 + 10.0 * x * x_2;
+    let m = a + (b - a) * v;
+    let n = c + (d - c) * v;
     return interpol_cos_1d(m, n, y);
 }
 

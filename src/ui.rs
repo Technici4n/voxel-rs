@@ -1,7 +1,7 @@
+use crate::settings::SETTINGS;
 use anyhow::Result;
 use conrod_core::widget_ids;
 use std::path::Path;
-use crate::settings::SETTINGS;
 
 /// Wrapper around the ui
 pub struct Ui {
@@ -27,10 +27,7 @@ impl Ui {
         let font_path = assets_path.join("fonts/Ubuntu-R.ttf");
         ui.fonts.insert_from_file(font_path)?;
 
-        Ok(Self {
-            ui,
-            ids,
-        })
+        Ok(Self { ui, ids })
     }
 
     /// Handle a glutin event
@@ -71,7 +68,7 @@ impl<'a> conrod_winit::WinitWindow for WindowRef<'a> {
 
 conrod_winit::conversion_fns!();
 
-widget_ids!{
+widget_ids! {
     struct Ids {
         canvas,
         title,
@@ -89,7 +86,10 @@ fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
         color: Some(TRANSPARENT),
         ..widget::canvas::Style::default()
     };
-    widget::Canvas::new().scroll_kids_vertically().with_style(canvas_style).set(ids.canvas, ui);
+    widget::Canvas::new()
+        .scroll_kids_vertically()
+        .with_style(canvas_style)
+        .set(ids.canvas, ui);
     let title_style = widget::primitive::text::Style {
         font_size: None,
         color: Some(Color::Rgba(1.0, 1.0, 1.0, 1.0)),
@@ -98,5 +98,9 @@ fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
         justify: Some(Justify::Center),
         font_id: None,
     };
-    widget::Text::new("Welcome to voxel-rs").with_style(title_style).font_size(42).mid_top_of(ids.canvas).set(ids.title, ui);
+    widget::Text::new("Welcome to voxel-rs")
+        .with_style(title_style)
+        .font_size(42)
+        .mid_top_of(ids.canvas)
+        .set(ids.title, ui);
 }

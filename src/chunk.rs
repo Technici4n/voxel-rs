@@ -1,68 +1,74 @@
-const BLOC_IN_CHUNK: u32 = 16; // number of bloc of data in a chunk axis
-const BLOC_SIZE: u32 = 2; // number of data in a bloc axis
-pub const CHUNK_SIZE : u32 = BLOC_SIZE*BLOC_IN_CHUNK; // size of an axis of chunk (number of data)
-const BLOCK_LEN : usize = (BLOC_SIZE*BLOC_SIZE*BLOC_SIZE) as usize; // number of data in a block
+/// Number of blocks of data in a chunk axis
+const CHUNK_LEN: u32 = 16;
+/// Number of data in a bloc axis
+const GROUP_LEN: u32 = 2;
+/// size of an axis of chunk (number of data)
+pub const CHUNK_SIZE: u32 = GROUP_LEN * CHUNK_LEN;
+/// number of data in a block
+const BLOCK_SIZE: usize = (GROUP_LEN * GROUP_LEN * GROUP_LEN) as usize;
 
 #[derive(Clone)]
 enum BlockGroup {
-     Compressed(u32), // 1 bit (NxNxN) times the same data
-     Uncompressed(Box<[u32; BLOCK_LEN]>), // different datas
- }
-
-#[derive(Clone)]
-pub struct Chunk{
-    pub px : i64, // position of the chunkc in the world
-    pub py : i64,
-    pub pz : i64,
-    data : Vec<BlockGroup> // data containde in the chunk
+    Compressed(u32),                      // 1 bit (NxNxN) times the same data
+    Uncompressed(Box<[u32; BLOCK_SIZE]>), // different datas
 }
 
+#[derive(Clone)]
+pub struct Chunk {
+    pub px: i64, // position of the chunkc in the world
+    pub py: i64,
+    pub pz: i64,
+    data: Vec<BlockGroup>, // data containde in the chunk
+}
 
 impl Chunk {
-
-    pub fn new(x : i64, y : i64, z : i64) -> Chunk{
-        Chunk{
-            px : x,
-            py : y,
-            pz : z,
-            data :  vec![BlockGroup::Compressed(0); (BLOC_IN_CHUNK*BLOC_IN_CHUNK*BLOC_IN_CHUNK) as usize],
+    pub fn new(x: i64, y: i64, z: i64) -> Chunk {
+        Chunk {
+            px: x,
+            py: y,
+            pz: z,
+            data: vec![BlockGroup::Compressed(0); (CHUNK_LEN * CHUNK_LEN * CHUNK_LEN) as usize],
             // chunk is empty
         }
-
     }
 
-
-    pub fn get_data(&self, px:u32, py:u32, pz:u32 ) -> u32{
-        match &self.data[((px/BLOC_SIZE)*BLOC_IN_CHUNK*BLOC_IN_CHUNK
-        + (py/BLOC_SIZE)*BLOC_IN_CHUNK+(pz/BLOC_SIZE)) as usize] {
+    pub fn get_data(&self, px: u32, py: u32, pz: u32) -> u32 {
+        match &self.data[((px / GROUP_LEN) * CHUNK_LEN * CHUNK_LEN
+            + (py / GROUP_LEN) * CHUNK_LEN
+            + (pz / GROUP_LEN)) as usize]
+        {
             BlockGroup::Compressed(block_type) => *block_type, // if compressed return the compressed type
-            BlockGroup::Uncompressed(blocks) => blocks[((px%BLOC_SIZE)*4 + (py%BLOC_SIZE)*2 + (pz%BLOC_SIZE)) as usize],
-            // if not compressed, return the data stored in the full array
+            BlockGroup::Uncompressed(blocks) => {
+                blocks[((px % GROUP_LEN) * 4 + (py % GROUP_LEN) * 2 + (pz % GROUP_LEN)) as usize]
+            } // if not compressed, return the data stored in the full array
         }
-
     }
 
-    pub fn set_data(&mut self, px:u32, py:u32, pz:u32, data: u32){
-        let x = &mut self.data[((px/BLOC_SIZE)*BLOC_IN_CHUNK*BLOC_IN_CHUNK
-        + (py/BLOC_SIZE)*BLOC_IN_CHUNK+(pz/BLOC_SIZE)) as usize];
+    pub fn set_data(&mut self, px: u32, py: u32, pz: u32, data: u32) {
+        let x = &mut self.data[((px / GROUP_LEN) * CHUNK_LEN * CHUNK_LEN
+            + (py / GROUP_LEN) * CHUNK_LEN
+            + (pz / GROUP_LEN)) as usize];
 
-         if let BlockGroup::Compressed(block_type) = x{
-            if *block_type != data{ // splitting the group into an new array
-                let mut fill = [*block_type; BLOCK_LEN];
-                fill[((px%BLOC_SIZE)*BLOC_SIZE*BLOC_SIZE + (py%BLOC_SIZE)*BLOC_SIZE + (pz%BLOC_SIZE)) as usize] = data;
+        if let BlockGroup::Compressed(block_type) = x {
+            if *block_type != data {
+                // splitting the group into an new array
+                let mut fill = [*block_type; BLOCK_SIZE];
+                fill[((px % GROUP_LEN) * GROUP_LEN * GROUP_LEN
+                    + (py % GROUP_LEN) * GROUP_LEN
+                    + (pz % GROUP_LEN)) as usize] = data;
                 *x = BlockGroup::Uncompressed(Box::new(fill));
-
             }
-        }else if let BlockGroup::Uncompressed(blocks) = x{
-            blocks[((px%BLOC_SIZE)*BLOC_SIZE*BLOC_SIZE + (py%BLOC_SIZE)*BLOC_SIZE + (pz%BLOC_SIZE)) as usize] = data;
-            for i in 0..BLOCK_LEN{ // if all the data in the array are the same -> merge
-                if blocks[i] != data{
-                    return
+        } else if let BlockGroup::Uncompressed(blocks) = x {
+            blocks[((px % GROUP_LEN) * GROUP_LEN * GROUP_LEN
+                + (py % GROUP_LEN) * GROUP_LEN
+                + (pz % GROUP_LEN)) as usize] = data;
+            for i in 0..BLOCK_SIZE {
+                // if all the data in the array are the same -> merge
+                if blocks[i] != data {
+                    return;
                 }
             }
             *x = BlockGroup::Compressed(data); // mergin all block in one
         }
-
     }
-
 }
