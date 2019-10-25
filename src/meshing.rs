@@ -8,6 +8,7 @@ const NORTH: u8 = 5; // -1z
 
 use crate::chunk::{Chunk, CHUNK_SIZE};
 
+#[derive(Clone)]
 pub struct Vertex {
     pub pos: [f32; 3],
     pub normal: u8,
@@ -195,4 +196,12 @@ pub fn meshing(chunk: Chunk) -> (Vec<Vertex>, Vec<usize>) {
     }
 
     (res_vertex, res_index)
+}
+
+pub fn desindex_meshing((indexed_vertex, index) : (Vec<Vertex>, Vec<usize>)) -> (Vec<Vertex>) {
+    let mut res_vertex: Vec<Vertex> = Vec::new();
+    for i in index.into_iter(){
+        res_vertex.push(indexed_vertex[i].clone());
+    }
+    res_vertex
 }
