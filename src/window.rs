@@ -1,7 +1,10 @@
 use anyhow::Result;
 use gfx_core::Device;
 use log::debug;
-use crate::ui::Ui;
+use crate::{
+    settings::SETTINGS,
+    ui::Ui,
+};
 
 /// Color format of the window's color buffer
 type ColorFormat = gfx::format::Srgba8;
@@ -29,7 +32,9 @@ impl Window {
         // Init window, OpenGL and gfx
         let events_loop = glutin::EventsLoop::new();
         let (context, device, mut factory, color_buffer, depth_buffer) = {
-            let window_builder = glutin::WindowBuilder::new().with_title("voxel-rs".to_owned());
+            let window_builder = glutin::WindowBuilder::new()
+                .with_title("voxel-rs".to_owned())
+                .with_dimensions(SETTINGS.window_size.into());
             let context_builder = glutin::ContextBuilder::new()
                 .with_vsync(false)
                 .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)));

@@ -1,6 +1,7 @@
 use anyhow::Result;
 use conrod_core::widget_ids;
 use std::path::Path;
+use crate::settings::SETTINGS;
 
 /// Wrapper around the ui
 pub struct Ui {
@@ -13,9 +14,10 @@ pub struct Ui {
 impl Ui {
     /// Create a new ui
     pub fn new() -> Result<Self> {
-        // TODO: clean default window size
+        use conrod_core::position::Scalar;
         // Create Ui
-        let mut ui = conrod_core::UiBuilder::new([512.0, 512.0])
+        let (win_w, win_h) = SETTINGS.window_size;
+        let mut ui = conrod_core::UiBuilder::new([win_h as Scalar, win_w as Scalar])
             .theme(conrod_core::Theme::default())
             .build();
         let ids = Ids::new(ui.widget_id_generator());
