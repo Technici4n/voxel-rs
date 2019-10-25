@@ -180,7 +180,7 @@ pub fn meshing(chunk: Chunk) -> (Vec<Vertex>, Vec<usize>) {
                                     j as f32 + MESH_NORTH[l][1],
                                     k as f32 + MESH_NORTH[l][2],
                                 ],
-                                normal: UP,
+                                normal: NORTH,
                             });
                         }
 
