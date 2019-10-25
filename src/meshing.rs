@@ -1,3 +1,5 @@
+
+// The constant associated to the normal direction
 const UP : u8 = 1; // 1y
 const DOWN : u8 = 2; // -1y
 const NORTH : u8 = 1; // -1z
@@ -73,6 +75,10 @@ const MESH_SOUTH_INDEX : [usize; 6] = [0, 1, 2, 2, 1, 3];
 
 
 pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
+    /// Return a list of vertex a (3*n) indexes array (for n quads)
+    /// which contains the index of the corresponding quads
+    /// in the first array
+    /// Each vertex contains its position and the normal associated to the quad
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index : Vec<usize> = Vec::new();
 
@@ -81,9 +87,10 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
     for i in 0..CHUNK_SIZE{
         for j in 0..CHUNK_SIZE{
             for k in 0..CHUNK_SIZE{
-                if chunk.get_data(i,j,k) != 0{
+
+                if chunk.get_data(i,j,k) != 0{ //checking if not void
                     // 1x -- est
-                    if i == CHUNK_SIZE - 1 || chunk.get_data(i+1,j,k) != 0{
+                    if i == CHUNK_SIZE - 1 || chunk.get_data(i+1,j,k) == 0{
 
                         for l in 0..4{
                             res_vertex.push(
@@ -104,7 +111,7 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
 
                     }
                     // -1x -- WEST
-                    if i == 0 || chunk.get_data(i-1,j,k) != 0{
+                    if i == 0 || chunk.get_data(i-1,j,k) == 0{
 
                         for l in 0..4{
                             res_vertex.push(
@@ -125,7 +132,7 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
 
                     }
                     // 1y -- UP
-                    if j == CHUNK_SIZE - 1 || chunk.get_data(i,j+1,k) != 0{
+                    if j == CHUNK_SIZE - 1 || chunk.get_data(i,j+1,k) == 0{
 
                         for l in 0..4{
                             res_vertex.push(
@@ -145,7 +152,7 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
 
                     }
                     // -1y -- DOWN
-                    if j == 0 || chunk.get_data(i,j+1,k) != 0{
+                    if j == 0 || chunk.get_data(i,j+1,k) == 0{
 
                         for l in 0..4{
                             res_vertex.push(
@@ -166,7 +173,7 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
 
                     }
                     // 1z -- SOUTH
-                    if k == CHUNK_SIZE - 1 || chunk.get_data(i,j,k+1) != 0{
+                    if k == CHUNK_SIZE - 1 || chunk.get_data(i,j,k+1) == 0{
                         for l in 0..4{
                             res_vertex.push(
                                 Vertex{
@@ -187,7 +194,7 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     }
                     // -1z -- NORTH
                     if k == 0 || chunk.get_data(i,j,k-1) != 0{
-                        if k == CHUNK_SIZE - 1 || chunk.get_data(i,j,k+1) != 0{
+                        if k == CHUNK_SIZE - 1 || chunk.get_data(i,j,k+1) == 0{
                             for l in 0..4{
                                 res_vertex.push(
                                     Vertex{
