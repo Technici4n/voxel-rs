@@ -124,6 +124,7 @@ impl Window {
     }
 }
 
+
 /// Store for all rendering-related data
 struct Gfx {
     pub context: glutin::WindowedContext<glutin::PossiblyCurrent>,

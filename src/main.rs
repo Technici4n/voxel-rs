@@ -3,10 +3,11 @@ use log::info;
 
 mod ui;
 mod window;
+mod chunk;
 
 fn main() -> Result<()> {
     env_logger::init();
-
+    
     info!("Starting up...");
     let mut window = window::Window::new()?;
     while window.running {
