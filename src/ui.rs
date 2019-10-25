@@ -1,4 +1,5 @@
 use crate::settings::SETTINGS;
+use crate::world::transform::Camera;
 use anyhow::Result;
 use conrod_core::widget_ids;
 use std::path::Path;
@@ -38,10 +39,10 @@ impl Ui {
     }
 
     /// Rebuild the Ui if it changed
-    pub fn build_if_changed(&mut self) {
+    pub fn build_if_changed(&mut self, camera: &Camera) {
         if self.ui.global_input().events().next().is_some() {
             let mut ui_cell = self.ui.set_widgets();
-            gui(&mut ui_cell, &self.ids);
+            gui(&mut ui_cell, &self.ids, camera);
         }
     }
 
@@ -72,14 +73,16 @@ widget_ids! {
     struct Ids {
         canvas,
         title,
+        yaw_pitch,
     }
 }
 
 // Create the gui
-fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
-    use conrod_core::color::{Color, TRANSPARENT};
+fn gui(ui: &mut conrod_core::UiCell, ids: &Ids, camera: &Camera) {
+    use conrod_core::color::{Color, TRANSPARENT, WHITE};
     use conrod_core::position::Positionable;
     use conrod_core::text::Justify;
+    use conrod_core::widget::primitive::text::Style as TextStyle;
     use conrod_core::widget::{self, Widget};
 
     let canvas_style = widget::canvas::Style {
@@ -90,7 +93,7 @@ fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
         .scroll_kids_vertically()
         .with_style(canvas_style)
         .set(ids.canvas, ui);
-    let title_style = widget::primitive::text::Style {
+    let title_style = TextStyle {
         font_size: None,
         color: Some(Color::Rgba(1.0, 1.0, 1.0, 1.0)),
         maybe_wrap: None,
@@ -103,4 +106,13 @@ fn gui(ui: &mut conrod_core::UiCell, ids: &Ids) {
         .font_size(42)
         .mid_top_of(ids.canvas)
         .set(ids.title, ui);
+
+    widget::Text::new(&format!("Yaw = {}\nPitch = {}", camera.yaw, camera.pitch))
+        .with_style(TextStyle {
+            color: Some(WHITE),
+            ..TextStyle::default()
+        })
+        .font_size(30)
+        .mid_bottom_of(ids.title)
+        .set(ids.yaw_pitch, ui);
 }

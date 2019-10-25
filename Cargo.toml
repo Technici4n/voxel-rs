@@ -25,3 +25,6 @@ winit = "0.19"
 conrod_core = "0.67"
 conrod_gfx = "0.67"
 conrod_winit = "0.67"
+
+# Math
+nalgebra = "0.18"

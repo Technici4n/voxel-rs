@@ -1,18 +1,13 @@
 // The constant associated to the normal direction
-const EAST: u8 = 0; // 1x
-const WEST: u8 = 1; // -1x
-const UP: u8 = 2; // 1y
-const DOWN: u8 = 3; // -1y
-const SOUTH: u8 = 4; // 1z
-const NORTH: u8 = 5; // -1z
+const EAST: u32 = 0; // 1x
+const WEST: u32 = 1; // -1x
+const UP: u32 = 2; // 1y
+const DOWN: u32 = 3; // -1y
+const SOUTH: u32 = 4; // 1z
+const NORTH: u32 = 5; // -1z
 
 use crate::chunk::{Chunk, CHUNK_SIZE};
-
-#[derive(Clone)]
-pub struct Vertex {
-    pub pos: [f32; 3],
-    pub normal: u8,
-}
+use crate::world::Vertex;
 
 const MESH_EAST: [[f32; 3]; 4] = [
     [1.0, 0.0, 0.0],
@@ -67,11 +62,11 @@ const MESH_SOUTH: [[f32; 3]; 4] = [
 ];
 const MESH_SOUTH_INDEX: [usize; 6] = [0, 1, 2, 2, 1, 3];
 
-pub fn meshing(chunk: Chunk) -> (Vec<Vertex>, Vec<usize>) {
-    /// Return a list of vertex a (3*n) indexes array (for n quads)
-    /// which contains the index of the corresponding quads
-    /// in the first array
-    /// Each vertex contains its position and the normal associated to the quad
+/// Return a list of vertex a (3*n) indexes array (for n quads)
+/// which contains the index of the corresponding quads
+/// in the first array
+/// Each vertex contains its position and the normal associated to the quad
+pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<usize>) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
@@ -198,9 +193,9 @@ pub fn meshing(chunk: Chunk) -> (Vec<Vertex>, Vec<usize>) {
     (res_vertex, res_index)
 }
 
-pub fn desindex_meshing((indexed_vertex, index) : (Vec<Vertex>, Vec<usize>)) -> (Vec<Vertex>) {
+pub fn desindex_meshing((indexed_vertex, index): (Vec<Vertex>, Vec<usize>)) -> (Vec<Vertex>) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
-    for i in index.into_iter(){
+    for i in index.into_iter() {
         res_vertex.push(indexed_vertex[i].clone());
     }
     res_vertex

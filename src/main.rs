@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate gfx;
+
 use anyhow::Result;
 use log::info;
 
@@ -7,6 +10,7 @@ mod perlin;
 mod settings;
 mod ui;
 mod window;
+mod world;
 
 fn main() -> Result<()> {
     env_logger::init();

@@ -1,12 +1,12 @@
-use crate::{settings::SETTINGS, ui::Ui};
+use crate::{settings::SETTINGS, ui::Ui, world::WorldRenderer};
 use anyhow::Result;
 use gfx_core::Device;
 use log::debug;
 
 /// Color format of the window's color buffer
-type ColorFormat = gfx::format::Srgba8;
+pub type ColorFormat = gfx::format::Srgba8;
 /// Format of the window's depth buffer
-type DepthFormat = gfx::format::DepthStencil;
+pub type DepthFormat = gfx::format::DepthStencil;
 
 const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
 
@@ -20,6 +20,8 @@ pub struct Window {
     gfx: Gfx,
     /// User interface
     ui: Ui,
+    /// World rendering
+    world_renderer: WorldRenderer,
 }
 
 impl Window {
@@ -46,18 +48,23 @@ impl Window {
         // Init Ui
         let ui = Ui::new()?;
 
+        let mut gfx = Gfx {
+            context,
+            device,
+            factory,
+            encoder,
+            color_buffer,
+            depth_buffer,
+        };
+
+        let world_renderer = WorldRenderer::new(&mut gfx)?;
+
         Ok(Self {
             events_loop,
             running: true,
-            gfx: Gfx {
-                context,
-                device,
-                factory,
-                encoder,
-                color_buffer,
-                depth_buffer,
-            },
+            gfx,
             ui,
+            world_renderer,
         })
     }
 
@@ -68,8 +75,11 @@ impl Window {
             ref mut running,
             ref mut gfx,
             ref mut ui,
+            ref mut world_renderer,
+            ..
         } = self;
         events_loop.poll_events(|event| {
+            use glutin::DeviceEvent::*;
             use glutin::Event::*;
             use glutin::WindowEvent::*;
 
@@ -94,11 +104,22 @@ impl Window {
                     }
                     _ => {}
                 },
+                DeviceEvent {
+                    event: device_event,
+                    ..
+                } => match device_event {
+                    Motion { axis, value } => match axis {
+                        0 => world_renderer.camera.update_cursor(value, 0.0),
+                        1 => world_renderer.camera.update_cursor(0.0, value),
+                        _ => panic!("Unknown axis. Expected 0 or 1, found {}.", axis),
+                    },
+                    _ => {}
+                },
                 _ => {}
             }
         });
 
-        ui.build_if_changed();
+        ui.build_if_changed(&world_renderer.camera);
     }
 
     /// Render the game
@@ -118,27 +139,39 @@ impl Window {
         if let Some(primitives) = self.ui.draw_if_changed() {
             debug!("Redrawing the Ui because it changed");
             let dims = (win_w as f32 * dpi_factor, win_h as f32 * dpi_factor);
+            {
+                let Gfx {
+                    ref context,
+                    ref mut factory,
+                    ref mut encoder,
+                    ref color_buffer,
+                    ref depth_buffer,
+                    ..
+                } = &mut self.gfx;
+
+                // Create a new Ui renderer and an empty image map
+                let mut ui_renderer = conrod_gfx::Renderer::new(
+                    factory,
+                    color_buffer,
+                    context.window().get_hidpi_factor(),
+                )?;
+                //let image_map = conrod_core::image::Map::new();
+
+                // Draw the Ui
+                ui_renderer.clear(encoder, CLEAR_COLOR);
+                encoder.clear_depth(depth_buffer, 1.0);
+                //ui_renderer.fill(encoder, dims, dpi_factor as f64, primitives, &image_map);
+                //ui_renderer.draw(factory, encoder, &image_map);
+            }
+
+            self.world_renderer.render(&mut self.gfx)?;
+
             let Gfx {
                 ref context,
                 ref mut device,
-                ref mut factory,
                 ref mut encoder,
-                ref color_buffer,
                 ..
             } = &mut self.gfx;
-
-            // Create a new Ui renderer and an empty image map
-            let mut ui_renderer = conrod_gfx::Renderer::new(
-                factory,
-                color_buffer,
-                context.window().get_hidpi_factor(),
-            )?;
-            let image_map = conrod_core::image::Map::new();
-
-            // Draw the Ui
-            ui_renderer.clear(encoder, CLEAR_COLOR);
-            ui_renderer.fill(encoder, dims, dpi_factor as f64, primitives, &image_map);
-            ui_renderer.draw(factory, encoder, &image_map);
 
             // Flush and swap buffers
             encoder.flush(device);
@@ -151,7 +184,7 @@ impl Window {
 }
 
 /// Store for all rendering-related data
-struct Gfx {
+pub struct Gfx {
     pub context: glutin::WindowedContext<glutin::PossiblyCurrent>,
     pub device: gfx_device_gl::Device,
     pub factory: gfx_device_gl::Factory,
