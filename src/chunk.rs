@@ -43,7 +43,7 @@ impl Chunk {
     }
 
     pub fn set_data(&mut self, px:u32, py:u32, pz:u32, data: u32){
-        let mut x = &mut self.data[((px/BLOC_SIZE)*BLOC_IN_CHUNK*BLOC_IN_CHUNK
+        let x = &mut self.data[((px/BLOC_SIZE)*BLOC_IN_CHUNK*BLOC_IN_CHUNK
         + (py/BLOC_SIZE)*BLOC_IN_CHUNK+(pz/BLOC_SIZE)) as usize];
 
          if let BlockGroup::Compressed(block_type) = x{

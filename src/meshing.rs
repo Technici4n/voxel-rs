@@ -12,7 +12,7 @@ pub struct Vertex {
     pub normal : u8,
 }
 
-const meshEst : [[f32; 3]; 4] =
+const MESH_EST : [[f32; 3]; 4] =
 [
 [1.0, 0.0, 0.0],
 [1.0, 1.0, 0.0],
@@ -20,9 +20,9 @@ const meshEst : [[f32; 3]; 4] =
 [1.0, 1.0, 1.0],
 ];
 
-const meshEstIndex : [usize; 6] = [0, 1, 2, 2, 1, 3];
+const MESH_EST_INDEX : [usize; 6] = [0, 1, 2, 2, 1, 3];
 
-const meshWest : [[f32; 3]; 4] =
+const MESH_WEST : [[f32; 3]; 4] =
 [
 [0.0, 0.0, 0.0],
 [0.0, 1.0, 0.0],
@@ -30,9 +30,9 @@ const meshWest : [[f32; 3]; 4] =
 [0.0, 1.0, 1.0],
 ];
 
-const meshWestIndex : [usize; 6] = [0, 2, 1, 2, 3, 1];
+const MESH_WEST_INDEX : [usize; 6] = [0, 2, 1, 2, 3, 1];
 
-const meshUp : [[f32; 3]; 4] =
+const MESH_UP : [[f32; 3]; 4] =
 [
 [0.0, 1.0, 0.0],
 [1.0, 1.0, 0.0],
@@ -40,9 +40,9 @@ const meshUp : [[f32; 3]; 4] =
 [1.0, 1.0, 1.0],
 ];
 
-const meshUpIndex : [usize; 6] = [0, 2, 1, 2, 3, 1];
+const MESH_UP_INDEX : [usize; 6] = [0, 2, 1, 2, 3, 1];
 
-const meshDown : [[f32; 3]; 4] =
+const MESH_DOWN : [[f32; 3]; 4] =
 [
 [0.0, 0.0, 0.0],
 [1.0, 0.0, 0.0],
@@ -50,9 +50,9 @@ const meshDown : [[f32; 3]; 4] =
 [1.0, 0.0, 1.0],
 ];
 
-const meshDownIndex : [usize; 6] = [0, 1, 2, 2, 1, 3];
+const MESH_DOWN_INDEX : [usize; 6] = [0, 1, 2, 2, 1, 3];
 
-const meshNorth : [[f32; 3]; 4] =
+const MESH_NORTH : [[f32; 3]; 4] =
 [
 [0.0, 0.0, 0.0],
 [1.0, 0.0, 0.0],
@@ -60,21 +60,21 @@ const meshNorth : [[f32; 3]; 4] =
 [1.0, 1.0, 0.0],
 ];
 
-const meshNorthIndex : [usize; 6] = [0, 2, 1, 2, 3, 1];
+const MESH_NORTH_INDEX : [usize; 6] = [0, 2, 1, 2, 3, 1];
 
-const meshSouth : [[f32; 3]; 4] =
+const MESH_SOUTH : [[f32; 3]; 4] =
 [
 [0.0, 0.0, 1.0],
 [1.0, 0.0, 1.0],
 [0.0, 1.0, 1.0],
 [1.0, 1.0, 1.0],
 ];
-const meshSouthIndex : [usize; 6] = [0, 1, 2, 2, 1, 3];
+const MESH_SOUTH_INDEX : [usize; 6] = [0, 1, 2, 2, 1, 3];
 
 
 pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
-    let mut resVertex: Vec<Vertex> = Vec::new();
-    let mut resIndex : Vec<usize> = Vec::new();
+    let mut res_vertex: Vec<Vertex> = Vec::new();
+    let mut res_index : Vec<usize> = Vec::new();
 
     let mut n_of_different_vertex = 0;
 
@@ -86,18 +86,18 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     if i == CHUNK_SIZE - 1 || chunk.get_data(i+1,j,k) != 0{
 
                         for l in 0..4{
-                            resVertex.push(
+                            res_vertex.push(
                                 Vertex{
-                                    pos: [i as f32 + meshEst[l][0],
-                                          j as f32 + meshEst[l][1],
-                                          k as f32 + meshEst[l][2]],
+                                    pos: [i as f32 + MESH_EST[l][0],
+                                          j as f32 + MESH_EST[l][1],
+                                          k as f32 + MESH_EST[l][2]],
                                     normal : EST,
                                 }
                             );
                         }
 
                         for l in 0..6{
-                            resIndex.push(n_of_different_vertex + meshEstIndex[l]);
+                            res_index.push(n_of_different_vertex + MESH_EST_INDEX[l]);
                         }
                         n_of_different_vertex += 4;
 
@@ -107,18 +107,18 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     if i == 0 || chunk.get_data(i-1,j,k) != 0{
 
                         for l in 0..4{
-                            resVertex.push(
+                            res_vertex.push(
                                 Vertex{
-                                    pos: [i as f32 + meshWest[l][0],
-                                          j as f32 + meshWest[l][1],
-                                          k as f32 + meshWest[l][2]],
+                                    pos: [i as f32 + MESH_WEST[l][0],
+                                          j as f32 + MESH_WEST[l][1],
+                                          k as f32 + MESH_WEST[l][2]],
                                     normal : WEST,
                                 }
                             );
                         }
 
                         for l in 0..6{
-                            resIndex.push(n_of_different_vertex + meshEstIndex[l]);
+                            res_index.push(n_of_different_vertex + MESH_EST_INDEX[l]);
                         }
                         n_of_different_vertex += 4;
 
@@ -128,18 +128,18 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     if j == CHUNK_SIZE - 1 || chunk.get_data(i,j+1,k) != 0{
 
                         for l in 0..4{
-                            resVertex.push(
+                            res_vertex.push(
                                 Vertex{
-                                    pos: [i as f32 + meshUp[l][0],
-                                          j as f32 + meshUp[l][1],
-                                          k as f32 + meshUp[l][2]],
+                                    pos: [i as f32 + MESH_UP[l][0],
+                                          j as f32 + MESH_UP[l][1],
+                                          k as f32 + MESH_UP[l][2]],
                                     normal : UP,
                                 }
                             );
                         }
 
                         for l in 0..6{
-                            resIndex.push(n_of_different_vertex + meshUpIndex[l]);
+                            res_index.push(n_of_different_vertex + MESH_UP_INDEX[l]);
                         }
                         n_of_different_vertex += 4;
 
@@ -148,18 +148,18 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     if j == 0 || chunk.get_data(i,j+1,k) != 0{
 
                         for l in 0..4{
-                            resVertex.push(
+                            res_vertex.push(
                                 Vertex{
-                                    pos: [i as f32 + meshDown[l][0],
-                                          j as f32 + meshDown[l][1],
-                                          k as f32 + meshDown[l][2]],
+                                    pos: [i as f32 + MESH_DOWN[l][0],
+                                          j as f32 + MESH_DOWN[l][1],
+                                          k as f32 + MESH_DOWN[l][2]],
                                     normal : DOWN,
                                 }
                             );
                         }
 
                         for l in 0..6{
-                            resIndex.push(n_of_different_vertex + meshDownIndex[l]);
+                            res_index.push(n_of_different_vertex + MESH_DOWN_INDEX[l]);
                         }
                         n_of_different_vertex += 4;
 
@@ -168,18 +168,18 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     // 1z -- SOUTH
                     if k == CHUNK_SIZE - 1 || chunk.get_data(i,j,k+1) != 0{
                         for l in 0..4{
-                            resVertex.push(
+                            res_vertex.push(
                                 Vertex{
-                                    pos: [i as f32 + meshSouth[l][0],
-                                          j as f32 + meshSouth[l][1],
-                                          k as f32 + meshSouth[l][2]],
+                                    pos: [i as f32 + MESH_SOUTH[l][0],
+                                          j as f32 + MESH_SOUTH[l][1],
+                                          k as f32 + MESH_SOUTH[l][2]],
                                     normal : SOUTH,
                                 }
                             );
                         }
 
                         for l in 0..6{
-                            resIndex.push(n_of_different_vertex + meshSouthIndex[l]);
+                            res_index.push(n_of_different_vertex + MESH_SOUTH_INDEX[l]);
                         }
                         n_of_different_vertex += 4;
 
@@ -189,18 +189,18 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
                     if k == 0 || chunk.get_data(i,j,k-1) != 0{
                         if k == CHUNK_SIZE - 1 || chunk.get_data(i,j,k+1) != 0{
                             for l in 0..4{
-                                resVertex.push(
+                                res_vertex.push(
                                     Vertex{
-                                        pos: [i as f32 + meshNorth[l][0],
-                                              j as f32 + meshNorth[l][1],
-                                              k as f32 + meshNorth[l][2]],
+                                        pos: [i as f32 + MESH_NORTH[l][0],
+                                              j as f32 + MESH_NORTH[l][1],
+                                              k as f32 + MESH_NORTH[l][2]],
                                         normal : UP,
                                     }
                                 );
                             }
 
                             for l in 0..6{
-                                resIndex.push(n_of_different_vertex + meshNorthIndex[l]);
+                                res_index.push(n_of_different_vertex + MESH_NORTH_INDEX[l]);
                             }
                             n_of_different_vertex += 4;
 
@@ -215,5 +215,5 @@ pub fn meshing(chunk : Chunk) -> (Vec<Vertex>, Vec<usize>){
     }
 
 
-    (resVertex, resIndex)
+    (res_vertex, res_index)
 }
