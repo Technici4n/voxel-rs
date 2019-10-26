@@ -10,7 +10,7 @@ use crate::{
 pub type ImageMap = Map<(ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>, (u32, u32))>;
 
 pub struct UiRenderer {
-    renderer: Renderer<'static, gfx_device_gl::Resources>,
+    pub renderer: Renderer<'static, gfx_device_gl::Resources>,
     image_map: ImageMap,
 }
 

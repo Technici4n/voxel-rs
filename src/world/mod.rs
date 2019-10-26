@@ -120,4 +120,13 @@ impl WorldRenderer {
 
         Ok(())
     }
+
+    pub fn on_resize(
+        &mut self,
+        color_buffer: gfx_core::handle::RenderTargetView<gfx_device_gl::Resources, ColorFormat>,
+        depth_buffer: gfx_core::handle::DepthStencilView<gfx_device_gl::Resources, DepthFormat>
+    ) {
+        self.data.color_buffer = color_buffer;
+        self.data.depth_buffer = depth_buffer;
+    }
 }

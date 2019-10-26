@@ -112,6 +112,7 @@ impl Window {
             ref mut running,
             ref mut gfx,
             ref mut ui,
+            ref mut ui_renderer,
             ref mut world_renderer,
             ..
         } = self;
@@ -120,9 +121,7 @@ impl Window {
             use glutin::Event::*;
             use glutin::WindowEvent::*;
 
-            ui.handle_event(event.clone(), gfx.context.window());
-
-            match event {
+            match event.clone() {
                 WindowEvent {
                     event: window_event,
                     ..
@@ -138,6 +137,8 @@ impl Window {
                             gfx_window_glutin::new_views::<ColorFormat, DepthFormat>(&gfx.context);
                         gfx.color_buffer = new_color;
                         gfx.depth_buffer = new_depth;
+                        world_renderer.on_resize(gfx.color_buffer.clone(), gfx.depth_buffer.clone());
+                        ui_renderer.renderer.on_resize(gfx.color_buffer.clone());
                     }
                     _ => {}
                 },
@@ -154,6 +155,8 @@ impl Window {
                 },
                 _ => {}
             }
+
+            ui.handle_event(event.clone(), gfx.context.window());
         });
 
         ui.build_if_changed(&world_renderer.camera);
