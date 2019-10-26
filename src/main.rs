@@ -4,8 +4,7 @@ extern crate gfx;
 use anyhow::Result;
 use log::info;
 
-mod chunk;
-mod meshing;
+mod input;
 mod perlin;
 mod settings;
 mod ui;
@@ -19,7 +18,8 @@ fn main() -> Result<()> {
     info!("Current settings: {:?}", *settings::SETTINGS);
     let mut window = window::Window::new()?;
     while window.running {
-        window.process_events();
+        window.process_events()?;
+        window.tick()?;
         window.render()?;
     }
     Ok(())

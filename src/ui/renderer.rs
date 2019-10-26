@@ -1,39 +1,59 @@
-use anyhow::Result;
-use conrod_core::{image::Map, render::Primitives};
-use conrod_gfx::Renderer;
-use gfx_core::handle::ShaderResourceView;
 use crate::{
     ui::Ui,
     window::{Gfx, RenderInfo},
 };
+use anyhow::Result;
+use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Section};
 
-pub type ImageMap = Map<(ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>, (u32, u32))>;
+#[derive(Debug)]
+pub struct UiRenderingError {
+    pub what: String,
+}
+
+impl std::fmt::Display for UiRenderingError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Some error happened during rendering of the ui text: {}",
+            self.what
+        )
+    }
+}
+
+impl std::error::Error for UiRenderingError {}
 
 pub struct UiRenderer {
-    renderer: Renderer<'static, gfx_device_gl::Resources>,
-    image_map: ImageMap,
+    glyph_brush: GlyphBrush<'static, gfx_device_gl::Resources, gfx_device_gl::Factory>,
 }
 
 impl UiRenderer {
-    pub fn new(gfx: &mut Gfx, renderInfo: &RenderInfo) -> Result<Self> {
-        let Gfx { ref mut factory, ref color_buffer, .. } = gfx;
+    pub fn new(gfx: &mut Gfx, _render_info: &RenderInfo) -> Result<Self> {
+        let Gfx {
+            ref mut factory, ..
+        } = gfx;
 
-        Ok(Self {
-            renderer: Renderer::new(factory, color_buffer, renderInfo.dpi_factor)?,
-            image_map: ImageMap::new(),
-        })
+        let ubuntu: &'static [u8] = include_bytes!("../../assets/fonts/Ubuntu-R.ttf");
+        let glyph_brush = GlyphBrushBuilder::using_font_bytes(ubuntu).build(factory.clone());
+
+        Ok(Self { glyph_brush })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, renderInfo: RenderInfo, ui: &mut Ui) -> Result<()> {
-        let Gfx { ref mut encoder, ref mut factory, .. } = gfx;
+    pub fn render(&mut self, gfx: &mut Gfx, _render_info: RenderInfo, ui: &mut Ui) -> Result<()> {
+        let Gfx {
+            ref mut encoder,
+            ref color_buffer,
+            ..
+        } = gfx;
 
-        // Rebuild primitives if necessary
-        if let Some(primitives) = ui.draw_if_changed() {
-            let (win_w, win_h) = renderInfo.window_dimensions;
-            self.renderer.fill(encoder, (win_w as f32, win_h as f32), renderInfo.dpi_factor as f64, primitives, &self.image_map);
-        }
-
-        self.renderer.draw(factory, encoder, &self.image_map);
+        let section = Section {
+            text: ui.get_text(),
+            ..Section::default()
+        };
+        self.glyph_brush.queue(section);
+        self.glyph_brush
+            .use_queue()
+            .draw(encoder, color_buffer)
+            .map_err(|what| UiRenderingError { what })?;
 
         Ok(())
     }

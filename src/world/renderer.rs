@@ -1,14 +1,10 @@
-use self::transform::Camera;
-use crate::window::{ColorFormat, DepthFormat, Gfx};
+use crate::perlin::perlin;
+use crate::window::{ColorFormat, DepthFormat, Gfx, RenderInfo};
+use crate::world::World;
 use anyhow::Result;
 use gfx;
 use gfx::traits::FactoryExt;
-use log::debug;
 use nalgebra::{convert, Matrix4};
-use crate::perlin::perlin;
-
-pub mod transform;
-
 // TODO: add images
 
 gfx_defines! {
@@ -40,13 +36,12 @@ pub struct WorldRenderer {
     pub pso: PsoType,
     pub data: PipeDataType,
     pub buffer: gfx::Slice<gfx_device_gl::Resources>,
-    pub camera: Camera,
 }
 
 impl WorldRenderer {
     pub fn new(gfx: &mut Gfx) -> Result<Self> {
-        use crate::chunk::Chunk;
-        use crate::meshing::{desindex_meshing, meshing};
+        use super::chunk::Chunk;
+        use super::meshing::meshing;
 
         let Gfx {
             ref mut factory,
@@ -69,17 +64,21 @@ impl WorldRenderer {
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if perlin((i as f64)/16.0, (j as f64)/16.0, (k as f64)/16.0, 7, 0.5, 42 ) > 0.5{
-                            chunk.set_data(i, j, k, 1);
+                    if perlin(
+                        (i as f64) / 16.0,
+                        (j as f64) / 16.0,
+                        (k as f64) / 16.0,
+                        7,
+                        0.5,
+                        42,
+                    ) > 0.5
+                    {
+                        chunk.set_data(i, j, k, 1);
                     }
                 }
             }
         }
-        // TODO: use indexed meshing
         let (vertices, indices) = meshing(&mut chunk);
-        for i in 0..10 {
-            debug!("vertices[{}] = {:?}", i, vertices[i]);
-        }
         let (handle, buffer) = factory.create_vertex_buffer_with_slice(&vertices, &indices[..]);
 
         let data = {
@@ -90,23 +89,25 @@ impl WorldRenderer {
                 depth_buffer: depth_buffer.clone(),
             }
         };
-        Ok(Self {
-            pso,
-            data,
-            buffer,
-            camera: Camera::new(),
-        })
+        Ok(Self { pso, data, buffer })
     }
 
-    pub fn render(&self, gfx: &mut Gfx) -> Result<()> {
+    pub fn render(&self, gfx: &mut Gfx, render_info: RenderInfo, world: &World) -> Result<()> {
         let Gfx {
             ref mut encoder, ..
         } = gfx;
 
-        // TODO: refactor camera somewhere else
+        let aspect_ratio = {
+            let (win_w, win_h) = render_info.window_dimensions;
+            win_w as f64 / win_h as f64
+        };
+
+        let camera = &world.camera;
         let transform = Transform {
-            view_proj: convert::<Matrix4<f64>, Matrix4<f32>>(self.camera.get_view_projection())
-                .into(),
+            view_proj: convert::<Matrix4<f64>, Matrix4<f32>>(
+                camera.get_view_projection(aspect_ratio),
+            )
+            .into(),
             model: [
                 [1.0, 0.0, 0.0, 0.0],
                 [0.0, 1.0, 0.0, 0.0],
@@ -119,5 +120,14 @@ impl WorldRenderer {
         encoder.draw(&self.buffer, &self.pso, &self.data);
 
         Ok(())
+    }
+
+    pub fn on_resize(
+        &mut self,
+        color_buffer: gfx_core::handle::RenderTargetView<gfx_device_gl::Resources, ColorFormat>,
+        depth_buffer: gfx_core::handle::DepthStencilView<gfx_device_gl::Resources, DepthFormat>,
+    ) {
+        self.data.color_buffer = color_buffer;
+        self.data.depth_buffer = depth_buffer;
     }
 }

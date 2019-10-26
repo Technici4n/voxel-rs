@@ -19,12 +19,9 @@ gfx_core = "0.9"
 gfx_device_gl = "0.16"
 gfx_window_glutin = "0.31"
 glutin = "0.21"
-winit = "0.19"
 
 # Gui
-conrod_core = "0.67"
-conrod_gfx = "0.67"
-conrod_winit = "0.67"
+gfx_glyph = "0.16"
 
 # Math
 nalgebra = "0.18"
