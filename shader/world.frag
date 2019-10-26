@@ -11,4 +11,3 @@ const float SUN_FRACTION = 0.3;
 void main() {
     ColorBuffer = occl * vec4(1.0, 1.0, 1.0, 1.0) * (1.0 - SUN_FRACTION + SUN_FRACTION * abs(dot(v_Norm, SUN_DIRECTION)));
 }
-s

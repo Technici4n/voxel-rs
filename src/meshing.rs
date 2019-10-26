@@ -291,7 +291,7 @@ pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<usize>) {
                         n_of_different_vertex += 4;
                     }
                     // -1z -- NORTH
-                    if k == 0 || chunk.get_data(i, j, k - 1) != 0 {
+                    if k == 0 || chunk.get_data(i, j, k - 1) == 0 {
                         for l in 0..4 {
                             let px = i as f32 + MESH_NORTH[l][0];
                             let py = j as f32 + MESH_NORTH[l][1];
