@@ -5,6 +5,7 @@ use gfx;
 use gfx::traits::FactoryExt;
 use log::debug;
 use nalgebra::{convert, Matrix4};
+use crate::perlin::perlin;
 
 pub mod transform;
 
@@ -65,7 +66,9 @@ impl WorldRenderer {
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    chunk.set_data(i, j, k, 1);
+                    if perlin((i as f64)/16.0, (j as f64)/16.0, (k as f64)/16.0, 7, 0.5, 42 ) > 0.5{
+                            chunk.set_data(i, j, k, 1);
+                    }
                 }
             }
         }

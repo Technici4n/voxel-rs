@@ -9,6 +9,20 @@ uniform Transform {
 };
 
 out vec3 v_Norm;
+out float occl;
+
+
+uint get_occl_code(uint code){
+  if(code < 8u){
+    return 0u;
+  }else if(code < 16u){
+    return 1u;
+  }else if(code < 24u){
+    return 2u;
+  }else{
+    return 3u;
+  }
+}
 
 vec3 get_normal(uint id) {
     if(id == 0u) {
@@ -28,5 +42,19 @@ vec3 get_normal(uint id) {
 
 void main() {
     gl_Position = u_ViewProj * u_Model * vec4(a_Pos, 1.0);
-    v_Norm = get_normal(a_Norm);
+
+    uint code_occl = get_occl_code(a_Norm);
+    uint code_normal = a_Norm - code_occl*8u;
+
+    v_Norm = get_normal(code_normal);
+
+    if(code_occl == 3u){
+      occl = 1.0;
+    }else if(code_occl == 2u){
+      occl = 0.9;
+    }else if(code_occl == 1u){
+      occl = 0.7;
+    }else{
+      occl = 0.6;
+    }
 }
