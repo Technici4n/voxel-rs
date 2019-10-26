@@ -4,6 +4,8 @@ use anyhow::Result;
 use conrod_core::widget_ids;
 use std::path::Path;
 
+pub mod renderer;
+
 /// Wrapper around the ui
 pub struct Ui {
     /// The ui state managed by conrod
@@ -17,7 +19,7 @@ impl Ui {
     pub fn new() -> Result<Self> {
         use conrod_core::position::Scalar;
         // Create Ui
-        let (win_w, win_h) = SETTINGS.window_size;
+        let (win_w, win_h) = SETTINGS.read().unwrap().window_size;
         let mut ui = conrod_core::UiBuilder::new([win_h as Scalar, win_w as Scalar])
             .theme(conrod_core::Theme::default())
             .build();
@@ -79,6 +81,7 @@ widget_ids! {
 
 // Create the gui
 fn gui(ui: &mut conrod_core::UiCell, ids: &Ids, camera: &Camera) {
+    // TODO: use a real gui
     use conrod_core::color::{Color, TRANSPARENT, WHITE};
     use conrod_core::position::Positionable;
     use conrod_core::text::Justify;

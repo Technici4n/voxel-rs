@@ -66,7 +66,7 @@ const MESH_SOUTH_INDEX: [usize; 6] = [0, 1, 2, 2, 1, 3];
 /// which contains the index of the corresponding quads
 /// in the first array
 /// Each vertex contains its position and the normal associated to the quad
-pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<usize>) {
+pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<u32>) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
@@ -190,6 +190,7 @@ pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<usize>) {
         }
     }
 
+    let res_index: Vec<u32> = res_index.iter().map(|x| *x as u32).collect();
     (res_vertex, res_index)
 }
 

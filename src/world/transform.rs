@@ -40,7 +40,7 @@ impl Camera {
 
     pub fn get_view_projection(&self) -> Matrix4<f64> {
         let aspect_ratio = {
-            let (win_w, win_h) = SETTINGS.window_size;
+            let (win_w, win_h) = SETTINGS.read().unwrap().window_size;
             win_w as f64 / win_h as f64
         };
         // TODO: remove hardcoded constants
