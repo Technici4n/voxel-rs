@@ -9,6 +9,8 @@ use crate::perlin::perlin;
 
 pub mod transform;
 
+// TODO: add images
+
 gfx_defines! {
     vertex Vertex {
         pos: [f32; 3] = "a_Pos",
@@ -59,6 +61,7 @@ impl WorldRenderer {
         let pso = factory.create_pipeline_state(
             &shader_set,
             gfx::Primitive::TriangleList,
+            // TODO: cull backfaces
             gfx::state::Rasterizer::new_fill(), //.with_cull_back(),
             pipe::new(),
         )?;
@@ -72,25 +75,12 @@ impl WorldRenderer {
                 }
             }
         }
-        let vertices = desindex_meshing(meshing(&mut chunk));
+        // TODO: use indexed meshing
+        let (vertices, indices) = meshing(&mut chunk);
         for i in 0..10 {
             debug!("vertices[{}] = {:?}", i, vertices[i]);
         }
-        /*let vertices = vec![
-            Vertex {
-                pos: [0.0, 0.0, 0.0],
-                normal: 0,
-            },
-            Vertex {
-                pos: [0.5, 0.0, 0.0],
-                normal: 0,
-            },
-            Vertex {
-                pos: [0.0, 0.5, 0.0],
-                normal: 0,
-            },
-        ];*/
-        let (handle, buffer) = factory.create_vertex_buffer_with_slice(&vertices, ());
+        let (handle, buffer) = factory.create_vertex_buffer_with_slice(&vertices, &indices[..]);
 
         let data = {
             pipe::Data {
@@ -113,6 +103,7 @@ impl WorldRenderer {
             ref mut encoder, ..
         } = gfx;
 
+        // TODO: refactor camera somewhere else
         let transform = Transform {
             view_proj: convert::<Matrix4<f64>, Matrix4<f32>>(self.camera.get_view_projection())
                 .into(),

@@ -99,7 +99,7 @@ fn ambiant_occl(coins : u32, edge : u32) -> u32{
 /// which contains the index of the corresponding quads
 /// in the first array
 /// Each vertex contains its position and the normal associated to the quad
-pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<usize>) {
+pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<u32>) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
@@ -331,6 +331,7 @@ pub fn meshing(chunk: &mut Chunk) -> (Vec<Vertex>, Vec<usize>) {
         }
     }
 
+    let res_index: Vec<u32> = res_index.iter().map(|x| *x as u32).collect();
     (res_vertex, res_index)
 }
 

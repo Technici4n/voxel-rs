@@ -1,4 +1,4 @@
-use crate::{settings::SETTINGS, ui::Ui, world::WorldRenderer};
+use crate::{settings::SETTINGS, ui::{renderer::UiRenderer, Ui}, world::WorldRenderer};
 use anyhow::Result;
 use gfx_core::Device;
 use log::debug;
@@ -9,6 +9,7 @@ pub type ColorFormat = gfx::format::Srgba8;
 pub type DepthFormat = gfx::format::DepthStencil;
 
 const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
+const CLEAR_DEPTH: f32 = 1.0;
 
 /// Wrapper around the game window
 pub struct Window {
@@ -20,12 +21,33 @@ pub struct Window {
     gfx: Gfx,
     /// User interface
     ui: Ui,
+    /// User interface renderer
+    ui_renderer: UiRenderer,
     /// World rendering
     world_renderer: WorldRenderer,
 }
 
+/// Useful information for renderers
+#[derive(Clone, Copy)]
+pub struct RenderInfo {
+    pub window_dimensions: (u32, u32),
+    pub dpi_factor: f64,
+}
+
+fn get_context_render_info(context: &glutin::WindowedContext<glutin::PossiblyCurrent>) -> Option<RenderInfo> {
+    let window_dimensions: Option<(u32, u32)> = context.window().get_inner_size().map(Into::into);
+
+    let dpi_factor = context.window().get_hidpi_factor();
+
+    window_dimensions.map(|window_dimensions| {
+        RenderInfo {
+            window_dimensions,
+            dpi_factor,
+        }
+    })
+}
+
 impl Window {
-    // TODO: add initial size
     /// Create a new game window
     pub fn new() -> Result<Self> {
         // Init window, OpenGL and gfx
@@ -33,7 +55,7 @@ impl Window {
         let (context, device, mut factory, color_buffer, depth_buffer) = {
             let window_builder = glutin::WindowBuilder::new()
                 .with_title("voxel-rs".to_owned())
-                .with_dimensions(SETTINGS.window_size.into());
+                .with_dimensions(SETTINGS.read().unwrap().window_size.into());
             let context_builder = glutin::ContextBuilder::new()
                 .with_vsync(false)
                 .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)));
@@ -57,6 +79,9 @@ impl Window {
             depth_buffer,
         };
 
+        let render_info = get_context_render_info(&gfx.context).expect("Newly created OpenGL context has no size");
+
+        let ui_renderer = UiRenderer::new(&mut gfx, &render_info)?;
         let world_renderer = WorldRenderer::new(&mut gfx)?;
 
         Ok(Self {
@@ -64,8 +89,20 @@ impl Window {
             running: true,
             gfx,
             ui,
+            ui_renderer,
             world_renderer,
         })
+    }
+
+    /// Get the render info from the underlying context.
+    /// This function stops the application and returns `None` if the window was closed.
+    pub fn get_render_info(&mut self) -> Option<RenderInfo> {
+        if let Some(render_info) = get_context_render_info(&self.gfx.context) {
+            Some(render_info)
+        } else {
+            self.running = false;
+            None
+        }
     }
 
     /// Process all incoming events
@@ -125,47 +162,30 @@ impl Window {
     /// Render the game
     pub fn render(&mut self) -> Result<()> {
         // Get the current window dimensions if they are available or stop the game otherwise.
-        let (win_w, win_h): (u32, u32) = match self.gfx.context.window().get_inner_size() {
-            Some(s) => s.into(),
-            None => {
-                self.running = false;
-                return Ok(());
-            }
+        let render_info = match self.get_render_info() {
+            Some(render_info) => render_info,
+            None => return Ok(()),
         };
 
-        let dpi_factor = self.gfx.context.window().get_hidpi_factor() as f32;
+        // Clear buffers
+        {
+            let Gfx { ref mut encoder, ref color_buffer, ref depth_buffer, .. } = &mut self.gfx;
+            encoder.clear(color_buffer, CLEAR_COLOR);
+            encoder.clear_depth(depth_buffer, CLEAR_DEPTH);
+        }
 
-        // Render the Ui if it changed
-        if let Some(primitives) = self.ui.draw_if_changed() {
-            debug!("Redrawing the Ui because it changed");
-            let dims = (win_w as f32 * dpi_factor, win_h as f32 * dpi_factor);
-            {
-                let Gfx {
-                    ref context,
-                    ref mut factory,
-                    ref mut encoder,
-                    ref color_buffer,
-                    ref depth_buffer,
-                    ..
-                } = &mut self.gfx;
+        // Draw World
+        self.world_renderer.render(&mut self.gfx)?;
+        // Clear depth buffer to draw Ui on top of the world
+        {
+            let Gfx { ref mut encoder, ref depth_buffer, .. } = &mut self.gfx;
+            encoder.clear_depth(depth_buffer, CLEAR_DEPTH);
+        }
+        // Draw Ui
+        self.ui_renderer.render(&mut self.gfx, render_info, &mut self.ui)?;
 
-                // Create a new Ui renderer and an empty image map
-                let mut ui_renderer = conrod_gfx::Renderer::new(
-                    factory,
-                    color_buffer,
-                    context.window().get_hidpi_factor(),
-                )?;
-                //let image_map = conrod_core::image::Map::new();
-
-                // Draw the Ui
-                ui_renderer.clear(encoder, CLEAR_COLOR);
-                encoder.clear_depth(depth_buffer, 1.0);
-                //ui_renderer.fill(encoder, dims, dpi_factor as f64, primitives, &image_map);
-                //ui_renderer.draw(factory, encoder, &image_map);
-            }
-
-            self.world_renderer.render(&mut self.gfx)?;
-
+        // Flush and swap buffers
+        {
             let Gfx {
                 ref context,
                 ref mut device,
@@ -173,7 +193,6 @@ impl Window {
                 ..
             } = &mut self.gfx;
 
-            // Flush and swap buffers
             encoder.flush(device);
             context.swap_buffers()?;
             device.cleanup();
