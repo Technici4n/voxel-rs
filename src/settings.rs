@@ -9,6 +9,8 @@ use std::{
     sync::RwLock,
 };
 
+// TODO: don't make this static
+
 static SETTINGS_PATH: &'static str = "config";
 static SETTINGS_FILE: &'static str = "config/Settings.ron";
 
@@ -21,7 +23,7 @@ lazy_static! {
     };
 }
 
-pub fn update_settings(new_settings: Settings) -> Result<()> {
+pub fn _update_settings(new_settings: Settings) -> Result<()> {
     write_settings(SETTINGS_FILE, &new_settings)?;
     *SETTINGS.write().unwrap() = new_settings;
     Ok(())
@@ -65,7 +67,7 @@ fn write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
     settings_file
         .write(string.as_bytes())
         .context(format!("Failed to write settings file {}", path.display()))?;
-    
+
     Ok(())
 }
 
