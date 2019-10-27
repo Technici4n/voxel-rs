@@ -77,7 +77,7 @@ impl WorldRenderer {
                 }
             }
         }
-        let (vertices, indices) = meshing(&mut chunk);
+        let (vertices, indices) = meshing(&mut chunk, None);
         let (handle, buffer) = factory.create_vertex_buffer_with_slice(&vertices, &indices[..]);
 
         let data = {
