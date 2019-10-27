@@ -76,12 +76,14 @@ fn write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
 #[serde(default)]
 pub struct Settings {
     pub window_size: (u32, u32),
+    pub invert_mouse: bool,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             window_size: (1600, 900),
+            invert_mouse: false,
         }
     }
 }

@@ -10,23 +10,30 @@ const BLOCK_SIZE: usize = (GROUP_LEN * GROUP_LEN * GROUP_LEN) as usize;
 #[derive(Clone)]
 enum BlockGroup {
     Compressed(u32),                      // 1 bit (NxNxN) times the same data
-    Uncompressed(Box<[u32; BLOCK_SIZE]>), // different datas
+    Uncompressed(Box<[u32; BLOCK_SIZE]>), // different data
+}
+
+#[derive(Clone, Copy, Hash,  PartialEq, Eq)]
+pub struct ChunkPos{
+    pub px: i64, // position of the chunkc in the world
+    pub py: i64,
+    pub pz: i64,
 }
 
 #[derive(Clone)]
 pub struct Chunk {
-    pub px: i64, // position of the chunkc in the world
-    pub py: i64,
-    pub pz: i64,
+    pub pos : ChunkPos,
     data: Vec<BlockGroup>, // data containde in the chunk
 }
 
 impl Chunk {
     pub fn new(x: i64, y: i64, z: i64) -> Chunk {
         Chunk {
-            px: x,
-            py: y,
-            pz: z,
+            pos: ChunkPos{
+                px: x,
+                py: y,
+                pz: z,
+            },
             data: vec![BlockGroup::Compressed(0); (CHUNK_LEN * CHUNK_LEN * CHUNK_LEN) as usize],
             // chunk is empty
         }

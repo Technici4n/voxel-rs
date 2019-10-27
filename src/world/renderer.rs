@@ -56,8 +56,7 @@ impl WorldRenderer {
         let pso = factory.create_pipeline_state(
             &shader_set,
             gfx::Primitive::TriangleList,
-            // TODO: cull backfaces
-            gfx::state::Rasterizer::new_fill(), //.with_cull_back(),
+            gfx::state::Rasterizer::new_fill().with_cull_back(),
             pipe::new(),
         )?;
         let mut chunk = Chunk::new(0, 0, 0);
@@ -69,7 +68,7 @@ impl WorldRenderer {
                         (j as f64) / 16.0,
                         (k as f64) / 16.0,
                         7,
-                        0.5,
+                        0.4,
                         42,
                     ) > 0.5
                     {

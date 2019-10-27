@@ -32,8 +32,8 @@ impl Camera {
     pub fn update_cursor(&mut self, dx: f64, dy: f64) {
         // TODO: remove this
         let mouse_speed: f64 = 0.2;
-        self.yaw += mouse_speed * (dx as f64);
-        self.pitch += mouse_speed * (dy as f64);
+        self.yaw -= mouse_speed * (dx as f64);
+        self.pitch -= mouse_speed * (dy as f64);
 
         // Ensure the yaw stays within [-180; 180]
         if self.yaw < -180.0 {
