@@ -81,7 +81,7 @@ impl Window {
         let encoder = factory.create_command_buffer().into();
 
         // Init Ui
-        let ui = Ui::new()?;
+        let ui = Ui::new();
         let world = World::new();
 
         let mut gfx = Gfx {
@@ -212,7 +212,7 @@ impl Window {
         } = self;
 
         // Rebuild Ui
-        ui.build_if_changed(&world);
+        ui.build_if_changed(&world)?;
 
         // Show or hide cursor
         if ui.should_hide_and_center_cursor() {

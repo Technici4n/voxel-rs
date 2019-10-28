@@ -22,6 +22,7 @@ glutin = "0.21"
 
 # Gui
 gfx_glyph = "0.16"
+stretch = "0.3"
 
 # Math
 nalgebra = "0.18"
