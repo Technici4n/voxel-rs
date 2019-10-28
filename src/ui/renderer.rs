@@ -2,7 +2,7 @@ use crate::{
     ui::Ui,
     window::{Gfx, RenderInfo},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use gfx;
 use gfx::traits::{Factory, FactoryExt};
 use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Section};
@@ -51,7 +51,18 @@ gfx_defines! {
     pipeline pipe {
         vbuf: gfx::VertexBuffer<Vertex> = (),
         transform: gfx::ConstantBuffer<Transform> = "Transform",
-        color_buffer: gfx::RenderTarget<crate::window::ColorFormat> = "ColorBuffer",
+        color_buffer: gfx::BlendTarget<crate::window::ColorFormat> = ("ColorBuffer", gfx::state::ColorMask::all(), gfx::state::Blend {
+            color: gfx::state::BlendChannel {
+                equation: gfx::state::Equation::Add,
+                source: gfx::state::Factor::ZeroPlus(gfx::state::BlendValue::SourceAlpha),
+                destination: gfx::state::Factor::OneMinus(gfx::state::BlendValue::SourceAlpha),
+            },
+            alpha: gfx::state::BlendChannel {
+                equation: gfx::state::Equation::Add,
+                source: gfx::state::Factor::Zero,
+                destination: gfx::state::Factor::One,
+            },
+        }),
         depth_buffer: gfx::DepthTarget<crate::window::DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
     }
@@ -95,15 +106,15 @@ impl UiRenderer {
             gfx::state::Rasterizer::new_fill().with_cull_back(),
             pipe::new(),
         )?;
-        let rect_vertex_buffer = factory.create_vertex_buffer(&[]);
-        let index_buffer_bind = {
+        let buffer_bind = {
             use gfx::memory::Bind;
             let mut bind = Bind::empty();
             bind.insert(Bind::SHADER_RESOURCE);
             bind.insert(Bind::TRANSFER_DST);
             bind
         };
-        let rect_index_buffer = factory.create_buffer(1, gfx::buffer::Role::Index, gfx::memory::Usage::Dynamic, index_buffer_bind)?;
+        let rect_vertex_buffer = factory.create_buffer(1, gfx::buffer::Role::Vertex, gfx::memory::Usage::Dynamic, buffer_bind.clone())?;
+        let rect_index_buffer = factory.create_buffer(1, gfx::buffer::Role::Index, gfx::memory::Usage::Dynamic, buffer_bind.clone())?;
         let data = pipe::Data {
             vbuf: rect_vertex_buffer.clone(),
             transform: factory.create_constant_buffer(1),
@@ -123,7 +134,9 @@ impl UiRenderer {
     pub fn render(&mut self, gfx: &mut Gfx, render_info: RenderInfo, ui: &mut Ui) -> Result<()> {
         let Gfx {
             ref mut encoder,
+            ref mut factory,
             ref color_buffer,
+            ref depth_buffer,
             ..
         } = gfx;
 
@@ -198,12 +211,24 @@ impl UiRenderer {
         }
 
         // Draw rectangles
-        // TODO: update uniform buffer
         {
+            // Update the uniform buffer to map (w, h) coordinates to [-1, 1]
+            let transformation_matrix = [
+                [2.0/win_w as f32, 0.0, 0.0, 0.0],
+                [0.0, -2.0/win_h as f32, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [-1.0, 1.0, 0.0, 1.0],
+            ];
+            encoder.update_constant_buffer(&self.data.transform, &Transform {
+                transform: transformation_matrix,
+                debug: false,
+            });
             // Update vertex buffer
-            encoder.update_buffer(&self.rect_vertex_buffer, &rect_vertices, 0)?;
+            ensure_buffer_capacity(&mut self.rect_vertex_buffer, rect_vertices.len(), factory)?;
+            encoder.update_buffer(&self.rect_vertex_buffer, &rect_vertices, 0).context("Updating rectangle vertex buffer in UiRenderer")?;
             // Update index buffer
-            encoder.update_buffer(&self.rect_index_buffer, &rect_indices, 0)?;
+            ensure_buffer_capacity(&mut self.rect_index_buffer, rect_indices.len(), factory)?;
+            encoder.update_buffer(&self.rect_index_buffer, &rect_indices, 0).context("Updating rectangle index buffer in UiRenderer")?;
             // Create the Slice that dictates how to render the vertex buffer
             let slice = Slice {
                 start: 0, // start at 0 in the index buffer
@@ -212,13 +237,26 @@ impl UiRenderer {
                 instances: None, // don't use instancing
                 buffer: gfx::IndexBuffer::Index32(self.rect_index_buffer.clone()), // index buffer to use
             };
-            // Note: the pipeline already contains the vertex buffer!
+            // Update the vertex buffer in the pipeline data
+            self.data.vbuf = self.rect_vertex_buffer.clone();
+            self.data.color_buffer = color_buffer.clone();
+            self.data.depth_buffer = depth_buffer.clone();
             // Draw the vertex buffer
             encoder.draw(&slice, &self.pso, &self.data);
         }
 
         // Draw text
-        self.glyph_brush.use_queue().draw(encoder, color_buffer).map_err(UiRenderingError::from)?;
+        self.glyph_brush.use_queue().draw(encoder, color_buffer).map_err(UiRenderingError::from).context("Drawing text glyphs in UiRenderer")?;
         Ok(())
     }
+}
+
+pub fn ensure_buffer_capacity<T>(buffer: &mut gfx::handle::Buffer<R, T>, min_num: usize, factory: &mut gfx_device_gl::Factory) -> Result<(), gfx::buffer::CreationError> {
+    let info = buffer.get_info().clone();
+    let buffer_num = info.size / std::mem::size_of::<T>();
+    if buffer_num < min_num {
+        let new_buffer = factory.create_buffer(min_num, info.role, info.usage, info.bind)?;
+        *buffer = new_buffer;
+    }
+    Ok(())
 }

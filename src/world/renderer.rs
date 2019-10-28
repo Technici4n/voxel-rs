@@ -78,6 +78,8 @@ impl WorldRenderer {
             }
         }
         let (vertices, indices) = meshing(&mut chunk, None);
+        //  (vertex buffer handle, index buffer data)
+        //  (this goes inside data, this goes in the draw() call)
         let (handle, buffer) = factory.create_vertex_buffer_with_slice(&vertices, &indices[..]);
 
         let data = {
@@ -116,6 +118,7 @@ impl WorldRenderer {
         };
 
         encoder.update_buffer(&self.data.transform, &[transform], 0)?;
+        // (index buffer, pso, full data with vertex buffer and uniform buffer inside)
         encoder.draw(&self.buffer, &self.pso, &self.data);
 
         Ok(())

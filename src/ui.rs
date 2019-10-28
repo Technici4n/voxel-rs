@@ -110,18 +110,49 @@ z = {:.2}
             },
             ..Style::default()
         };
+        let subcontainer_style = Style {
+            size: Size {
+                width: Dimension::Percent(0.5),
+                height: Dimension::Percent(1.0),
+            },
+            display: Display::Flex,
+            flex_wrap: FlexWrap::Wrap,
+            justify_content: JustifyContent::SpaceBetween,
+            ..Style::default()
+        };
 
         // Clear nodes
         self.stretch.clear();
         self.primitives.clear();
+
+        let rect_style = Style {
+            size: Size {
+                width: Dimension::Points(100.0),
+                height: Dimension::Points(100.0),
+            },
+            margin: Rect {
+                start: Dimension::Points(10.0),
+                end: Dimension::Points(10.0),
+                top: Dimension::Points(10.0),
+                bottom: Dimension::Points(10.0),
+            },
+            ..Style::default()
+        };
+        // Add small rectangles
+        let rectangles: Vec<_> = (0..20).into_iter().map(|i| {
+            let node = self.stretch.new_node(rect_style, vec![]).unwrap();
+            //self.primitives.insert(node, Primitive::Text { text: format!("{}", i+1), font_size: Scale::uniform(40.0) });
+            self.primitives.insert(node, Primitive::Rectangle { color: [1.0, 0.0, 0.0, 0.5] });
+            node
+        }).collect();
+
         // Register stretch nodes
         let text_node = self.stretch.new_node(text_style, vec![]).map_err(UiError::from)?;
-        let root_node = self.stretch.new_node(container_style, vec![text_node]).map_err(UiError::from)?;
+        let subcontainer_node = self.stretch.new_node(subcontainer_style, rectangles).map_err(UiError::from)?;
+        let root_node = self.stretch.new_node(container_style, vec![text_node, subcontainer_node]).map_err(UiError::from)?;
         self.root_node = Some(root_node);
 
-        // Register primitives
-        // TODO: uncommenting this crashes the game
-        //self.primitives.insert(root_node, Primitive::Rectangle { color: [1.0, 0.0, 0.0, 0.2] });
+        // Register primitive
         self.primitives.insert(text_node, Primitive::Text { text, font_size: Scale::uniform(20.0) });
 
         Ok(())
@@ -129,7 +160,7 @@ z = {:.2}
 
     /// Should the cursor be automatically centered and hidden?
     pub fn should_hide_and_center_cursor(&self) -> bool {
-        true
+        false
     }
 }
 
