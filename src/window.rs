@@ -60,6 +60,8 @@ pub trait State {
     ) -> Result<StateTransition>;
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
+    /// Cursor moved
+    fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition);
 }
 
 /// Color format of the window's color buffer
@@ -156,8 +158,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                             keyboard_state.clear();
                         }
                         KeyboardInput { input, .. } => keyboard_state.process_input(input),
-                        CursorMoved { .. }
-                        | CursorEntered { .. }
+                        CursorMoved { position, .. } => state.handle_cursor_movement(position),
+                        CursorEntered { .. }
                         | CursorLeft { .. }
                         | MouseWheel { .. }
                         | MouseInput { .. } => (),

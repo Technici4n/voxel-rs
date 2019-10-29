@@ -8,10 +8,21 @@ use stretch::{node::Node, style::Style, Stretch};
 pub mod renderer;
 
 /// A Ui primitive
+#[derive(Debug, Clone)]
 pub enum Primitive {
     Nothing,
-    Rectangle { color: [f32; 4] },
+    Rectangle { color: [f32; 4], hover_color: [f32; 4], hovered: bool },
     Text { text: String, font_size: Scale },
+}
+
+impl Primitive {
+    pub fn set_hover(&mut self, hover: bool) {
+        match self {
+            Self::Nothing => (),
+            Self::Rectangle { ref mut hovered, .. } => *hovered = true,
+            Self::Text { .. } => (),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -45,6 +56,8 @@ pub struct Ui {
     pub(self) stretch: Stretch,
     pub(self) primitives: HashMap<Node, Primitive>,
     pub(self) root_node: Option<Node>,
+    pub(self) hovered_nodes: Vec<Node>,
+    cursor_position: LogicalPosition,
 }
 
 impl Ui {
@@ -53,6 +66,8 @@ impl Ui {
             stretch: Stretch::new(),
             primitives: HashMap::new(),
             root_node: None,
+            hovered_nodes: Vec::new(),
+            cursor_position: (10000, 10000).into(),
         }
     }
 
@@ -67,8 +82,38 @@ impl Ui {
         Ok(node)
     }
 
-    pub fn cursor_moved(&mut self, cursor_position: LogicalPosition) {
+    pub fn cursor_moved(&mut self, p: LogicalPosition) {
+        self.cursor_position = p;
+    }
 
+    pub(self) fn update_hover(&mut self) {
+        let p = self.cursor_position.clone();
+        // Clear hover flags
+        for hovered_node in self.hovered_nodes.iter() {
+            self.primitives.entry(*hovered_node).and_modify(|primitive| primitive.set_hover(false));
+        }
+        // Recompute hovered nodes
+        self.hovered_nodes.clear();
+        // Recursively check position
+        let root_node = match self.root_node {
+            Some(root_node) => root_node,
+            None => return,
+        };
+        let mut nodes = vec![root_node];
+        while let Some(current_node) = nodes.pop() {
+            if let Ok(children) = self.stretch.children(current_node) {
+                nodes.extend(children.into_iter());
+            }
+            if let Ok(l) = self.stretch.layout(current_node) {
+                if l.location.x <= p.x as f32 && (p.x as f32) < l.location.x + l.size.width && l.location.y <= p.y as f32 && (p.y as f32) < l.location.y + l.size.height {
+                    self.hovered_nodes.push(current_node);
+                }
+            }
+        }
+        // Set hover flags
+        for hovered_node in self.hovered_nodes.iter() {
+            self.primitives.entry(*hovered_node).and_modify(|primitive| primitive.set_hover(true));
+        }
     }
 
     pub fn mouse_input(&mut self, state: glutin::ElementState, mouse: glutin::MouseButton) {
@@ -151,6 +196,8 @@ z = {:.2}
                     node,
                     Primitive::Rectangle {
                         color: [1.0, 0.0, 0.0, 0.5],
+                        hover_color: [0.0, 1.0, 0.0, 0.5],
+                        hovered: false,
                     },
                 );
                 node

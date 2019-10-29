@@ -153,10 +153,10 @@ impl UiRenderer {
         };
 
         // Rebuild Ui
-        let glutin::dpi::PhysicalSize {
+        let glutin::dpi::LogicalSize {
             width: win_w,
             height: win_h,
-        } = data.physical_window_size;
+        } = data.logical_window_size;
         let layout_size = Size {
             width: Number::Defined(win_w as f32),
             height: Number::Defined(win_h as f32),
@@ -164,6 +164,7 @@ impl UiRenderer {
         ui.stretch
             .compute_layout(root_node, layout_size)
             .map_err(super::UiError::from)?;
+        ui.update_hover();
 
         // Recursively render every child of the root_node
         let mut rect_vertices: Vec<Vertex> = Vec::new();
@@ -180,7 +181,8 @@ impl UiRenderer {
                     use super::Primitive::*;
                     match primitive {
                         Nothing => {}
-                        Rectangle { color } => {
+                        Rectangle { color, hover_color, hovered } => {
+                            let color = if *hovered { hover_color } else { color };
                             // a --- b
                             // |  /  |
                             // c --- d

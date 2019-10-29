@@ -41,7 +41,7 @@ impl State for SinglePlayer {
     ) -> Result<StateTransition> {
         self.world.camera.tick(seconds_delta, keyboard_state);
         self.ui.build_if_changed(&self.world, self.fps_counter.fps())?;
-        flags.hide_and_center_cursor = true;
+        //flags.hide_and_center_cursor = true;
         Ok(StateTransition::KeepCurrent)
     }
 
@@ -76,5 +76,9 @@ impl State for SinglePlayer {
 
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64)) {
         self.world.camera.update_cursor(delta.0, delta.1);
+    }
+
+    fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition) {
+        self.ui.cursor_moved(logical_position);
     }
 }
