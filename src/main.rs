@@ -3,10 +3,12 @@ extern crate gfx;
 
 use anyhow::Result;
 use log::info;
+use std::path::Path;
 
 mod input;
 mod perlin;
 mod settings;
+mod singleplayer;
 mod ui;
 mod window;
 mod world;
@@ -16,12 +18,10 @@ fn main() -> Result<()> {
     env_logger::init();
 
     info!("Starting up...");
-    info!("Current settings: {:?}", *settings::SETTINGS);
-    let mut window = window::Window::new()?;
-    while window.running {
-        window.process_events()?;
-        window.tick()?;
-        window.render()?;
-    }
+    let config_folder = Path::new("config");
+    let config_file = Path::new("config/Settings.ron");
+    let mut settings = settings::load_settings(&config_folder, &config_file)?;
+    info!("Current settings: {:?}", settings);
+    window::open_window(&mut settings, Box::new(singleplayer::SinglePlayer::new))?;
     Ok(())
 }

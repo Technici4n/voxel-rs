@@ -1,16 +1,18 @@
 use crate::{
     ui::Ui,
-    window::{Gfx, RenderInfo},
+    window::{Gfx, WindowData},
 };
 use anyhow::{Context, Result};
 use gfx;
-use gfx::traits::{Factory, FactoryExt};
+use gfx::{
+    Slice,
+    traits::{Factory, FactoryExt},
+};
 use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Section};
 use stretch::{
     geometry::Size,
     number::Number,
 };
-use gfx::Slice;
 
 #[derive(Debug)]
 pub struct UiRenderingError {
@@ -83,7 +85,7 @@ pub struct UiRenderer {
 }
 
 impl UiRenderer {
-    pub fn new(gfx: &mut Gfx, _render_info: &RenderInfo) -> Result<Self> {
+    pub fn new(gfx: &mut Gfx) -> Result<Self> {
         let Gfx {
             ref mut factory,
             ref color_buffer,
@@ -131,7 +133,7 @@ impl UiRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, render_info: RenderInfo, ui: &mut Ui) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, ui: &mut Ui) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref mut factory,
@@ -146,7 +148,7 @@ impl UiRenderer {
         };
 
         // Rebuild Ui
-        let (win_w, win_h) = render_info.window_dimensions;
+        let glutin::dpi::PhysicalSize { width: win_w, height: win_h } = data.physical_window_size;
         let layout_size = Size {
             width: Number::Defined(win_w as f32),
             height: Number::Defined(win_h as f32),

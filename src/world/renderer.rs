@@ -1,9 +1,9 @@
-use crate::perlin::perlin;
-use crate::window::{ColorFormat, DepthFormat, Gfx, RenderInfo};
-use crate::world::World;
-use crate::mesh::{Mesh};
-use crate::world::chunk::CHUNK_SIZE;
-
+use crate::{
+    mesh::Mesh,
+    perlin::perlin,
+    window::{ColorFormat, DepthFormat, Gfx, WindowData},
+    world::{World, chunk::CHUNK_SIZE},
+};
 use anyhow::Result;
 use gfx;
 use gfx::traits::FactoryExt;
@@ -97,14 +97,20 @@ impl WorldRenderer {
             depth_buffer : depth_buffer.clone() })
     }
 
-    pub fn render(&self, gfx: &mut Gfx, render_info: RenderInfo, world: &World) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, world: &World) -> Result<()> {
         let Gfx {
-            ref mut encoder, ..
+            ref mut encoder,
+            ref color_buffer,
+            ref depth_buffer,
+            ..
         } = gfx;
 
+        self.data.color_buffer = color_buffer.clone();
+        self.data.depth_buffer = depth_buffer.clone();
+
         let aspect_ratio = {
-            let (win_w, win_h) = render_info.window_dimensions;
-            win_w as f64 / win_h as f64
+            let glutin::dpi::PhysicalSize { width: win_w, height: win_h } = data.physical_window_size;
+            win_w / win_h
         };
 
         let camera = &world.camera;
@@ -137,14 +143,5 @@ impl WorldRenderer {
         }
 
         Ok(())
-    }
-
-    pub fn on_resize(
-        &mut self,
-        color_buffer: gfx_core::handle::RenderTargetView<gfx_device_gl::Resources, ColorFormat>,
-        depth_buffer: gfx_core::handle::DepthStencilView<gfx_device_gl::Resources, DepthFormat>,
-    ) {
-        self.color_buffer = color_buffer;
-        self.depth_buffer = depth_buffer;
     }
 }
