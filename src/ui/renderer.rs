@@ -5,14 +5,11 @@ use crate::{
 use anyhow::{Context, Result};
 use gfx;
 use gfx::{
-    Slice,
     traits::{Factory, FactoryExt},
+    Slice,
 };
 use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Section};
-use stretch::{
-    geometry::Size,
-    number::Number,
-};
+use stretch::{geometry::Size, number::Number};
 
 #[derive(Debug)]
 pub struct UiRenderingError {
@@ -33,9 +30,7 @@ impl std::error::Error for UiRenderingError {}
 
 impl From<String> for UiRenderingError {
     fn from(string: String) -> Self {
-        Self {
-            what: string,
-        }
+        Self { what: string }
     }
 }
 
@@ -115,8 +110,18 @@ impl UiRenderer {
             bind.insert(Bind::TRANSFER_DST);
             bind
         };
-        let rect_vertex_buffer = factory.create_buffer(1, gfx::buffer::Role::Vertex, gfx::memory::Usage::Dynamic, buffer_bind.clone())?;
-        let rect_index_buffer = factory.create_buffer(1, gfx::buffer::Role::Index, gfx::memory::Usage::Dynamic, buffer_bind.clone())?;
+        let rect_vertex_buffer = factory.create_buffer(
+            1,
+            gfx::buffer::Role::Vertex,
+            gfx::memory::Usage::Dynamic,
+            buffer_bind.clone(),
+        )?;
+        let rect_index_buffer = factory.create_buffer(
+            1,
+            gfx::buffer::Role::Index,
+            gfx::memory::Usage::Dynamic,
+            buffer_bind.clone(),
+        )?;
         let data = pipe::Data {
             vbuf: rect_vertex_buffer.clone(),
             transform: factory.create_constant_buffer(1),
@@ -148,12 +153,17 @@ impl UiRenderer {
         };
 
         // Rebuild Ui
-        let glutin::dpi::PhysicalSize { width: win_w, height: win_h } = data.physical_window_size;
+        let glutin::dpi::PhysicalSize {
+            width: win_w,
+            height: win_h,
+        } = data.physical_window_size;
         let layout_size = Size {
             width: Number::Defined(win_w as f32),
             height: Number::Defined(win_h as f32),
         };
-        ui.stretch.compute_layout(root_node, layout_size).map_err(super::UiError::from)?;
+        ui.stretch
+            .compute_layout(root_node, layout_size)
+            .map_err(super::UiError::from)?;
 
         // Recursively render every child of the root_node
         let mut rect_vertices: Vec<Vertex> = Vec::new();
@@ -169,34 +179,40 @@ impl UiRenderer {
                 if let Ok(l) = ui.stretch.layout(current_node) {
                     use super::Primitive::*;
                     match primitive {
-                        Nothing => {},
+                        Nothing => {}
                         Rectangle { color } => {
                             // a --- b
                             // |  /  |
                             // c --- d
                             let a = Vertex {
-                                pos: [ l.location.x, l.location.y, 0.0 ],
+                                pos: [l.location.x, l.location.y, 0.0],
                                 color: (*color).clone(),
                             };
                             let b = Vertex {
-                                pos: [ l.location.x + l.size.width, l.location.y, 0.0 ],
+                                pos: [l.location.x + l.size.width, l.location.y, 0.0],
                                 color: (*color).clone(),
                             };
                             let c = Vertex {
-                                pos: [ l.location.x, l.location.y + l.size.height, 0.0 ],
+                                pos: [l.location.x, l.location.y + l.size.height, 0.0],
                                 color: (*color).clone(),
                             };
                             let d = Vertex {
-                                pos: [ l.location.x + l.size.width, l.location.y + l.size.height, 0.0 ],
+                                pos: [
+                                    l.location.x + l.size.width,
+                                    l.location.y + l.size.height,
+                                    0.0,
+                                ],
                                 color: (*color).clone(),
                             };
                             let a_index = rect_vertices.len() as u32;
-                            let b_index = a_index+1;
-                            let c_index = b_index+1;
-                            let d_index = c_index+1;
+                            let b_index = a_index + 1;
+                            let c_index = b_index + 1;
+                            let d_index = c_index + 1;
                             rect_vertices.extend([a, b, c, d].into_iter());
-                            rect_indices.extend([b_index, a_index, c_index, b_index, c_index, d_index].into_iter());
-                        },
+                            rect_indices.extend(
+                                [b_index, a_index, c_index, b_index, c_index, d_index].into_iter(),
+                            );
+                        }
                         Text { text, font_size } => {
                             let section = Section {
                                 text: &*text,
@@ -206,7 +222,7 @@ impl UiRenderer {
                                 ..Section::default()
                             };
                             self.glyph_brush.queue(section);
-                        },
+                        }
                     }
                 }
             }
@@ -216,27 +232,34 @@ impl UiRenderer {
         {
             // Update the uniform buffer to map (w, h) coordinates to [-1, 1]
             let transformation_matrix = [
-                [2.0/win_w as f32, 0.0, 0.0, 0.0],
-                [0.0, -2.0/win_h as f32, 0.0, 0.0],
+                [2.0 / win_w as f32, 0.0, 0.0, 0.0],
+                [0.0, -2.0 / win_h as f32, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [-1.0, 1.0, 0.0, 1.0],
             ];
-            encoder.update_constant_buffer(&self.data.transform, &Transform {
-                transform: transformation_matrix,
-                debug: false,
-            });
+            encoder.update_constant_buffer(
+                &self.data.transform,
+                &Transform {
+                    transform: transformation_matrix,
+                    debug: false,
+                },
+            );
             // Update vertex buffer
             ensure_buffer_capacity(&mut self.rect_vertex_buffer, rect_vertices.len(), factory)?;
-            encoder.update_buffer(&self.rect_vertex_buffer, &rect_vertices, 0).context("Updating rectangle vertex buffer in UiRenderer")?;
+            encoder
+                .update_buffer(&self.rect_vertex_buffer, &rect_vertices, 0)
+                .context("Updating rectangle vertex buffer in UiRenderer")?;
             // Update index buffer
             ensure_buffer_capacity(&mut self.rect_index_buffer, rect_indices.len(), factory)?;
-            encoder.update_buffer(&self.rect_index_buffer, &rect_indices, 0).context("Updating rectangle index buffer in UiRenderer")?;
+            encoder
+                .update_buffer(&self.rect_index_buffer, &rect_indices, 0)
+                .context("Updating rectangle index buffer in UiRenderer")?;
             // Create the Slice that dictates how to render the vertex buffer
             let slice = Slice {
-                start: 0, // start at 0 in the index buffer
+                start: 0,                       // start at 0 in the index buffer
                 end: rect_indices.len() as u32, // end at last element in the index buffer
-                base_vertex: 0, // start at 0 in the vertex buffer
-                instances: None, // don't use instancing
+                base_vertex: 0,                 // start at 0 in the vertex buffer
+                instances: None,                // don't use instancing
                 buffer: gfx::IndexBuffer::Index32(self.rect_index_buffer.clone()), // index buffer to use
             };
             // Update the vertex buffer in the pipeline data
@@ -248,12 +271,20 @@ impl UiRenderer {
         }
 
         // Draw text
-        self.glyph_brush.use_queue().draw(encoder, color_buffer).map_err(UiRenderingError::from).context("Drawing text glyphs in UiRenderer")?;
+        self.glyph_brush
+            .use_queue()
+            .draw(encoder, color_buffer)
+            .map_err(UiRenderingError::from)
+            .context("Drawing text glyphs in UiRenderer")?;
         Ok(())
     }
 }
 
-pub fn ensure_buffer_capacity<T>(buffer: &mut gfx::handle::Buffer<R, T>, min_num: usize, factory: &mut gfx_device_gl::Factory) -> Result<(), gfx::buffer::CreationError> {
+pub fn ensure_buffer_capacity<T>(
+    buffer: &mut gfx::handle::Buffer<R, T>,
+    min_num: usize,
+    factory: &mut gfx_device_gl::Factory,
+) -> Result<(), gfx::buffer::CreationError> {
     let info = buffer.get_info().clone();
     let buffer_num = info.size / std::mem::size_of::<T>();
     if buffer_num < min_num {

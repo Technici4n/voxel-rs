@@ -1,11 +1,11 @@
-use anyhow::Result;
 use crate::{
     input::KeyboardState,
     settings::Settings,
-    ui::{Ui, renderer::UiRenderer},
+    ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{World, renderer::WorldRenderer},
+    world::{renderer::WorldRenderer, World},
 };
+use anyhow::Result;
 use gfx::Device;
 
 pub struct SinglePlayer {
@@ -27,21 +27,36 @@ impl SinglePlayer {
 }
 
 impl State for SinglePlayer {
-    fn update(&mut self, _settings: &mut Settings, keyboard_state: &KeyboardState, _data: &WindowData, flags: &mut WindowFlags, seconds_delta: f64) -> Result<StateTransition> {
+    fn update(
+        &mut self,
+        _settings: &mut Settings,
+        keyboard_state: &KeyboardState,
+        _data: &WindowData,
+        flags: &mut WindowFlags,
+        seconds_delta: f64,
+    ) -> Result<StateTransition> {
         self.world.camera.tick(seconds_delta, keyboard_state);
         self.ui.build_if_changed(&self.world)?;
         flags.hide_and_center_cursor = true;
         Ok(StateTransition::KeepCurrent)
     }
 
-    fn render(&mut self, _settings: &Settings, gfx: &mut Gfx, data: &WindowData) -> Result<StateTransition> {
+    fn render(
+        &mut self,
+        _settings: &Settings,
+        gfx: &mut Gfx,
+        data: &WindowData,
+    ) -> Result<StateTransition> {
         // Clear buffers
-        gfx.encoder.clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
-        gfx.encoder.clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
+        gfx.encoder
+            .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
+        gfx.encoder
+            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
         self.world_renderer.render(gfx, data, &self.world)?;
         // Clear depth
-        gfx.encoder.clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
+        gfx.encoder
+            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
         self.ui_renderer.render(gfx, &data, &mut self.ui)?;
         // Flush and swap buffers

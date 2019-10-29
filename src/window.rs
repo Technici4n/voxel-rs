@@ -1,7 +1,4 @@
-use crate::{
-    input::KeyboardState,
-    settings::Settings,
-};
+use crate::{input::KeyboardState, settings::Settings};
 use anyhow::{Context, Result};
 use log::info;
 use std::time::Instant;
@@ -44,11 +41,23 @@ pub struct WindowFlags {
 /// A window state. It has full control over the rendered content.
 pub trait State {
     /// Update using the given time delta.
-    fn update(&mut self, settings: &mut Settings, keyboard_state: &KeyboardState, data: &WindowData, flags: &mut WindowFlags, seconds_delta: f64) -> Result<StateTransition>;
+    fn update(
+        &mut self,
+        settings: &mut Settings,
+        keyboard_state: &KeyboardState,
+        data: &WindowData,
+        flags: &mut WindowFlags,
+        seconds_delta: f64,
+    ) -> Result<StateTransition>;
     /// Render.
     ///
     /// Note: The state is responsible for swapping buffers.
-    fn render(&mut self, settings: &Settings, gfx: &mut Gfx, data: &WindowData) -> Result<StateTransition>;
+    fn render(
+        &mut self,
+        settings: &Settings,
+        gfx: &mut Gfx,
+        data: &WindowData,
+    ) -> Result<StateTransition>;
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
 }
@@ -84,7 +93,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
             window_builder,
             context_builder,
             &events_loop,
-        ).context("Failed to initialize the window and the OpenGL context")?
+        )
+        .context("Failed to initialize the window and the OpenGL context")?
     };
     let encoder = factory.create_command_buffer().into();
 
@@ -121,7 +131,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
 
     info!("Done initializing the window. Moving on to the first state...");
 
-    let mut state = initial_state(settings, &mut gfx).context("Failed to create initial window state")?;
+    let mut state =
+        initial_state(settings, &mut gfx).context("Failed to create initial window state")?;
 
     let mut previous_time = std::time::Instant::now();
 
@@ -143,30 +154,34 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                         Focused(focused) => {
                             window_data.focused = focused;
                             keyboard_state.clear();
-                        },
+                        }
                         KeyboardInput { input, .. } => keyboard_state.process_input(input),
-                        CursorMoved {..} | CursorEntered {..} | CursorLeft {..} | MouseWheel {..} | MouseInput {..} => (),
+                        CursorMoved { .. }
+                        | CursorEntered { .. }
+                        | CursorLeft { .. }
+                        | MouseWheel { .. }
+                        | MouseInput { .. } => (),
                         // weird events
-                        TouchpadPressure {..} | AxisMotion {..} | Touch (..) => (),
+                        TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
                         Refresh => (),
                     }
-                },
+                }
                 // There is no need to handle device events,
                 // all relevant should already be received by the window.
                 DeviceEvent { event, .. } => {
                     if !window_data.focused {
-                        return
+                        return;
                     }
                     use glutin::DeviceEvent::*;
                     match event {
                         MouseMotion { delta } => state.handle_mouse_motion(settings, delta),
                         _ => (),
                     }
-                },
+                }
                 Awakened | Suspended(_) => {
                     // TODO: implement this ?
                     unimplemented!("Awakening and suspending is not currently handled")
-                },
+                }
             }
         });
         if !keep_running {
@@ -178,8 +193,14 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                 None => return Err(WindowError::ClosedUnexpectedly)?,
             };
             window_data.hidpi_factor = gfx.context.window().get_hidpi_factor();
-            window_data.physical_window_size = window_data.logical_window_size.to_physical(window_data.hidpi_factor);
-            gfx_window_glutin::update_views(&gfx.context, &mut gfx.color_buffer, &mut gfx.depth_buffer);
+            window_data.physical_window_size = window_data
+                .logical_window_size
+                .to_physical(window_data.hidpi_factor);
+            gfx_window_glutin::update_views(
+                &gfx.context,
+                &mut gfx.color_buffer,
+                &mut gfx.depth_buffer,
+            );
         }
 
         // Update state
@@ -189,17 +210,28 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
             previous_time = current_time;
             delta.as_secs() as f64 + delta.subsec_nanos() as f64 / 1e9
         };
-        let state_transition = state.update(settings, &keyboard_state, &window_data, &mut window_flags, seconds_delta).context("Failed to `update` the current window state")?;
+        let state_transition = state
+            .update(
+                settings,
+                &keyboard_state,
+                &window_data,
+                &mut window_flags,
+                seconds_delta,
+            )
+            .context("Failed to `update` the current window state")?;
 
         // Update window flags
         gfx.context.window().set_title(&window_flags.window_title);
         if window_flags.hide_and_center_cursor && window_data.focused {
             gfx.context.window().hide_cursor(true);
             let sz = window_data.logical_window_size;
-            gfx.context.window().set_cursor_position(glutin::dpi::LogicalPosition {
-                x: sz.width / 2.0,
-                y: sz.height / 2.0,
-            }).map_err(|why| WindowError::CouldntSetCursorPosition(why))?;
+            gfx.context
+                .window()
+                .set_cursor_position(glutin::dpi::LogicalPosition {
+                    x: sz.width / 2.0,
+                    y: sz.height / 2.0,
+                })
+                .map_err(|why| WindowError::CouldntSetCursorPosition(why))?;
         } else {
             gfx.context.window().hide_cursor(false);
         }
@@ -208,23 +240,28 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
         match state_transition {
             StateTransition::KeepCurrent => (),
             StateTransition::ReplaceCurrent(new_state) => {
-                state = new_state(settings, &mut gfx).context("Failed to create next window state")?;
-                continue
-            },
+                state =
+                    new_state(settings, &mut gfx).context("Failed to create next window state")?;
+                continue;
+            }
             StateTransition::CloseWindow => {
                 return Ok(());
-            },
+            }
         }
 
         // Render frame
-        match state.render(settings, &mut gfx, &window_data).context("Failed to `render` the current window state")? {
+        match state
+            .render(settings, &mut gfx, &window_data)
+            .context("Failed to `render` the current window state")?
+        {
             StateTransition::KeepCurrent => (),
             StateTransition::ReplaceCurrent(new_state) => {
-                state = new_state(settings, &mut gfx).context("Failed to create next window state")?;
-            },
+                state =
+                    new_state(settings, &mut gfx).context("Failed to create next window state")?;
+            }
             StateTransition::CloseWindow => {
                 return Ok(());
-            },
+            }
         }
     }
 }
@@ -233,7 +270,9 @@ impl std::fmt::Display for WindowError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             WindowError::ClosedUnexpectedly => write!(f, "The window was closed unexpectedly"),
-            WindowError::CouldntSetCursorPosition(why) => write!(f, "Couldn't set cursor position: {}", why),
+            WindowError::CouldntSetCursorPosition(why) => {
+                write!(f, "Couldn't set cursor position: {}", why)
+            }
         }
     }
 }

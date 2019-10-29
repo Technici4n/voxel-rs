@@ -15,8 +15,8 @@ enum BlockGroup {
     Uncompressed(Box<[u32; BLOCK_SIZE]>), // different data
 }
 
-#[derive(Clone, Copy, Hash,  PartialEq, Eq)]
-pub struct ChunkPos{
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct ChunkPos {
     pub px: i64, // position of the chunkc in the world
     pub py: i64,
     pub pz: i64,
@@ -24,14 +24,14 @@ pub struct ChunkPos{
 
 #[derive(Clone)]
 pub struct Chunk {
-    pub pos : ChunkPos,
+    pub pos: ChunkPos,
     data: Vec<BlockGroup>, // data containde in the chunk
 }
 
 impl Chunk {
     pub fn new(x: i64, y: i64, z: i64) -> Chunk {
         Chunk {
-            pos: ChunkPos{
+            pos: ChunkPos {
                 px: x,
                 py: y,
                 pz: z,
@@ -82,14 +82,14 @@ impl Chunk {
     }
 
     /// Fill the chunk with perlin noise
-    pub fn fill_perlin(&mut self){
+    pub fn fill_perlin(&mut self) {
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
                     if perlin(
-                        (i as f64 + (self.pos.px*CHUNK_SIZE as i64) as f64)/16.0,
-                        (j as f64 + (self.pos.py*CHUNK_SIZE as i64) as f64)/16.0,
-                        (k as f64 + (self.pos.pz*CHUNK_SIZE as i64) as f64)/16.0,
+                        (i as f64 + (self.pos.px * CHUNK_SIZE as i64) as f64) / 16.0,
+                        (j as f64 + (self.pos.py * CHUNK_SIZE as i64) as f64) / 16.0,
+                        (k as f64 + (self.pos.pz * CHUNK_SIZE as i64) as f64) / 16.0,
                         7,
                         0.4,
                         42,

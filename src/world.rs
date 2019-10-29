@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::world::chunk::{Chunk, CHUNK_SIZE, ChunkPos};
+use crate::world::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
 
 use self::camera::Camera;
 
@@ -43,19 +43,27 @@ impl World {
     /// Return data at position x,y,z
     pub fn get_data(&self, x: i64, y: i64, z: i64) -> u32 {
         let (cx, cy, cz) = World::get_chunk_coord(x, y, z);
-        let (dx, dy, dz) = ((x - cx * CHUNK_SIZE as i64) as u32, (y - cy * CHUNK_SIZE as i64) as u32, (z - cz * CHUNK_SIZE as i64) as u32);
-        match self.get_chunk(cx,cy, cz){
+        let (dx, dy, dz) = (
+            (x - cx * CHUNK_SIZE as i64) as u32,
+            (y - cy * CHUNK_SIZE as i64) as u32,
+            (z - cz * CHUNK_SIZE as i64) as u32,
+        );
+        match self.get_chunk(cx, cy, cz) {
             None => 0,
-            Some(chunk) => chunk.get_data(dx, dy, dz)
+            Some(chunk) => chunk.get_data(dx, dy, dz),
         }
     }
 
     /// Set data at position x,y,z
     /// Enventually create a new chunk if necessary
-    pub fn set_data(&mut self, x: i64, y: i64, z: i64, data : u32) {
+    pub fn set_data(&mut self, x: i64, y: i64, z: i64, data: u32) {
         let (cx, cy, cz) = World::get_chunk_coord(x, y, z);
-        let (dx, dy, dz) = ((x - cx * CHUNK_SIZE as i64) as u32, (y - cy * CHUNK_SIZE as i64) as u32, (z - cz * CHUNK_SIZE as i64) as u32);
-        self.get_add_chunk(cx,cy,cz).set_data(dx, dy, dz, data);
+        let (dx, dy, dz) = (
+            (x - cx * CHUNK_SIZE as i64) as u32,
+            (y - cy * CHUNK_SIZE as i64) as u32,
+            (z - cz * CHUNK_SIZE as i64) as u32,
+        );
+        self.get_add_chunk(cx, cy, cz).set_data(dx, dy, dz, data);
     }
 
     /// Create a new chunk at position (x, y, z) if not already present
@@ -66,19 +74,17 @@ impl World {
             py: y,
             pz: z,
         };
-        if self.chunks.contains_key(pos){
+        if self.chunks.contains_key(pos) {
             self.chunks.get_mut(pos).unwrap()
-        }else{
-            self.chunks.insert(*pos, Chunk::new(x,y,z));
+        } else {
+            self.chunks.insert(*pos, Chunk::new(x, y, z));
             self.chunks.get_mut(pos).unwrap()
         }
     }
 
-
-
     /// Convert the world block coordinates into the chunk coordinates
     pub fn get_chunk_coord(ix: i64, iy: i64, iz: i64) -> (i64, i64, i64) {
-        let ( x,  y,  z);
+        let (x, y, z);
         if ix >= 0 {
             x = ix / CHUNK_SIZE as i64;
         } else {

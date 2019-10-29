@@ -8,19 +8,32 @@ use std::{
 };
 
 pub fn load_settings(folder_path: &Path, file_path: &Path) -> Result<Settings> {
-    info!("Reading settings from folder path {} and file path {}...", folder_path.display(), file_path.display());
+    info!(
+        "Reading settings from folder path {} and file path {}...",
+        folder_path.display(),
+        file_path.display()
+    );
     let settings = if file_path.is_file() {
         let mut settings_file = OpenOptions::new()
             .read(true)
             .write(true)
             .open(file_path)
-            .context(format!("Failed to open settings file from folder path {} and file path {}...", folder_path.display(), file_path.display()))?;
+            .context(format!(
+                "Failed to open settings file from folder path {} and file path {}...",
+                folder_path.display(),
+                file_path.display()
+            ))?;
         let mut buf = String::new();
-        settings_file
-            .read_to_string(&mut buf)
-            .context(format!("Failed to read settings file from folder path {} and file path {}...", folder_path.display(), file_path.display()))?;
-        ron::de::from_str(&buf)
-            .context(format!("Failed to parse settings file from folder path {} and file path {}...", folder_path.display(), file_path.display()))?
+        settings_file.read_to_string(&mut buf).context(format!(
+            "Failed to read settings file from folder path {} and file path {}...",
+            folder_path.display(),
+            file_path.display()
+        ))?;
+        ron::de::from_str(&buf).context(format!(
+            "Failed to parse settings file from folder path {} and file path {}...",
+            folder_path.display(),
+            file_path.display()
+        ))?
     } else {
         std::fs::create_dir_all(folder_path)?;
         Settings::default()

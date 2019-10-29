@@ -1,8 +1,8 @@
 use crate::world::World;
 use anyhow::Result;
 use gfx_glyph::Scale;
-use stretch::{Stretch, node::Node, style::Style};
 use std::collections::HashMap;
+use stretch::{node::Node, style::Style, Stretch};
 
 pub mod renderer;
 
@@ -55,7 +55,12 @@ impl Ui {
         }
     }
 
-    pub fn new_node(&mut self, style: Style, children: Vec<Node>, primitive: Primitive) -> Result<Node, stretch::Error> {
+    pub fn new_node(
+        &mut self,
+        style: Style,
+        children: Vec<Node>,
+        primitive: Primitive,
+    ) -> Result<Node, stretch::Error> {
         let node = self.stretch.new_node(style, children)?;
         self.primitives.insert(node, primitive);
         Ok(node)
@@ -126,21 +131,44 @@ z = {:.2}
             ..Style::default()
         };
         // Add small rectangles
-        let rectangles: Vec<_> = (0..20).into_iter().map(|_| {
-            let node = self.stretch.new_node(rect_style, vec![]).unwrap();
-            //self.primitives.insert(node, Primitive::Text { text: format!("{}", i+1), font_size: Scale::uniform(40.0) });
-            self.primitives.insert(node, Primitive::Rectangle { color: [1.0, 0.0, 0.0, 0.5] });
-            node
-        }).collect();
+        let rectangles: Vec<_> = (0..20)
+            .into_iter()
+            .map(|_| {
+                let node = self.stretch.new_node(rect_style, vec![]).unwrap();
+                //self.primitives.insert(node, Primitive::Text { text: format!("{}", i+1), font_size: Scale::uniform(40.0) });
+                self.primitives.insert(
+                    node,
+                    Primitive::Rectangle {
+                        color: [1.0, 0.0, 0.0, 0.5],
+                    },
+                );
+                node
+            })
+            .collect();
 
         // Register stretch nodes
-        let text_node = self.stretch.new_node(text_style, vec![]).map_err(UiError::from)?;
-        let subcontainer_node = self.stretch.new_node(subcontainer_style, rectangles).map_err(UiError::from)?;
-        let root_node = self.stretch.new_node(container_style, vec![text_node, subcontainer_node]).map_err(UiError::from)?;
+        let text_node = self
+            .stretch
+            .new_node(text_style, vec![])
+            .map_err(UiError::from)?;
+        let subcontainer_node = self
+            .stretch
+            .new_node(subcontainer_style, rectangles)
+            .map_err(UiError::from)?;
+        let root_node = self
+            .stretch
+            .new_node(container_style, vec![text_node, subcontainer_node])
+            .map_err(UiError::from)?;
         self.root_node = Some(root_node);
 
         // Register primitive
-        self.primitives.insert(text_node, Primitive::Text { text, font_size: Scale::uniform(20.0) });
+        self.primitives.insert(
+            text_node,
+            Primitive::Text {
+                text,
+                font_size: Scale::uniform(20.0),
+            },
+        );
 
         Ok(())
     }

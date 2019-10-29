@@ -6,13 +6,13 @@ use log::info;
 use std::path::Path;
 
 mod input;
+mod mesh;
 mod perlin;
 mod settings;
 mod singleplayer;
 mod ui;
 mod window;
 mod world;
-mod mesh;
 
 fn main() -> Result<()> {
     env_logger::init();
