@@ -1,305 +1,247 @@
 use crate::{
     input::KeyboardState,
-    settings::SETTINGS,
-    ui::{renderer::UiRenderer, Ui},
-    world::{renderer::WorldRenderer, World},
+    settings::Settings,
 };
-use anyhow::Result;
-use gfx_core::Device;
+use anyhow::{Context, Result};
+use log::info;
 use std::time::Instant;
+
+/// A closure that creates a new instance of `State`.
+pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Gfx) -> Result<Box<dyn State>>>;
+
+/// A transition from one state to another.
+pub enum StateTransition {
+    /// Don't transition, keep the current state.
+    KeepCurrent,
+    /// Transition to another state using its `StateFactory`.
+    ReplaceCurrent(StateFactory),
+    /// Don't transition, close the current window.
+    CloseWindow,
+}
+
+/// Read-only data that is provided to the states.
+#[derive(Debug, Clone)]
+pub struct WindowData {
+    /// Logical size of the window. See [the glutin documentation](glutin::dpi).
+    pub logical_window_size: glutin::dpi::LogicalSize,
+    /// Physical size of the window.
+    pub physical_window_size: glutin::dpi::PhysicalSize,
+    /// HiDpi factor of the window.
+    pub hidpi_factor: f64,
+    /// `true` if the window is currently focused
+    pub focused: bool,
+}
+
+/// Read-write data of the window that the states can modify.
+#[derive(Debug, Clone)]
+pub struct WindowFlags {
+    /// `true` if the cursor should be hidden and centered.
+    pub hide_and_center_cursor: bool,
+    /// Window title
+    pub window_title: String,
+}
+
+/// A window state. It has full control over the rendered content.
+pub trait State {
+    /// Update using the given time delta.
+    fn update(&mut self, settings: &mut Settings, keyboard_state: &KeyboardState, data: &WindowData, flags: &mut WindowFlags, seconds_delta: f64) -> Result<StateTransition>;
+    /// Render.
+    ///
+    /// Note: The state is responsible for swapping buffers.
+    fn render(&mut self, settings: &Settings, gfx: &mut Gfx, data: &WindowData) -> Result<StateTransition>;
+    /// Mouse motion
+    fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
+}
 
 /// Color format of the window's color buffer
 pub type ColorFormat = gfx::format::Srgba8;
 /// Format of the window's depth buffer
 pub type DepthFormat = gfx::format::DepthStencil;
 
-const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
-const CLEAR_DEPTH: f32 = 1.0;
-
-/// Wrapper around the game window
-pub struct Window {
-    /// Glutin's event loop
-    events_loop: glutin::EventsLoop,
-    /// A boolean indicating if the game should still be running
-    pub running: bool,
-    /// A boolean indicating if the window is currently focused
-    pub focused: bool,
-    /// Time of the last tick
-    pub last_tick: Instant,
-    /// State of the keyboard
-    pub keyboard_state: KeyboardState,
-    /// Rendering-related data storage
-    gfx: Gfx,
-    /// User interface
-    ui: Ui,
-    /// User interface renderer
-    ui_renderer: UiRenderer,
-    /// World
-    world: World,
-    /// World rendering
-    world_renderer: WorldRenderer,
+/// An error that can happen when manipulating the window.
+#[derive(Debug, Clone)]
+pub enum WindowError {
+    /// The window was closed unexpectedly.
+    ClosedUnexpectedly,
+    /// Setting the cursor position failed.
+    CouldntSetCursorPosition(String),
 }
 
-/// Useful information for renderers
-#[derive(Clone, Copy)]
-pub struct RenderInfo {
-    pub window_dimensions: (u32, u32),
-    pub dpi_factor: f64,
-}
+/// Open a new window with the given settings and the given initial state
+pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Result<()> {
+    info!("Opening new window...");
+    // Initialize window and OpenGL context
+    let window_title = "voxel-rs".to_owned();
+    let mut events_loop = glutin::EventsLoop::new();
+    let (context, device, mut factory, color_buffer, depth_buffer) = {
+        let window_builder = glutin::WindowBuilder::new()
+            .with_title(window_title.clone())
+            .with_dimensions(settings.window_size.into());
+        let context_builder = glutin::ContextBuilder::new()
+            .with_vsync(false)
+            .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)));
+        gfx_window_glutin::init::<ColorFormat, DepthFormat>(
+            window_builder,
+            context_builder,
+            &events_loop,
+        ).context("Failed to initialize the window and the OpenGL context")?
+    };
+    let encoder = factory.create_command_buffer().into();
 
-fn get_context_render_info(
-    context: &glutin::WindowedContext<glutin::PossiblyCurrent>,
-) -> Option<RenderInfo> {
-    let window_dimensions: Option<(u32, u32)> = context.window().get_inner_size().map(Into::into);
+    let mut gfx = Gfx {
+        context,
+        device,
+        factory,
+        encoder,
+        color_buffer,
+        depth_buffer,
+    };
 
-    let dpi_factor = context.window().get_hidpi_factor();
-
-    window_dimensions.map(|window_dimensions| RenderInfo {
-        window_dimensions,
-        dpi_factor,
-    })
-}
-
-impl Window {
-    /// Create a new game window
-    pub fn new() -> Result<Self> {
-        // Init window, OpenGL and gfx
-        let events_loop = glutin::EventsLoop::new();
-        let (context, device, mut factory, color_buffer, depth_buffer) = {
-            let window_builder = glutin::WindowBuilder::new()
-                .with_title("voxel-rs".to_owned())
-                .with_dimensions(SETTINGS.read().unwrap().window_size.into());
-            let context_builder = glutin::ContextBuilder::new()
-                .with_vsync(false)
-                .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)));
-            gfx_window_glutin::init::<ColorFormat, DepthFormat>(
-                window_builder,
-                context_builder,
-                &events_loop,
-            )?
+    let mut window_data = {
+        let logical_window_size = match gfx.context.window().get_inner_size() {
+            Some(logical_window_size) => logical_window_size,
+            None => return Err(WindowError::ClosedUnexpectedly)?,
         };
-        let encoder = factory.create_command_buffer().into();
-
-        // Init Ui
-        let ui = Ui::new();
-        let world = World::new();
-
-        let mut gfx = Gfx {
-            context,
-            device,
-            factory,
-            encoder,
-            color_buffer,
-            depth_buffer,
-        };
-
-        let render_info = get_context_render_info(&gfx.context)
-            .expect("Newly created OpenGL context has no size");
-
-        let ui_renderer = UiRenderer::new(&mut gfx, &render_info)?;
-        let world_renderer = WorldRenderer::new(&mut gfx)?;
-
-        Ok(Self {
-            events_loop,
-            running: true,
+        let hidpi_factor = gfx.context.window().get_hidpi_factor();
+        let physical_window_size = logical_window_size.to_physical(hidpi_factor);
+        WindowData {
+            logical_window_size,
+            physical_window_size,
+            hidpi_factor,
             focused: false,
-            last_tick: Instant::now(),
-            keyboard_state: KeyboardState::new(),
-            gfx,
-            ui,
-            ui_renderer,
-            world,
-            world_renderer,
-        })
-    }
-
-    /// Get the render info from the underlying context.
-    /// This function stops the application and returns `None` if the window was closed.
-    pub fn get_render_info(&mut self) -> Option<RenderInfo> {
-        if let Some(render_info) = get_context_render_info(&self.gfx.context) {
-            Some(render_info)
-        } else {
-            self.running = false;
-            None
         }
-    }
+    };
 
-    /// Process all incoming events
-    pub fn process_events(&mut self) -> Result<()> {
-        let Self {
-            ref mut events_loop,
-            ref mut running,
-            ref mut focused,
-            ref mut last_tick,
-            ref mut keyboard_state,
-            ref mut gfx,
-            ref mut ui,
-            ref mut world,
-            ref mut world_renderer,
-            ..
-        } = self;
+    let mut keyboard_state = KeyboardState::new();
+
+    let mut window_flags = WindowFlags {
+        hide_and_center_cursor: false,
+        window_title,
+    };
+
+    info!("Done initializing the window. Moving on to the first state...");
+
+    let mut state = initial_state(settings, &mut gfx).context("Failed to create initial window state")?;
+
+    let mut previous_time = std::time::Instant::now();
+
+    loop {
+        let mut keep_running = true;
+        let mut window_resized = false;
+        // Handle events
         events_loop.poll_events(|event| {
-            use glutin::DeviceEvent::*;
             use glutin::Event::*;
-            use glutin::WindowEvent::*;
-
-            match event.clone() {
-                WindowEvent {
-                    event: window_event,
-                    ..
-                } => match window_event {
-                    CloseRequested => {
-                        *running = false;
-                    }
-                    Resized(logical_size) => {
-                        // TODO: take new Ui into account
-                        let hidpi_factor = gfx.context.window().get_hidpi_factor();
-                        let physical_size = logical_size.to_physical(hidpi_factor);
-                        gfx.context.resize(physical_size);
-                        let (new_color, new_depth) =
-                            gfx_window_glutin::new_views::<ColorFormat, DepthFormat>(&gfx.context);
-                        gfx.color_buffer = new_color;
-                        gfx.depth_buffer = new_depth;
-                        world_renderer
-                            .on_resize(gfx.color_buffer.clone(), gfx.depth_buffer.clone());
-                        //ui_renderer.renderer.on_resize(gfx.color_buffer.clone());
-                    }
-                    Focused(is_focused) => {
-                        if is_focused {
-                            *focused = true;
-                            *last_tick = Instant::now();
-                        } else {
-                            *focused = false;
+            match event {
+                WindowEvent { event, .. } => {
+                    use glutin::WindowEvent::*;
+                    match event {
+                        Resized(_) | HiDpiFactorChanged(_) => window_resized = true,
+                        Moved(_) => (),
+                        CloseRequested | Destroyed => keep_running = false,
+                        DroppedFile(_) | HoveredFile(_) | HoveredFileCancelled => (),
+                        ReceivedCharacter(_) => (),
+                        Focused(focused) => {
+                            window_data.focused = focused;
                             keyboard_state.clear();
-                        }
+                        },
+                        KeyboardInput { input, .. } => keyboard_state.process_input(input),
+                        CursorMoved {..} | CursorEntered {..} | CursorLeft {..} | MouseWheel {..} | MouseInput {..} => (),
+                        // weird events
+                        TouchpadPressure {..} | AxisMotion {..} | Touch (..) => (),
+                        Refresh => (),
                     }
-                    KeyboardInput { input, .. } => {
-                        keyboard_state.process_input(input);
+                },
+                // There is no need to handle device events,
+                // all relevant should already be received by the window.
+                DeviceEvent { event, .. } => {
+                    if !window_data.focused {
+                        return
                     }
-                    _ => {}
+                    use glutin::DeviceEvent::*;
+                    match event {
+                        MouseMotion { delta } => state.handle_mouse_motion(settings, delta),
+                        _ => (),
+                    }
                 },
-                DeviceEvent {
-                    event: device_event,
-                    ..
-                } => match device_event {
-                    Motion { axis, value } => match axis {
-                        0 => world.camera.update_cursor(value, 0.0),
-                        1 => world.camera.update_cursor(0.0, value),
-                        _ => panic!("Unknown axis. Expected 0 or 1, found {}.", axis),
-                    },
-                    _ => {}
+                Awakened | Suspended(_) => {
+                    // TODO: implement this ?
+                    unimplemented!("Awakening and suspending is not currently handled")
                 },
-                _ => {}
             }
-
-            ui.handle_event(event.clone(), gfx.context.window());
         });
-
-        if !*focused {
+        if !keep_running {
             return Ok(());
         }
+        if window_resized {
+            window_data.logical_window_size = match gfx.context.window().get_inner_size() {
+                Some(logical_window_size) => logical_window_size,
+                None => return Err(WindowError::ClosedUnexpectedly)?,
+            };
+            window_data.hidpi_factor = gfx.context.window().get_hidpi_factor();
+            window_data.physical_window_size = window_data.logical_window_size.to_physical(window_data.hidpi_factor);
+            gfx_window_glutin::update_views(&gfx.context, &mut gfx.color_buffer, &mut gfx.depth_buffer);
+        }
 
-        let render_info = match self.get_render_info() {
-            Some(render_info) => render_info,
-            None => return Ok(()),
+        // Update state
+        let seconds_delta = {
+            let current_time = Instant::now();
+            let delta = current_time - previous_time;
+            previous_time = current_time;
+            delta.as_secs() as f64 + delta.subsec_nanos() as f64 / 1e9
         };
+        let state_transition = state.update(settings, &keyboard_state, &window_data, &mut window_flags, seconds_delta).context("Failed to `update` the current window state")?;
 
-        let Self {
-            ref mut gfx,
-            ref mut ui,
-            ref mut world,
-            ..
-        } = self;
-
-        // Rebuild Ui
-        ui.build_if_changed(&world)?;
-
-        // Show or hide cursor
-        if ui.should_hide_and_center_cursor() {
+        // Update window flags
+        gfx.context.window().set_title(&window_flags.window_title);
+        if window_flags.hide_and_center_cursor && window_data.focused {
             gfx.context.window().hide_cursor(true);
-            let (win_w, win_h) = render_info.window_dimensions;
-            gfx.context
-                .window()
-                .set_cursor_position((win_w as f64 / 2.0, win_h as f64 / 2.0).into())
-                .expect("Couldn't set cursor position");
+            let sz = window_data.logical_window_size;
+            gfx.context.window().set_cursor_position(glutin::dpi::LogicalPosition {
+                x: sz.width / 2.0,
+                y: sz.height / 2.0,
+            }).map_err(|why| WindowError::CouldntSetCursorPosition(why))?;
         } else {
             gfx.context.window().hide_cursor(false);
         }
-        Ok(())
-    }
 
-    /// Render the game
-    pub fn render(&mut self) -> Result<()> {
-        if !self.focused {
-            return Ok(());
-        }
-        // Get the current window dimensions if they are available or stop the game otherwise.
-        let render_info = match self.get_render_info() {
-            Some(render_info) => render_info,
-            None => return Ok(()),
-        };
-
-        // Clear buffers
-        {
-            let Gfx {
-                ref mut encoder,
-                ref color_buffer,
-                ref depth_buffer,
-                ..
-            } = &mut self.gfx;
-            encoder.clear(color_buffer, CLEAR_COLOR);
-            encoder.clear_depth(depth_buffer, CLEAR_DEPTH);
+        // Transition if necessary
+        match state_transition {
+            StateTransition::KeepCurrent => (),
+            StateTransition::ReplaceCurrent(new_state) => {
+                state = new_state(settings, &mut gfx).context("Failed to create next window state")?;
+                continue
+            },
+            StateTransition::CloseWindow => {
+                return Ok(());
+            },
         }
 
-        // Draw World
-        self.world_renderer
-            .render(&mut self.gfx, render_info, &self.world)?;
-        // Clear depth buffer to draw Ui on top of the world
-        {
-            let Gfx {
-                ref mut encoder,
-                ref depth_buffer,
-                ..
-            } = &mut self.gfx;
-            encoder.clear_depth(depth_buffer, CLEAR_DEPTH);
+        // Render frame
+        match state.render(settings, &mut gfx, &window_data).context("Failed to `render` the current window state")? {
+            StateTransition::KeepCurrent => (),
+            StateTransition::ReplaceCurrent(new_state) => {
+                state = new_state(settings, &mut gfx).context("Failed to create next window state")?;
+            },
+            StateTransition::CloseWindow => {
+                return Ok(());
+            },
         }
-        // Draw Ui
-        self.ui_renderer
-            .render(&mut self.gfx, render_info, &mut self.ui)?;
-
-        // Flush and swap buffers
-        {
-            let Gfx {
-                ref context,
-                ref mut device,
-                ref mut encoder,
-                ..
-            } = &mut self.gfx;
-
-            encoder.flush(device);
-            context.swap_buffers()?;
-            device.cleanup();
-        }
-
-        Ok(())
-    }
-
-    /// Tick the game
-    pub fn tick(&mut self) -> Result<()> {
-        if !self.focused {
-            return Ok(());
-        }
-
-        let current_tick = Instant::now();
-        let tick_duration = current_tick - self.last_tick;
-        self.last_tick = current_tick;
-
-        // TODO: use as_secs_f64 when it will be stable
-        let dt = tick_duration.as_secs() as f64 + tick_duration.as_nanos() as f64 / 1e9;
-        self.world.camera.tick(dt, &self.keyboard_state);
-        Ok(())
     }
 }
+
+impl std::fmt::Display for WindowError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WindowError::ClosedUnexpectedly => write!(f, "The window was closed unexpectedly"),
+            WindowError::CouldntSetCursorPosition(why) => write!(f, "Couldn't set cursor position: {}", why),
+        }
+    }
+}
+
+impl std::error::Error for WindowError {}
+
+pub const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
+pub const CLEAR_DEPTH: f32 = 1.0;
 
 /// Store for all rendering-related data
 pub struct Gfx {

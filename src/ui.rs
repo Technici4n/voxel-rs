@@ -18,19 +18,11 @@ pub struct UiError {
     pub what: String,
 }
 
-impl UiError {
-    pub fn new(what: String) -> Self {
-        Self {
-            what
-        }
-    }
-}
-
 impl std::fmt::Display for UiError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "Some error happened during creating of the Ui: {}",
+            "Some error happened during creation of the Ui: {}",
             self.what
         )
     }
@@ -67,11 +59,6 @@ impl Ui {
         let node = self.stretch.new_node(style, children)?;
         self.primitives.insert(node, primitive);
         Ok(node)
-    }
-
-    /// Handle a glutin event
-    pub fn handle_event(&mut self, _event: glutin::Event, _window: &glutin::Window) {
-        // TODO: remove or implement
     }
 
     /// Rebuild the Ui if it changed
@@ -139,7 +126,7 @@ z = {:.2}
             ..Style::default()
         };
         // Add small rectangles
-        let rectangles: Vec<_> = (0..20).into_iter().map(|i| {
+        let rectangles: Vec<_> = (0..20).into_iter().map(|_| {
             let node = self.stretch.new_node(rect_style, vec![]).unwrap();
             //self.primitives.insert(node, Primitive::Text { text: format!("{}", i+1), font_size: Scale::uniform(40.0) });
             self.primitives.insert(node, Primitive::Rectangle { color: [1.0, 0.0, 0.0, 0.5] });
@@ -156,11 +143,6 @@ z = {:.2}
         self.primitives.insert(text_node, Primitive::Text { text, font_size: Scale::uniform(20.0) });
 
         Ok(())
-    }
-
-    /// Should the cursor be automatically centered and hidden?
-    pub fn should_hide_and_center_cursor(&self) -> bool {
-        false
     }
 }
 

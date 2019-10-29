@@ -1,55 +1,32 @@
 use anyhow::{Context, Result};
-use lazy_static::lazy_static;
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::{
     fs::OpenOptions,
     io::{Read, Write},
     path::Path,
-    sync::RwLock,
 };
 
-// TODO: don't make this static
-
-static SETTINGS_PATH: &'static str = "config";
-static SETTINGS_FILE: &'static str = "config/Settings.ron";
-
-lazy_static! {
-    pub static ref SETTINGS: RwLock<Settings> = {
-        RwLock::new(load_settings(SETTINGS_FILE).expect(&format!(
-            "Failed to load settings from file {}",
-            SETTINGS_FILE
-        )))
-    };
-}
-
-pub fn _update_settings(new_settings: Settings) -> Result<()> {
-    write_settings(SETTINGS_FILE, &new_settings)?;
-    *SETTINGS.write().unwrap() = new_settings;
-    Ok(())
-}
-
-fn load_settings(path: impl AsRef<Path>) -> Result<Settings> {
-    info!("Reading settings...");
-    let path = path.as_ref();
-    let settings = if path.is_file() {
+pub fn load_settings(folder_path: &Path, file_path: &Path) -> Result<Settings> {
+    info!("Reading settings from folder path {} and file path {}...", folder_path.display(), file_path.display());
+    let settings = if file_path.is_file() {
         let mut settings_file = OpenOptions::new()
             .read(true)
             .write(true)
-            .open(&path)
-            .context(format!("Failed to open settings file {}", path.display()))?;
+            .open(file_path)
+            .context(format!("Failed to open settings file from folder path {} and file path {}...", folder_path.display(), file_path.display()))?;
         let mut buf = String::new();
         settings_file
             .read_to_string(&mut buf)
-            .context(format!("Failed to read settings file {}", path.display()))?;
+            .context(format!("Failed to read settings file from folder path {} and file path {}...", folder_path.display(), file_path.display()))?;
         ron::de::from_str(&buf)
-            .context(format!("Failed to parse settings file {}", path.display()))?
+            .context(format!("Failed to parse settings file from folder path {} and file path {}...", folder_path.display(), file_path.display()))?
     } else {
-        std::fs::create_dir_all(&SETTINGS_PATH)?;
+        std::fs::create_dir_all(folder_path)?;
         Settings::default()
     };
 
-    write_settings(path, &settings)?;
+    // TODO: write settings
 
     Ok(settings)
 }
