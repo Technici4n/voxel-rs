@@ -53,13 +53,13 @@ impl AdjChunkOccl {
             } else if x == -1 {
                 return self.faces[1][y as usize][z as usize];
             } else if y == CHUNK_SIZE as i32 {
-                return self.faces[0][x as usize][z as usize];
+                return self.faces[2][x as usize][z as usize];
             } else if y == -1 {
-                return self.faces[1][x as usize][z as usize];
+                return self.faces[3][x as usize][z as usize];
             } else if z == CHUNK_SIZE as i32 {
-                return self.faces[0][x as usize][y as usize];
+                return self.faces[4][x as usize][y as usize];
             } else if z == -1 {
-                return self.faces[1][x as usize][y as usize];
+                return self.faces[5][x as usize][y as usize];
             }
         } else if n_outside == 2 {
             if x >= 0 && x < CHUNK_SIZE as i32 {
@@ -167,11 +167,12 @@ fn ambiant_occl(coins: u32, edge: u32) -> u32 {
     }
 }
 
+// TODO: Refactor
 /// Return a list of vertex a (3*n) indexes array (for n quads)
 /// which contains the index of the corresponding quads
 /// in the first array
 /// Each vertex contains its position and the normal associated to the quad
-pub fn meshing(chunk: &mut Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u32>) {
+pub fn meshing(chunk: & Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u32>) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 

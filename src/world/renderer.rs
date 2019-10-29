@@ -62,27 +62,30 @@ impl WorldRenderer {
         )?;
 
         let mut meshes = Vec::new(); // all the mesh to be rendered
+        let mut world = World::new();
 
         for i in -1..1 {
             for j in -1..1 {
                 for k in -1..1 {
-                    // generating the chunk
-                    let mut chunk = Chunk::new(i, j, k);
-                    chunk.fill_perlin();
-
-                    // meshing of the chunk
-                    let (vertices, indices) = meshing(&mut chunk, None);
-                    let pos = (
-                        (i * CHUNK_SIZE as i64) as f32,
-                        (j * CHUNK_SIZE as i64) as f32,
-                        (k * CHUNK_SIZE as i64) as f32,
-                    );
-                    let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
-
-                    meshes.push(chunk_mesh);
+                    // generating the chunks
+                    world.gen_chunk(i,j,k);
                 }
             }
         }
+        for chunk in world.chunks.values() {
+            let (vertices, indices) = meshing(chunk,
+                                              Some(world.create_adj_chunk_occl(
+                                                  chunk.pos.px,chunk.pos.py, chunk.pos.pz
+                                              )));
+            let pos = (
+                (chunk.pos.px * CHUNK_SIZE as i64) as f32,
+                (chunk.pos.py * CHUNK_SIZE as i64) as f32,
+                (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
+            );
+            let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
+            meshes.push(chunk_mesh);
+        }
+
 
         Ok(Self {
             pso,
