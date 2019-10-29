@@ -1,4 +1,5 @@
 use crate::{
+    fps::FpsCounter,
     input::KeyboardState,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
@@ -8,7 +9,9 @@ use crate::{
 use anyhow::Result;
 use gfx::Device;
 
+/// State of a singleplayer world
 pub struct SinglePlayer {
+    fps_counter: FpsCounter,
     ui: Ui,
     ui_renderer: UiRenderer,
     world: World,
@@ -18,6 +21,7 @@ pub struct SinglePlayer {
 impl SinglePlayer {
     pub fn new(_settings: &mut Settings, gfx: &mut Gfx) -> Result<Box<dyn State>> {
         Ok(Box::new(Self {
+            fps_counter: FpsCounter::new(),
             ui: Ui::new(),
             ui_renderer: UiRenderer::new(gfx)?,
             world: World::new(),
@@ -36,7 +40,7 @@ impl State for SinglePlayer {
         seconds_delta: f64,
     ) -> Result<StateTransition> {
         self.world.camera.tick(seconds_delta, keyboard_state);
-        self.ui.build_if_changed(&self.world)?;
+        self.ui.build_if_changed(&self.world, self.fps_counter.fps())?;
         flags.hide_and_center_cursor = true;
         Ok(StateTransition::KeepCurrent)
     }
@@ -47,6 +51,9 @@ impl State for SinglePlayer {
         gfx: &mut Gfx,
         data: &WindowData,
     ) -> Result<StateTransition> {
+        // Count fps
+        self.fps_counter.add_frame();
+
         // Clear buffers
         gfx.encoder
             .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);

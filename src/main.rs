@@ -5,6 +5,7 @@ use anyhow::Result;
 use log::info;
 use std::path::Path;
 
+mod fps;
 mod input;
 mod mesh;
 mod perlin;

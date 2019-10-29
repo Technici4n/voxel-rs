@@ -64,9 +64,9 @@ impl WorldRenderer {
         let mut meshes = Vec::new(); // all the mesh to be rendered
         let mut world = World::new();
 
-        for i in -1..1 {
-            for j in -1..1 {
-                for k in -1..1 {
+        for i in -4..4 {
+            for j in -4..4 {
+                for k in -4..4 {
                     // generating the chunks
                     world.gen_chunk(i,j,k);
                 }

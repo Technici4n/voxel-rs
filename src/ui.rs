@@ -1,6 +1,7 @@
 use crate::world::World;
 use anyhow::Result;
 use gfx_glyph::Scale;
+use glutin::dpi::LogicalPosition;
 use std::collections::HashMap;
 use stretch::{node::Node, style::Style, Stretch};
 
@@ -66,12 +67,22 @@ impl Ui {
         Ok(node)
     }
 
+    pub fn cursor_moved(&mut self, cursor_position: LogicalPosition) {
+
+    }
+
+    pub fn mouse_input(&mut self, state: glutin::ElementState, mouse: glutin::MouseButton) {
+
+    }
+
     /// Rebuild the Ui if it changed
-    pub fn build_if_changed(&mut self, world: &World) -> Result<()> {
+    pub fn build_if_changed(&mut self, world: &World, fps: usize) -> Result<()> {
         let camera = &world.camera;
         let text = format!(
             "\
 Welcome to voxel-rs
+
+FPS = {}
 
 yaw = {:4.0}
 pitch = {:4.0}
@@ -80,7 +91,7 @@ x = {:.2}
 y = {:.2}
 z = {:.2}
 ",
-            camera.yaw, camera.pitch, camera.position.x, camera.position.y, camera.position.z
+            fps, camera.yaw, camera.pitch, camera.position.x, camera.position.y, camera.position.z
         );
 
         use stretch::geometry::*;
