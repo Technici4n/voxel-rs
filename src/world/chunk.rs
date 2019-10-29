@@ -7,6 +7,8 @@ pub const CHUNK_SIZE: u32 = GROUP_LEN * CHUNK_LEN;
 /// number of data in a block
 const BLOCK_SIZE: usize = (GROUP_LEN * GROUP_LEN * GROUP_LEN) as usize;
 
+use crate::perlin::perlin;
+
 #[derive(Clone)]
 enum BlockGroup {
     Compressed(u32),                      // 1 bit (NxNxN) times the same data
@@ -76,6 +78,27 @@ impl Chunk {
                 }
             }
             *x = BlockGroup::Compressed(data); // mergin all block in one
+        }
+    }
+
+    /// Fill the chunk with perlin noise
+    pub fn fill_perlin(&mut self){
+        for i in 0..32 {
+            for j in 0..32 {
+                for k in 0..32 {
+                    if perlin(
+                        (i as f64 + (self.pos.px*CHUNK_SIZE as i64) as f64)/16.0,
+                        (j as f64 + (self.pos.py*CHUNK_SIZE as i64) as f64)/16.0,
+                        (k as f64 + (self.pos.pz*CHUNK_SIZE as i64) as f64)/16.0,
+                        7,
+                        0.4,
+                        42,
+                    ) > 0.5
+                    {
+                        self.set_data(i, j, k, 1);
+                    }
+                }
+            }
         }
     }
 }

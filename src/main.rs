@@ -10,6 +10,7 @@ mod settings;
 mod ui;
 mod window;
 mod world;
+mod mesh;
 
 fn main() -> Result<()> {
     env_logger::init();
