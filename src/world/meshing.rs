@@ -2,6 +2,7 @@ use super::chunk::{Chunk, CHUNK_SIZE};
 use super::renderer::Vertex;
 
 // The constant associated to the normal direction
+/*
 const EAST: u32 = 0;
 // 1x
 const WEST: u32 = 1;
@@ -12,7 +13,7 @@ const DOWN: u32 = 3;
 // -1y
 const SOUTH: u32 = 4;
 // 1z
-const NORTH: u32 = 5; // -1z
+const NORTH: u32 = 5; // -1z*/
 
 /// Structure containing information about adjacent chunks for the meshing
 /// Order of face 1x, -1x, 1y, -1y, 1z, -1z => the two order component are in the (x,y,z) order
@@ -146,8 +147,6 @@ const MESH_INDEX: [[usize; 6]; 6] = [MESH_EAST_INDEX, MESH_WEST_INDEX, MESH_UP_I
 // good luck understanding this, future me !
 const OCC_POS_CHECK: [[[(i32, i32, i32, bool); 3]; 4]; 6] = [[[(1, -1, -1, false, ), (1, -1, 0, true, ), (1, 0, -1, true, ), ], [(1, 0, -1, true, ), (1, 1, -1, false, ), (1, 1, 0, true, ), ], [(1, -1, 0, true, ), (1, -1, 1, false, ), (1, 0, 1, true, ), ], [(1, 0, 1, true, ), (1, 1, 0, true, ), (1, 1, 1, false, ), ], ], [[(-1, -1, -1, false, ), (-1, -1, 0, true, ), (-1, 0, -1, true, ), ], [(-1, 0, -1, true, ), (-1, 1, -1, false, ), (-1, 1, 0, true, ), ], [(-1, -1, 0, true, ), (-1, -1, 1, false, ), (-1, 0, 1, true, ), ], [(-1, 0, 1, true, ), (-1, 1, 0, true, ), (-1, 1, 1, false, ), ], ], [[(-1, 1, -1, false, ), (-1, 1, 0, true, ), (0, 1, -1, true, ), ], [(0, 1, -1, true, ), (1, 1, -1, false, ), (1, 1, 0, true, ), ], [(-1, 1, 0, true, ), (-1, 1, 1, false, ), (0, 1, 1, true, ), ], [(0, 1, 1, true, ), (1, 1, 0, true, ), (1, 1, 1, false, ), ], ], [[(-1, -1, -1, false, ), (-1, -1, 0, true, ), (0, -1, -1, true, ), ], [(0, -1, -1, true, ), (1, -1, -1, false, ), (1, -1, 0, true, ), ], [(-1, -1, 0, true, ), (-1, -1, 1, false, ), (0, -1, 1, true, ), ], [(0, -1, 1, true, ), (1, -1, 0, true, ), (1, -1, 1, false, ), ], ], [[(-1, -1, 1, false, ), (-1, 0, 1, true, ), (0, -1, 1, true, ), ], [(0, -1, 1, true, ), (1, -1, 1, false, ), (1, 0, 1, true, ), ], [(-1, 0, 1, true, ), (-1, 1, 1, false, ), (0, 1, 1, true, ), ], [(0, 1, 1, true, ), (1, 0, 1, true, ), (1, 1, 1, false, ), ], ], [[(-1, -1, -1, false, ), (-1, 0, -1, true, ), (0, -1, -1, true, ), ], [(0, -1, -1, true, ), (1, -1, -1, false, ), (1, 0, -1, true, ), ], [(-1, 0, -1, true, ), (-1, 1, -1, false, ), (0, 1, -1, true, ), ], [(0, 1, -1, true, ), (1, 0, -1, true, ), (1, 1, -1, false, ), ], ], ];
 
-type ChunkArray = [[[bool; CHUNK_SIZE as usize]; CHUNK_SIZE as usize ]; CHUNK_SIZE as usize];
-
 /// Return True if full block (taking into account adjacent chunks)
 fn is_full(chunk: &Chunk, (i, j, k): (i32, i32, i32), adj: Option<AdjChunkOccl>) -> bool {
     let size = CHUNK_SIZE as i32;
@@ -162,7 +161,7 @@ fn is_full(chunk: &Chunk, (i, j, k): (i32, i32, i32), adj: Option<AdjChunkOccl>)
 }
 
 /// Return true if pos (x,y,z) is in block (i,j,k)
-fn in_block((i, j, k): (i32, i32, i32), (x, y, z): (f32, f32, f32)) -> bool {
+fn _in_block((i, j, k): (i32, i32, i32), (x, y, z): (f32, f32, f32)) -> bool {
     let dx = x - i as f32;
     let dy = y - j as f32;
     let dz = z - k as f32;
@@ -227,10 +226,47 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
         (a*N_SIZE*N_SIZE + b*N_SIZE + c) as usize
     }
 
-    for i  in 0..(N_SIZE as i32) {
-        for j in 0..(N_SIZE as i32) {
-            for k in 0..(N_SIZE as i32) {
-                chunk_mask[ind(i,j,k)] = is_full(chunk, (i-1,j-1,k-1), adj);
+    const IN_SIZE: i32 = N_SIZE as i32;
+    for i  in 0..IN_SIZE {
+        for j in 0..IN_SIZE {
+            for k in 0..IN_SIZE {
+                if i == 0 || i == IN_SIZE-1 || j == 0 || j == IN_SIZE-1 || k == 0 || k == IN_SIZE-1 {
+                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj);
+                }
+            }
+        }
+    }
+
+    const UCHUNK_LEN: usize = super::chunk::CHUNK_LEN as usize;
+    const UN_SIZE: usize = N_SIZE as usize;
+    for i in 0..UCHUNK_LEN {
+        for j in 0..UCHUNK_LEN {
+            for k in 0..UCHUNK_LEN {
+                let index = (i * UCHUNK_LEN + j) * UCHUNK_LEN + k;
+                let world_index = ((2 * i + 1) * UN_SIZE + 2 * j + 1) * UN_SIZE + 2 * k + 1;
+                use super::chunk::BlockGroup;
+                match &chunk.data[index] {
+                    BlockGroup::Compressed(data) => {
+                        if *data != 0 {
+                            for i2 in 0..2 {
+                                for j2 in 0..2 {
+                                    for k2 in 0..2 {
+                                        chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = true;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    BlockGroup::Uncompressed(data) => {
+                        for i2 in 0..2 {
+                            for j2 in 0..2 {
+                                for k2 in 0..2 {
+                                    chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = data[i2*4 + j2*2 + k2] != 0;
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

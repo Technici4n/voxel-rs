@@ -36,7 +36,7 @@ impl State for SinglePlayer {
         _settings: &mut Settings,
         keyboard_state: &KeyboardState,
         _data: &WindowData,
-        flags: &mut WindowFlags,
+        _flags: &mut WindowFlags,
         seconds_delta: f64,
     ) -> Result<StateTransition> {
         self.world.camera.tick(seconds_delta, keyboard_state);
@@ -74,7 +74,7 @@ impl State for SinglePlayer {
         Ok(StateTransition::KeepCurrent)
     }
 
-    fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64)) {
+    fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
         self.world.camera.update_cursor(delta.0, delta.1);
     }
 

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::collections::HashMap;
 
 pub mod camera;
@@ -27,7 +28,7 @@ impl World {
     /// If the chunk at position x,y,z does not exist, create and generate it
     pub fn gen_chunk(&mut self, x: i64, y: i64, z: i64){
         match self.get_chunk(x, y, z){
-            Some(chunk) =>(),
+            Some(_chunk) =>(),
             None =>{
                 let mut chunk = Chunk::new(x,y,z);
                 chunk.fill_perlin();
@@ -51,7 +52,7 @@ impl World {
     }
 
     /// Return a mutable reference to the chunk if it exists None otherwise
-    pub fn get_chunk_mut(&mut self, x: i64, y: i64, z: i64) -> Option<&mut Chunk> {
+    pub fn _get_chunk_mut(&mut self, x: i64, y: i64, z: i64) -> Option<&mut Chunk> {
         self.chunks.get_mut(&ChunkPos {
             px: x,
             py: y,
@@ -60,7 +61,7 @@ impl World {
     }
 
     /// Return data at position x,y,z
-    pub fn get_data(&self, x: i64, y: i64, z: i64) -> u32 {
+    pub fn _get_data(&self, x: i64, y: i64, z: i64) -> u32 {
         let (cx, cy, cz) = World::get_chunk_coord(x, y, z);
         let (dx, dy, dz) = (
             (x - cx * CHUNK_SIZE as i64) as u32,
@@ -75,7 +76,7 @@ impl World {
 
     /// Set data at position x,y,z
     /// Enventually create a new chunk if necessary
-    pub fn set_data(&mut self, x: i64, y: i64, z: i64, data: u32) {
+    pub fn _set_data(&mut self, x: i64, y: i64, z: i64, data: u32) {
         let (cx, cy, cz) = World::get_chunk_coord(x, y, z);
         let (dx, dy, dz) = (
             (x - cx * CHUNK_SIZE as i64) as u32,

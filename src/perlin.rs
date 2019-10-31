@@ -4,9 +4,9 @@ use simdnoise::*;
 /// Point in the block are distant of 1
 /// Use the parameter factor to set the scale factor
 pub fn perlin(
-    mut x: f32,
-    mut y: f32,
-    mut z: f32,
+    x: f32,
+    y: f32,
+    z: f32,
     size : usize,
     mut factor : f32,
     octave: i32,

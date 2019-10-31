@@ -19,7 +19,7 @@ impl KeyboardState {
         self.keys.insert(input.scancode, input.state);
     }
 
-    pub fn get_modifiers_state(&self) -> ModifiersState {
+    pub fn _get_modifiers_state(&self) -> ModifiersState {
         self.modifiers_state
     }
 

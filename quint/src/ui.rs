@@ -1,5 +1,7 @@
 use crate::{
+    Event,
     Layout,
+    Position,
     Size,
     Style,
 };
@@ -84,7 +86,7 @@ pub trait Widget<Renderer, Message> {
     // TODO: add screen size
     fn style(&self) -> Style;
     fn render(&self, renderer: &mut Renderer, layout: Layout);
-    //fn on_event(&self, event: &Event, messages: &mut Vec<Message>);
+    //fn on_event(&self, event: Event, layout: Layout, cursor_position: Position, messages: &mut Vec<Message>);
 }
 
 pub struct WidgetTree<Renderer, Message> {

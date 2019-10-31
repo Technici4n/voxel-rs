@@ -44,7 +44,7 @@ pub fn load_settings(folder_path: &Path, file_path: &Path) -> Result<Settings> {
     Ok(settings)
 }
 
-fn write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
+fn _write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
     info!("Writing settings...");
     let path = path.as_ref();
     let mut settings_file = OpenOptions::new()

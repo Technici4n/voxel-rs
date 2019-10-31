@@ -1,7 +1,7 @@
 use crate::perlin::perlin;
 
 /// Number of blocks of data in a chunk axis
-const CHUNK_LEN: u32 = 16;
+pub const CHUNK_LEN: u32 = 16;
 /// Number of data in a bloc axis
 const GROUP_LEN: u32 = 2;
 /// size of an axis of chunk (number of data)
@@ -10,7 +10,7 @@ pub const CHUNK_SIZE: u32 = GROUP_LEN * CHUNK_LEN;
 const BLOCK_SIZE: usize = (GROUP_LEN * GROUP_LEN * GROUP_LEN) as usize;
 
 #[derive(Clone)]
-enum BlockGroup {
+pub(super) enum BlockGroup {
     Compressed(u32),
     // 1 bit (NxNxN) times the same data
     Uncompressed(Box<[u32; BLOCK_SIZE]>), // different data
@@ -27,7 +27,7 @@ pub struct ChunkPos {
 #[derive(Clone)]
 pub struct Chunk {
     pub pos: ChunkPos,
-    data: Vec<BlockGroup>, // data containde in the chunk
+    pub(super) data: Vec<BlockGroup>, // data containde in the chunk
 }
 
 impl Chunk {

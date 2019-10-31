@@ -10,39 +10,6 @@ use self::{
 pub mod renderer;
 pub mod widgets;
 
-/// A Ui primitive
-#[derive(Debug, Clone)]
-pub enum Primitive {
-    Nothing,
-    Rectangle { color: [f32; 4], hover_color: [f32; 4], hovered: bool },
-    Text { text: String, font_size: Scale },
-}
-
-impl Primitive {
-    pub fn set_hover(&mut self, hover: bool) {
-        match self {
-            Self::Nothing => (),
-            Self::Rectangle { ref mut hovered, .. } => *hovered = true,
-            Self::Text { .. } => (),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct UiError {
-    pub what: String,
-}
-
-impl std::fmt::Display for UiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Some error happened during creation of the Ui: {}",
-            self.what
-        )
-    }
-}
-
 /// The user interface. Every element is represented by an id of type `Node`.
 /// It is layouted using flexbox
 pub struct Ui {
@@ -60,14 +27,6 @@ impl Ui {
 
     pub fn cursor_moved(&mut self, p: LogicalPosition) {
         self.cursor_position = p;
-    }
-
-    pub(self) fn update_hover(&mut self) {
-
-    }
-
-    pub fn mouse_input(&mut self, state: glutin::ElementState, mouse: glutin::MouseButton) {
-
     }
 
     /// Rebuild the Ui if it changed
