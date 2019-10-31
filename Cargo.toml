@@ -25,3 +25,6 @@ stretch = "0.3"
 
 # Math
 nalgebra = "0.18"
+
+# Noise
+simdnoise = "3.1.1"
