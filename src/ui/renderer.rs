@@ -8,8 +8,8 @@ use gfx::{
     traits::{Factory, FactoryExt},
     Slice,
 };
-use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Section};
-use stretch::{geometry::Size, number::Number};
+use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Scale, Section};
+use quint::Layout;
 
 #[derive(Debug)]
 pub struct UiRenderingError {
@@ -68,6 +68,35 @@ gfx_defines! {
 type R = gfx_device_gl::Resources;
 type PipeDataType = pipe::Data<R>;
 type PsoType = gfx::PipelineState<R, pipe::Meta>;
+
+#[derive(Debug, Clone)]
+pub struct RectanglePrimitive {
+    pub layout: Layout,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone)]
+pub struct TextPrimitive {
+    pub layout: Layout,
+    pub text: String,
+    pub font_size: Scale,
+}
+
+#[derive(Default, Debug)]
+pub struct PrimitiveBuffer {
+    pub(self) rectangle: Vec<RectanglePrimitive>,
+    pub(self) text: Vec<TextPrimitive>,
+}
+
+impl PrimitiveBuffer {
+    pub fn draw_rectangle(&mut self, color: [f32; 4], layout: Layout) {
+        self.rectangle.push(RectanglePrimitive { color, layout });
+    }
+
+    pub fn draw_text(&mut self, text: String, font_size: Scale, layout: Layout) {
+        self.text.push(TextPrimitive { text, font_size, layout });
+    }
+}
 
 pub struct UiRenderer {
     // Glyph rendering
@@ -147,91 +176,55 @@ impl UiRenderer {
             ..
         } = gfx;
 
-        let root_node = match ui.root_node {
-            Some(root_node) => root_node,
-            None => return Ok(()),
-        };
+        let mut primitive_buffer = PrimitiveBuffer::default();
+        ui.ui.render(&mut primitive_buffer);
 
-        // Rebuild Ui
-        let glutin::dpi::LogicalSize {
-            width: win_w,
-            height: win_h,
-        } = data.logical_window_size;
-        let layout_size = Size {
-            width: Number::Defined(win_w as f32),
-            height: Number::Defined(win_h as f32),
-        };
-        ui.stretch
-            .compute_layout(root_node, layout_size)
-            .map_err(super::UiError::from)?;
-        ui.update_hover();
-
-        // Recursively render every child of the root_node
+        // Render primitives
         let mut rect_vertices: Vec<Vertex> = Vec::new();
         let mut rect_indices: Vec<u32> = Vec::new();
-        let mut nodes = vec![root_node];
-        while let Some(current_node) = nodes.pop() {
-            // Enqueue children nodes
-            if let Ok(children) = ui.stretch.children(current_node) {
-                nodes.extend(children.into_iter());
-            }
-            // Process current node (if there is an associated primitive)
-            if let Some(primitive) = ui.primitives.get(&current_node) {
-                if let Ok(l) = ui.stretch.layout(current_node) {
-                    use super::Primitive::*;
-                    match primitive {
-                        Nothing => {}
-                        Rectangle { color, hover_color, hovered } => {
-                            let color = if *hovered { hover_color } else { color };
-                            // a --- b
-                            // |  /  |
-                            // c --- d
-                            let a = Vertex {
-                                pos: [l.location.x, l.location.y, 0.0],
-                                color: (*color).clone(),
-                            };
-                            let b = Vertex {
-                                pos: [l.location.x + l.size.width, l.location.y, 0.0],
-                                color: (*color).clone(),
-                            };
-                            let c = Vertex {
-                                pos: [l.location.x, l.location.y + l.size.height, 0.0],
-                                color: (*color).clone(),
-                            };
-                            let d = Vertex {
-                                pos: [
-                                    l.location.x + l.size.width,
-                                    l.location.y + l.size.height,
-                                    0.0,
-                                ],
-                                color: (*color).clone(),
-                            };
-                            let a_index = rect_vertices.len() as u32;
-                            let b_index = a_index + 1;
-                            let c_index = b_index + 1;
-                            let d_index = c_index + 1;
-                            rect_vertices.extend([a, b, c, d].into_iter());
-                            rect_indices.extend(
-                                [b_index, a_index, c_index, b_index, c_index, d_index].into_iter(),
-                            );
-                        }
-                        Text { text, font_size } => {
-                            let section = Section {
-                                text: &*text,
-                                screen_position: (l.location.x, l.location.y),
-                                bounds: (l.size.width, l.size.height),
-                                scale: font_size.clone(),
-                                ..Section::default()
-                            };
-                            self.glyph_brush.queue(section);
-                        }
-                    }
-                }
-            }
+
+        // Rectangles
+        for RectanglePrimitive { layout: l, color } in primitive_buffer.rectangle.into_iter() {
+            let a = Vertex {
+                pos: [l.x, l.y, 0.0],
+                color: color.clone(),
+            };
+            let b = Vertex {
+                pos: [l.x + l.width, l.y, 0.0],
+                color: color.clone(),
+            };
+            let c = Vertex {
+                pos: [l.x, l.y + l.height, 0.0],
+                color: color.clone(),
+            };
+            let d = Vertex {
+                pos: [l.x + l.width, l.y + l.height, 0.0],
+                color: color.clone(),
+            };
+            let a_index = rect_vertices.len() as u32;
+            let b_index = a_index + 1;
+            let c_index = b_index + 1;
+            let d_index = c_index + 1;
+            rect_vertices.extend([a, b, c, d].into_iter());
+            rect_indices.extend(
+                [b_index, a_index, c_index, b_index, c_index, d_index].into_iter(),
+            );
+        }
+        // Text
+        for TextPrimitive { layout: l, text, font_size } in primitive_buffer.text.into_iter() {
+            let section = Section {
+                text: &text,
+                screen_position: (l.x, l.y),
+                bounds: (l.width, l.height),
+                scale: font_size,
+                ..Section::default()
+            };
+            self.glyph_brush.queue(section);
         }
 
         // Draw rectangles
         {
+            let (win_w, win_h) = (data.logical_window_size.width, data.logical_window_size.height);
             // Update the uniform buffer to map (w, h) coordinates to [-1, 1]
             let transformation_matrix = [
                 [2.0 / win_w as f32, 0.0, 0.0, 0.0],

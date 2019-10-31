@@ -40,7 +40,6 @@ impl State for SinglePlayer {
         seconds_delta: f64,
     ) -> Result<StateTransition> {
         self.world.camera.tick(seconds_delta, keyboard_state);
-        self.ui.build_if_changed(&self.world, self.fps_counter.fps())?;
         //flags.hide_and_center_cursor = true;
         Ok(StateTransition::KeepCurrent)
     }
@@ -65,6 +64,7 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
+        self.ui.rebuild(&self.world, self.fps_counter.fps(), data)?;
         self.ui_renderer.render(gfx, &data, &mut self.ui)?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);

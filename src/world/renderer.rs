@@ -44,7 +44,6 @@ pub struct WorldRenderer {
 
 impl WorldRenderer {
     pub fn new(gfx: &mut Gfx) -> Result<Self> {
-        use super::chunk::Chunk;
         use super::meshing::meshing;
 
         let Gfx {
