@@ -149,10 +149,10 @@ const OCC_POS_CHECK: [[[(i32, i32, i32, bool); 3]; 4]; 6] = [[[(1, -1, -1, false
 type ChunkArray = [[[bool; CHUNK_SIZE as usize]; CHUNK_SIZE as usize ]; CHUNK_SIZE as usize];
 
 /// Return True if full block (taking into account adjacent chunks)
-fn is_full(chunk_mask: &ChunkArray, (i, j, k): (i32, i32, i32), adj: Option<AdjChunkOccl>) -> bool {
+fn is_full(chunk: &Chunk, (i, j, k): (i32, i32, i32), adj: Option<AdjChunkOccl>) -> bool {
     let size = CHUNK_SIZE as i32;
     if i >= 0 && j >= 0 && k >= 0 && i < size && j < size && k < size {
-        return chunk_mask[i as usize][j as usize][k as usize];
+        return chunk.get_data(i as u32,j as u32,k as u32) != 0;
     } else {
         match adj {
             Some(_adj) => _adj.is_full(i, j, k),
@@ -218,24 +218,31 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
     }
     dbg!(&occ_pos_check); => code used to generate the OCC_POS_CHECK struct*/
 
-    let mut chunk_mask : ChunkArray = Default::default();
+    const N_SIZE : usize = (CHUNK_SIZE + 2 ) as usize;
+    let mut chunk_mask = [false; N_SIZE * N_SIZE * N_SIZE];
 
-    for i in 0..CHUNK_SIZE {
-        for j in 0..CHUNK_SIZE {
-            for k in 0..CHUNK_SIZE {
-                chunk_mask[i as usize][j as usize][k as usize] = chunk.get_data(i ,j,k) != 0;
+    #[inline(always)]
+    fn ind(x:i32, y:i32, z:i32) -> usize{
+        let (a,b,c) = (x as usize, y as usize, z as usize);
+        (a*N_SIZE*N_SIZE + b*N_SIZE + c) as usize
+    }
+
+    for i  in 0..(N_SIZE as i32) {
+        for j in 0..(N_SIZE as i32) {
+            for k in 0..(N_SIZE as i32) {
+                chunk_mask[ind(i,j,k)] = is_full(chunk, (i-1,j-1,k-1), adj);
             }
         }
     }
 
-    for i in 0..CHUNK_SIZE {
-        for j in 0..CHUNK_SIZE {
-            for k in 0..CHUNK_SIZE {
-                if chunk.get_data(i, j, k) != 0 {
+    for i in 0..(CHUNK_SIZE as i32) {
+        for j in 0..(CHUNK_SIZE as i32) {
+            for k in 0..(CHUNK_SIZE as i32) {
+                if chunk_mask[ind(i + 1, j +1 , k + 1 )]{
                     //checking if not void
 
                     for s in 0..6 { // each direction
-                        if !is_full(&chunk_mask, (i as i32 + D[s][0], j as i32 + D[s][1], k as i32 + D[s][2]), adj) {
+                        if !chunk_mask[ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])]{
                             for l in 0..4 {
                                 let px = i as f32 + MESH_DIR[s][l][0];
                                 let py = j as f32 + MESH_DIR[s][l][1];
@@ -247,7 +254,7 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
                                         let mut coins = 0;
                                         let mut edge = 0;
                                         for (p1, p2, p3, is_edge) in OCC_POS_CHECK[s][l].iter() {
-                                            if is_full(&chunk_mask, (i as i32 + *p1, j as i32 + *p2, k as i32 + *p3), adj) {
+                                            if chunk_mask[ind (i + 1  + *p1, j + 1 + *p2, k + 1 + *p3)]{
                                                 if *is_edge {
                                                     edge += 1;
                                                 } else {
