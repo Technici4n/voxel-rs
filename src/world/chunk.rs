@@ -1,3 +1,5 @@
+use crate::perlin::perlin;
+
 /// Number of blocks of data in a chunk axis
 const CHUNK_LEN: u32 = 16;
 /// Number of data in a bloc axis
@@ -7,17 +9,17 @@ pub const CHUNK_SIZE: u32 = GROUP_LEN * CHUNK_LEN;
 /// number of data in a block
 const BLOCK_SIZE: usize = (GROUP_LEN * GROUP_LEN * GROUP_LEN) as usize;
 
-use crate::perlin::perlin;
-
 #[derive(Clone)]
 enum BlockGroup {
-    Compressed(u32),                      // 1 bit (NxNxN) times the same data
+    Compressed(u32),
+    // 1 bit (NxNxN) times the same data
     Uncompressed(Box<[u32; BLOCK_SIZE]>), // different data
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 pub struct ChunkPos {
-    pub px: i64, // position of the chunkc in the world
+    pub px: i64,
+    // position of the chunkc in the world
     pub py: i64,
     pub pz: i64,
 }
@@ -45,12 +47,12 @@ impl Chunk {
         match &self.data[((px / GROUP_LEN) * CHUNK_LEN * CHUNK_LEN
             + (py / GROUP_LEN) * CHUNK_LEN
             + (pz / GROUP_LEN)) as usize]
-        {
-            BlockGroup::Compressed(block_type) => *block_type, // if compressed return the compressed type
-            BlockGroup::Uncompressed(blocks) => {
-                blocks[((px % GROUP_LEN) * 4 + (py % GROUP_LEN) * 2 + (pz % GROUP_LEN)) as usize]
-            } // if not compressed, return the data stored in the full array
-        }
+            {
+                BlockGroup::Compressed(block_type) => *block_type, // if compressed return the compressed type
+                BlockGroup::Uncompressed(blocks) => {
+                    blocks[((px % GROUP_LEN) * 4 + (py % GROUP_LEN) * 2 + (pz % GROUP_LEN)) as usize]
+                } // if not compressed, return the data stored in the full array
+            }
     }
 
     pub fn set_data(&mut self, px: u32, py: u32, pz: u32, data: u32) {
@@ -83,17 +85,15 @@ impl Chunk {
 
     /// Fill the chunk with perlin noise
     pub fn fill_perlin(&mut self) {
+        let px = (self.pos.px * CHUNK_SIZE as i64) as f32;
+        let py = (self.pos.py * CHUNK_SIZE as i64) as f32;
+        let pz = (self.pos.pz * CHUNK_SIZE as i64) as f32;
+        let noise = perlin(px,py,pz,CHUNK_SIZE as usize, 1.0/32.0, 5, 0.4, 42);
+
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if perlin(
-                        (i as f64 + (self.pos.px * CHUNK_SIZE as i64) as f64) / 16.0,
-                        (j as f64 + (self.pos.py * CHUNK_SIZE as i64) as f64) / 16.0,
-                        (k as f64 + (self.pos.pz * CHUNK_SIZE as i64) as f64) / 16.0,
-                        7,
-                        0.4,
-                        42,
-                    ) > 0.5
+                    if noise[(k * 32*32 + j*32 + i) as usize] > 0.5 // warning : indexing order
                     {
                         self.set_data(i, j, k, 1);
                     }
