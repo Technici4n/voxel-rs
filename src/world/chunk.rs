@@ -11,9 +11,9 @@ const BLOCK_SIZE: usize = (GROUP_LEN * GROUP_LEN * GROUP_LEN) as usize;
 
 #[derive(Clone)]
 pub(super) enum BlockGroup {
-    Compressed(u32),
+    Compressed(u16, u16, u16, u16), // (x, y), (x, Y), (X, y), (X, Y)
     // 1 bit (NxNxN) times the same data
-    Uncompressed(Box<[u32; BLOCK_SIZE]>), // different data
+    Uncompressed(Box<[u16; BLOCK_SIZE]>), // different data
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
@@ -38,32 +38,58 @@ impl Chunk {
                 py: y,
                 pz: z,
             },
-            data: vec![BlockGroup::Compressed(0); (CHUNK_LEN * CHUNK_LEN * CHUNK_LEN) as usize],
+            data: vec![BlockGroup::Compressed(0, 0, 0, 0); (CHUNK_LEN * CHUNK_LEN * CHUNK_LEN) as usize],
             // chunk is empty
         }
     }
 
-    pub fn get_data(&self, px: u32, py: u32, pz: u32) -> u32 {
+    pub fn get_data(&self, px: u32, py: u32, pz: u32) -> u16 {
         match &self.data[((px / GROUP_LEN) * CHUNK_LEN * CHUNK_LEN
             + (py / GROUP_LEN) * CHUNK_LEN
             + (pz / GROUP_LEN)) as usize]
             {
-                BlockGroup::Compressed(block_type) => *block_type, // if compressed return the compressed type
+                BlockGroup::Compressed(bxz, bxZ, bXz, bXZ ) => {
+                    match (px%2)*2 + pz%2{
+                        0 => *bxz,
+                        1 => *bxZ,
+                        2 => *bXz,
+                        3 => *bXZ,
+                        _ => unreachable!(),
+                    }
+                }, // if compressed return the compressed type
                 BlockGroup::Uncompressed(blocks) => {
                     blocks[((px % GROUP_LEN) * 4 + (py % GROUP_LEN) * 2 + (pz % GROUP_LEN)) as usize]
                 } // if not compressed, return the data stored in the full array
             }
     }
 
-    pub fn set_data(&mut self, px: u32, py: u32, pz: u32, data: u32) {
+    pub fn set_data(&mut self, px: u32, py: u32, pz: u32, data: u16) {
         let x = &mut self.data[((px / GROUP_LEN) * CHUNK_LEN * CHUNK_LEN
             + (py / GROUP_LEN) * CHUNK_LEN
             + (pz / GROUP_LEN)) as usize];
 
-        if let BlockGroup::Compressed(block_type) = x {
-            if *block_type != data {
+        if let BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) = x {
+            let btype = match (px%2)*2 + pz%2{
+                0 => *bxz,
+                1 => *bxZ,
+                2 => *bXz,
+                3 => *bXZ,
+                _ => unreachable!(),
+            };
+            if btype != data {
                 // splitting the group into an new array
-                let mut fill = [*block_type; BLOCK_SIZE];
+                let mut fill = [0; BLOCK_SIZE];
+
+                // hardcoded for GROUP_LEN = 2
+                fill[0] = *bxz;
+                fill[2] = *bxz;
+                fill[1] = *bxZ;
+                fill[3] = *bxZ;
+                fill[4] = *bXz;
+                fill[6] = *bXz;
+                fill[5] = *bXZ;
+                fill[7] = *bXZ;
+
                 fill[((px % GROUP_LEN) * GROUP_LEN * GROUP_LEN
                     + (py % GROUP_LEN) * GROUP_LEN
                     + (pz % GROUP_LEN)) as usize] = data;
@@ -73,13 +99,20 @@ impl Chunk {
             blocks[((px % GROUP_LEN) * GROUP_LEN * GROUP_LEN
                 + (py % GROUP_LEN) * GROUP_LEN
                 + (pz % GROUP_LEN)) as usize] = data;
-            for i in 0..BLOCK_SIZE {
-                // if all the data in the array are the same -> merge
-                if blocks[i] != data {
-                    return;
-                }
+
+            if blocks[0] != blocks[2]{
+                return;
             }
-            *x = BlockGroup::Compressed(data); // mergin all block in one
+            if blocks[1] != blocks[3]{
+                return;
+            }
+            if blocks[4] != blocks[6]{
+                return;
+            }
+            if blocks[7] != blocks[5]{
+                return;
+            }
+            *x = BlockGroup::Compressed(blocks[0], blocks[1], blocks[4], blocks[5]); // merging all block in four columns
         }
     }
 

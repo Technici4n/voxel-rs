@@ -246,16 +246,18 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
                 let world_index = ((2 * i + 1) * UN_SIZE + 2 * j + 1) * UN_SIZE + 2 * k + 1;
                 use super::chunk::BlockGroup;
                 match &chunk.data[index] {
-                    BlockGroup::Compressed(data) => {
-                        if *data != 0 {
+                    BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) => {
+                        let obs = [*bxz != 0, *bxZ != 0, *bXz != 0, *bXZ != 0];
                             for i2 in 0..2 {
-                                for j2 in 0..2 {
-                                    for k2 in 0..2 {
-                                        chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = true;
+                                for k2 in 0..2 {
+                                    if obs[i2*2 + k2] {
+                                        for j2 in 0..2 {
+                                            chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = true;
+                                        }
                                     }
                                 }
                             }
-                        }
+
                     }
                     BlockGroup::Uncompressed(data) => {
                         for i2 in 0..2 {
