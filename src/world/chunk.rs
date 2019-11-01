@@ -121,12 +121,13 @@ impl Chunk {
         let px = (self.pos.px * CHUNK_SIZE as i64) as f32;
         let py = (self.pos.py * CHUNK_SIZE as i64) as f32;
         let pz = (self.pos.pz * CHUNK_SIZE as i64) as f32;
-        let noise = perlin(px,py,pz,CHUNK_SIZE as usize, 1.0/32.0, 5, 0.4, 42);
+        let freq = 1.0/32.0;
+        let noise = perlin(px,py,pz,CHUNK_SIZE as usize, freq, 4, 0.4, 42);
 
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if noise[(k * 32*32 + j*32 + i) as usize] > 0.5 // warning : indexing order
+                    if noise[(k* 32*32 + j*32 + i) as usize] > 0.5 // warning : indexing order
                     {
                         self.set_data(i, j, k, 1);
                     }

@@ -10,6 +10,7 @@ use gfx::handle::Buffer;
 use gfx::traits::FactoryExt;
 use gfx_device_gl::Resources;
 use nalgebra::{convert, Matrix4};
+use gfx::state::RasterMethod;
 
 // TODO: add images
 
@@ -38,35 +39,53 @@ gfx_defines! {
 type PsoType = gfx::PipelineState<gfx_device_gl::Resources, pipe::Meta>;
 
 pub struct WorldRenderer {
-    pub pso: PsoType,
+    pub pso_fill: PsoType,
+    pub pso_wireframe : PsoType,
     pub meshes: Vec<Mesh>,
     pub transform: Buffer<Resources, Transform>,
 }
 
 impl WorldRenderer {
     pub fn new(gfx: &mut Gfx) -> Result<Self> {
-        use super::meshing::meshing;
+        use super::meshing::greedy_meshing as meshing;
 
         let Gfx {
             ref mut factory, ..
         } = gfx;
+
+
         let shader_set = factory.create_shader_set(
             include_bytes!("../../shader/world.vert"),
             include_bytes!("../../shader/world.frag"),
         )?;
-        let pso = factory.create_pipeline_state(
+        let pso_fill = factory.create_pipeline_state(
             &shader_set,
             gfx::Primitive::TriangleList,
             gfx::state::Rasterizer::new_fill().with_cull_back(),
             pipe::new(),
         )?;
 
+        let shader_set_wireframe = factory.create_shader_set(
+            include_bytes!("../../shader/world.vert"),
+            include_bytes!("../../shader/world_wireframe.frag"),
+        )?;
+        let pso_wireframe = factory.create_pipeline_state(
+            &shader_set_wireframe,
+            gfx::Primitive::TriangleList,
+            {
+                let mut r = gfx::state::Rasterizer::new_fill().with_cull_back();
+                r.method = RasterMethod::Line(1);
+                r
+            },
+            pipe::new(),
+        )?;
+
         let mut meshes = Vec::new(); // all the mesh to be rendered
         let mut world = World::new();
 
-        for i in -2..2 {
-            for j in -2..2 {
-                for k in -2..2 {
+        for i in -4..4 {
+            for j in -4..4 {
+                for k in -4..4 {
                     // generating the chunks
                     println!("Generating chunk at pos ({}, {}, {})",i,j,k);
                     world.gen_chunk(i,j,k);
@@ -82,12 +101,13 @@ impl WorldRenderer {
 
             println!("Meshing chunk at pos ({}, {}, {})", pos.0,pos.1,pos.2);
             let t1 = Instant::now();
-            let (vertices, indices) = meshing(chunk,
+            let (vertices, indices, tot_quad, act_quad) = meshing(chunk,
                                               Some(world.create_adj_chunk_occl(
                                                   chunk.pos.px,chunk.pos.py, chunk.pos.pz
                                               )));
             let t2 = Instant::now();
             println!("Creating mesh : {} ms", (t2 - t1).subsec_millis());
+            println!("Compression factor : {} %", 100.0 * (act_quad as f32)/(tot_quad as f32));
 
 
 
@@ -99,7 +119,8 @@ impl WorldRenderer {
 
 
         Ok(Self {
-            pso,
+            pso_fill,
+            pso_wireframe,
             meshes,
             transform: factory.create_constant_buffer(1),
         })
@@ -148,7 +169,7 @@ impl WorldRenderer {
 
             encoder.update_buffer(&data.transform, &[transform], 0)?;
             // (index buffer, pso, full data with vertex buffer and uniform buffer inside)
-            encoder.draw(&mesh.indices, &self.pso, &data);
+            encoder.draw(&mesh.indices, &self.pso_fill, &data);
         }
 
         Ok(())
