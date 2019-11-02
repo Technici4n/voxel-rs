@@ -106,17 +106,17 @@ impl World {
         if ix >= 0 {
             x = ix / CHUNK_SIZE as i64;
         } else {
-            x = ix / CHUNK_SIZE as i64 - 1;
+            x = (ix+1) / CHUNK_SIZE as i64 - 1;
         }
         if iy >= 0 {
             y = iy / CHUNK_SIZE as i64;
         } else {
-            y = iy / CHUNK_SIZE as i64 - 1;
+            y = (iy+1) / CHUNK_SIZE as i64 - 1;
         }
         if iz >= 0 {
             z = iz / CHUNK_SIZE as i64;
         } else {
-            z = iz / CHUNK_SIZE as i64 - 1;
+            z = (iz+1) / CHUNK_SIZE as i64 - 1;
         }
         (x, y, z)
     }

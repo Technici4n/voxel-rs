@@ -1,16 +1,21 @@
-struct AABB {
-    pub x: f32,
-    pub y: f32,
-    pub z: f32,
-    pub size_x: f32,
-    pub size_y: f32,
-    pub size_z: f32,
+use crate::world::World;
+use nalgebra::Vector3;
+
+pub struct AABB {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+    pub size_x: f64,
+    pub size_y: f64,
+    pub size_z: f64,
 
 }
 
+// TODO : use nalgebra Vector3
+
 impl AABB {
     /// Create a new AABB box
-    pub fn new((px, py, pz): (f32, f32, f32), (sX, sY, sZ): (f32, f32, f32)) -> Self {
+    pub fn new((px, py, pz): (f64, f64, f64), (sX, sY, sZ): (f64, f64, f64)) -> Self {
         AABB {
             x: px,
             y: py,
@@ -22,7 +27,7 @@ impl AABB {
     }
 
     /// Create an AABB box of cubic shape
-    pub fn new_cube((px, py, pz): (f32, f32, f32), size: f32) -> Self {
+    pub fn new_cube((px, py, pz): (f64, f64, f64), size: f64) -> Self {
         AABB {
             x: px,
             y: py,
@@ -40,7 +45,7 @@ impl AABB {
             || (other.y >= self.y + self.size_y)
             || (other.y + other.size_y <= self.y)
             || (other.z >= self.z + self.size_z)
-            || (other.z + other.size <= self.z) {
+            || (other.z + other.size_z <= self.z) {
             return false;
         } else {
             return true;
@@ -48,7 +53,7 @@ impl AABB {
     }
 
     /// Return true if point (px, py, pz) is in the AABB box
-    pub fn intersect_point(&self, (px, py, pz): (f32, f32, f32)) -> bool {
+    pub fn intersect_point(&self, (px, py, pz): (f64, f64, f64)) -> bool {
         if px >= self.x && px <= self.x + self.size_x
             && py >= self.y && py <= self.y + self.size_y
             && pz >= self.z && pz <= self.z + self.size_z {
@@ -62,10 +67,10 @@ impl AABB {
     pub fn intersect_world(&self, world: &World) -> bool {
         let min_x = self.x.floor() as i64;
         let max_x = (self.x + self.size_x).ceil() as i64;
-        let min_y = self.size_y.floor() as i64;
-        let max_y = (self.size_y + self.size_y).ceil() as i64;
-        let min_z = self.size_z.floor() as i64;
-        let max_z = (self.size_z + self.size_z).ceil() as i64;
+        let min_y = self.y.floor() as i64;
+        let max_y = (self.y + self.size_y).ceil() as i64;
+        let min_z = self.z.floor() as i64;
+        let max_z = (self.z + self.size_z).ceil() as i64;
 
         for i in min_x..max_x {
             for j in min_y..max_y {
@@ -80,91 +85,107 @@ impl AABB {
     }
 
     /// Try to move the box in the world and stop the movement if it goes trough a block
-    pub fn move_check_collision(&mut self, world: &World, (dx, dy, dz) : (f32, f32, f32)){
+    /// Return the actual deplacement
+    pub fn move_check_collision(&mut self, world: &World, (dx, dy, dz) : (f64, f64, f64)) -> Vector3<f64>{
+
+        let mut res = Vector3::new(dx, dy, dz);
+
+        if self.intersect_world(world){
+            self.x += dx;
+            self.y += dy;
+            self.z += dz;
+            return res;
+        }
 
         let x_step = (dx.abs()/self.size_x).ceil() as u32;
         let y_step = (dy.abs()/self.size_y).ceil() as u32;
         let z_step = (dz.abs()/self.size_z).ceil() as u32;
 
-        let ddx = dx /(x_step as f32);
-        let ddy = dy /(y_step as f32);
-        let ddz = dz /(z_step as f32);
+        let ddx = dx /(x_step as f64);
+        let ddy = dy /(y_step as f64);
+        let ddz = dz /(z_step as f64);
+
+        let old_x = self.x;
 
         for i in 0..x_step{
-            self.posX += ddx;
-            if self.intersect_world(){
-                self.posX -= ddx; // canceling the last step
+            self.x += ddx;
+            if self.intersect_world(world){
+                self.x -= ddx; // canceling the last step
 
                 let mut min_d = 0.0;
                 let mut max_d = ddx.abs();
 
                 while max_d - min_d > 0.01{ // binary search the max delta
                     let med = (min_d + max_d)/2.0;
-                    self.posX += med*ddx.signum();
-                    if self.intersect_world(){
+                    self.x += med*ddx.signum();
+                    if self.intersect_world(world){
                         max_d = med;
                     }else{
                         min_d = med;
                     }
-                    self.posX -= med*ddx.signum();
+                    self.x -= med*ddx.signum();
                 }
 
-                self.posX += ddx.signum()*(min_d +max_d)/2.0;
-
+                self.x += ddx.signum()*(min_d)/2.0;
                 break;
             }
 
         }
 
+        res.x = self.x - old_x;
+        let old_y = self.y;
+
         for j in 0..y_step{
-            self.posY += ddy;
-            if self.intersect_world(){
-                self.posY -= ddy;
+            self.y += ddy;
+            if self.intersect_world(world){
+                self.y -= ddy;
                 let mut min_d = 0.0;
                 let mut max_d = ddy.abs();
 
                 while max_d - min_d > 0.01{
                     let med = (min_d + max_d)/2.0;
-                    self.posY += med*ddy.signum();
-                    if self.intersect_world(){
+                    self.y += med*ddy.signum();
+                    if self.intersect_world(world){
                         max_d = med;
                     }else{
                         min_d = med;
                     }
-                    self.posY -= med*ddy.signum();
+                    self.y -= med*ddy.signum();
                 }
 
-                self.posY += ddy.signum()*(min_d +max_d)/2.0;
-
+                self.y += ddy.signum()*(min_d)/2.0;
                 break;
             }
         }
 
+        res.y = self.y  - old_y;
+        let old_z = self.z;
+
         for k in 0..z_step{
-            self.posZ += ddz;
-            if self.intersect_world(){
-                self.posZ -= ddz;
+            self.z += ddz;
+            if self.intersect_world(world){
+                self.z -= ddz;
 
                 let mut min_d = 0.0;
                 let mut max_d = ddz.abs();
 
                 while max_d - min_d > 0.01{
                     let med = (min_d + max_d)/2.0;
-                    self.posZ += med*ddz.signum();
-                    if self.intersect_world(){
+                    self.z += med*ddz.signum();
+                    if self.intersect_world(world){
                         max_d = med;
                     }else{
                         min_d = med;
                     }
-                    self.posZ -= med*ddz.signum();
+                    self.z -= med*ddz.signum();
                 }
 
-                self.posZ += ddz.signum()*(min_d +max_d)/2.0;
-
+                self.z += ddz.signum()*(min_d)/2.0;
                 break;
             }
         }
 
-
+        res.z = self.z - old_z;
+        return res;
     }
 }

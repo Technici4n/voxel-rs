@@ -52,26 +52,28 @@ impl Camera {
         }
     }
 
-    pub fn tick(&mut self, dt: f64, keyboard_state: &KeyboardState) {
+    pub fn get_movement(&self, dt: f64, keyboard_state: &KeyboardState) -> Vector3<f64> {
         const SPEED: f64 = 10.0;
+        let mut result = Vector3::new(0.0, 0.0, 0.0);
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_FORWARD) {
-            self.position += self.movement_direction(0.0) * (dt * SPEED) as f64;
+            result += self.movement_direction(0.0) * (dt * SPEED) as f64;
         }
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_LEFT) {
-            self.position += self.movement_direction(90.0) * (dt * SPEED) as f64;
+            result += self.movement_direction(90.0) * (dt * SPEED) as f64;
         }
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_BACKWARD) {
-            self.position += self.movement_direction(180.0) * (dt * SPEED) as f64;
+            result += self.movement_direction(180.0) * (dt * SPEED) as f64;
         }
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_RIGHT) {
-            self.position += self.movement_direction(270.0) * (dt * SPEED) as f64;
+            result += self.movement_direction(270.0) * (dt * SPEED) as f64;
         }
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_UP) {
-            self.position.y += (dt * SPEED) as f64;
+            result.y += (dt * SPEED) as f64;
         }
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_DOWN) {
-            self.position.y -= (dt * SPEED) as f64;
+            result.y -= (dt * SPEED) as f64;
         }
+        result
     }
 
     pub fn get_view_projection(&self, aspect_ratio: f64) -> Matrix4<f64> {

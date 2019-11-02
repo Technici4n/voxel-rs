@@ -1,15 +1,19 @@
+use std::time::Instant;
+
+use anyhow::Result;
+use gfx::Device;
+use nalgebra::Vector3;
+
 use crate::{
     fps::FpsCounter,
     input::KeyboardState,
+    physics::{aabb::AABB},
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
     world::{renderer::WorldRenderer, World},
 };
-use anyhow::Result;
-use gfx::Device;
 use crate::world::camera::Camera;
-use std::time::Instant;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -19,6 +23,8 @@ pub struct SinglePlayer {
     world: World,
     world_renderer: WorldRenderer,
     camera: Camera,
+    player: AABB,
+
 }
 
 impl SinglePlayer {
@@ -32,12 +38,13 @@ impl SinglePlayer {
             for j in -4..4 {
                 for k in -4..4 {
                     // generating the chunks
-                    world.gen_chunk(i,j,k);
+                    world.gen_chunk(i, j, k);
                 }
             }
         }
+
         let t2 = Instant::now();
-        println!("Generating the world : {} ms", (t2 -t1).subsec_millis());
+        println!("Generating the world : {} ms", (t2 - t1).subsec_millis());
 
         let mut world_renderer = WorldRenderer::new(gfx, &world);
 
@@ -46,8 +53,13 @@ impl SinglePlayer {
             ui: Ui::new(),
             ui_renderer: UiRenderer::new(gfx)?,
             world,
-            world_renderer : world_renderer?,
-            camera: Camera::new(),
+            world_renderer: world_renderer?,
+            camera: {
+                let mut cam = Camera::new();
+                cam.position = Vector3::new(0.4, 1.6, 0.4);
+                cam
+            },
+            player: AABB::new((0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
         }))
     }
 }
@@ -61,7 +73,14 @@ impl State for SinglePlayer {
         _flags: &mut WindowFlags,
         seconds_delta: f64,
     ) -> Result<StateTransition> {
-        self.camera.tick(seconds_delta, keyboard_state);
+        let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
+        let new_delta = self.player.move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
+
+        self.camera.position += new_delta;
+        if self.player.intersect_world(&self.world) {
+            println!("Collision");
+        }
+
         //flags.hide_and_center_cursor = true;
         Ok(StateTransition::KeepCurrent)
     }
