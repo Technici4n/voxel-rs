@@ -73,6 +73,7 @@ type PsoType = gfx::PipelineState<R, pipe::Meta>;
 pub struct RectanglePrimitive {
     pub layout: Layout,
     pub color: [f32; 4],
+    pub z: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -80,6 +81,8 @@ pub struct TextPrimitive {
     pub layout: Layout,
     pub text: String,
     pub font_size: Scale,
+    pub z: f32,
+    pub centered: bool,
 }
 
 #[derive(Default, Debug)]
@@ -89,12 +92,16 @@ pub struct PrimitiveBuffer {
 }
 
 impl PrimitiveBuffer {
-    pub fn draw_rectangle(&mut self, color: [f32; 4], layout: Layout) {
-        self.rectangle.push(RectanglePrimitive { color, layout });
+    pub fn draw_rectangle(&mut self, color: [f32; 4], layout: Layout, z: f32) {
+        self.rectangle.push(RectanglePrimitive { color, layout, z });
     }
 
-    pub fn draw_text(&mut self, text: String, font_size: Scale, layout: Layout) {
-        self.text.push(TextPrimitive { text, font_size, layout });
+    pub fn draw_text(&mut self, text: String, font_size: Scale, layout: Layout, z: f32) {
+        self.text.push(TextPrimitive { text, font_size, layout, z, centered: false });
+    }
+
+    pub fn draw_text_centered(&mut self, text: String, font_size: Scale, layout: Layout, z: f32) {
+        self.text.push(TextPrimitive { text, font_size, layout, z, centered: true });
     }
 }
 
@@ -184,21 +191,21 @@ impl UiRenderer {
         let mut rect_indices: Vec<u32> = Vec::new();
 
         // Rectangles
-        for RectanglePrimitive { layout: l, color } in primitive_buffer.rectangle.into_iter() {
+        for RectanglePrimitive { layout: l, color, z } in primitive_buffer.rectangle.into_iter() {
             let a = Vertex {
-                pos: [l.x, l.y, 0.0],
+                pos: [l.x, l.y, z],
                 color: color.clone(),
             };
             let b = Vertex {
-                pos: [l.x + l.width, l.y, 0.0],
+                pos: [l.x + l.width, l.y, z],
                 color: color.clone(),
             };
             let c = Vertex {
-                pos: [l.x, l.y + l.height, 0.0],
+                pos: [l.x, l.y + l.height, z],
                 color: color.clone(),
             };
             let d = Vertex {
-                pos: [l.x + l.width, l.y + l.height, 0.0],
+                pos: [l.x + l.width, l.y + l.height, z],
                 color: color.clone(),
             };
             let a_index = rect_vertices.len() as u32;
@@ -211,13 +218,33 @@ impl UiRenderer {
             );
         }
         // Text
-        for TextPrimitive { layout: l, text, font_size } in primitive_buffer.text.into_iter() {
-            let section = Section {
-                text: &text,
-                screen_position: (l.x, l.y),
-                bounds: (l.width, l.height),
-                scale: font_size,
-                ..Section::default()
+        for TextPrimitive { layout: l, text, font_size, z, centered } in primitive_buffer.text.into_iter() {
+            use gfx_glyph::{ HorizontalAlign, Layout, VerticalAlign };
+            // TODO: use HiDPI factor to adjust the position of the text
+            // (gfx_glyph probably expects the physical size, but currently it's given the logical size)
+            let section = if centered {
+                Section {
+                    text: &text,
+                    screen_position: (l.x + l.width/2.0, l.y + l.height/2.0),
+                    bounds: (l.width, l.height),
+                    scale: font_size,
+                    z,
+                    layout: Layout::Wrap {
+                        line_breaker: Default::default(),
+                        v_align: VerticalAlign::Center,
+                        h_align: HorizontalAlign::Center,
+                    },
+                    ..Section::default()
+                }
+            } else {
+                Section {
+                    text: &text,
+                    screen_position: (l.x, l.y),
+                    bounds: (l.width, l.height),
+                    scale: font_size,
+                    z,
+                    ..Section::default()
+                }
             };
             self.glyph_brush.queue(section);
         }

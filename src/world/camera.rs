@@ -1,4 +1,4 @@
-use crate::input::KeyboardState;
+use crate::input::InputState;
 use glutin::ElementState;
 use nalgebra::{Matrix4, Perspective3, Vector3};
 
@@ -52,7 +52,7 @@ impl Camera {
         }
     }
 
-    pub fn get_movement(&self, dt: f64, keyboard_state: &KeyboardState) -> Vector3<f64> {
+    pub fn get_movement(&self, dt: f64, keyboard_state: &InputState) -> Vector3<f64> {
         const SPEED: f64 = 10.0;
         let mut result = Vector3::new(0.0, 0.0, 0.0);
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_FORWARD) {

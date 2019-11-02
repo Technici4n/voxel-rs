@@ -1,5 +1,6 @@
-use crate::{input::KeyboardState, settings::Settings};
+use crate::{input::InputState, settings::Settings};
 use anyhow::{Context, Result};
+use glutin::{ElementState, MouseButton};
 use log::info;
 use std::time::Instant;
 
@@ -44,7 +45,7 @@ pub trait State {
     fn update(
         &mut self,
         settings: &mut Settings,
-        keyboard_state: &KeyboardState,
+        input_state: &InputState,
         data: &WindowData,
         flags: &mut WindowFlags,
         seconds_delta: f64,
@@ -62,6 +63,10 @@ pub trait State {
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
     /// Cursor moved
     fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition);
+    /// Mouse clicked
+    fn handle_mouse_state_changes(&mut self, changes: Vec<(MouseButton, ElementState)>);
+    /// Key pressed
+    fn handle_key_state_changes(&mut self, changes: Vec<(u32, ElementState)>);
 }
 
 /// Color format of the window's color buffer
@@ -124,7 +129,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
         }
     };
 
-    let mut keyboard_state = KeyboardState::new();
+    let mut input_state = InputState::new();
 
     let mut window_flags = WindowFlags {
         hide_and_center_cursor: false,
@@ -141,6 +146,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
     loop {
         let mut keep_running = true;
         let mut window_resized = false;
+        let mut mouse_state_changes = Vec::new();
+        let mut key_state_changes = Vec::new();
         // Handle events
         events_loop.poll_events(|event| {
             use glutin::Event::*;
@@ -155,14 +162,22 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                         ReceivedCharacter(_) => (),
                         Focused(focused) => {
                             window_data.focused = focused;
-                            keyboard_state.clear();
+                            input_state.clear();
                         }
-                        KeyboardInput { input, .. } => keyboard_state.process_input(input),
+                        KeyboardInput { input, .. } => {
+                            if input_state.process_keyboard_input(input) {
+                                key_state_changes.push((input.scancode, input.state));
+                            }
+                        },
                         CursorMoved { position, .. } => state.handle_cursor_movement(position),
                         CursorEntered { .. }
                         | CursorLeft { .. }
-                        | MouseWheel { .. }
-                        | MouseInput { .. } => (),
+                        | MouseWheel { .. } => (),
+                        MouseInput { button, state: element_state, modifiers, .. } => {
+                            if input_state.process_mouse_input(element_state, button, modifiers) {
+                                mouse_state_changes.push((button, element_state));
+                            }
+                        },
                         // weird events
                         TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
                         Refresh => (),
@@ -206,6 +221,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
         }
 
         // Update state
+        state.handle_mouse_state_changes(mouse_state_changes);
+        state.handle_key_state_changes(key_state_changes);
         let seconds_delta = {
             let current_time = Instant::now();
             let delta = current_time - previous_time;
@@ -215,7 +232,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
         let state_transition = state
             .update(
                 settings,
-                &keyboard_state,
+                &input_state,
                 &window_data,
                 &mut window_flags,
                 seconds_delta,

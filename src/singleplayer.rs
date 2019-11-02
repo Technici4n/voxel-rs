@@ -6,7 +6,7 @@ use nalgebra::Vector3;
 
 use crate::{
     fps::FpsCounter,
-    input::KeyboardState,
+    input::InputState,
     physics::{aabb::AABB},
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
@@ -68,21 +68,27 @@ impl State for SinglePlayer {
     fn update(
         &mut self,
         _settings: &mut Settings,
-        keyboard_state: &KeyboardState,
+        keyboard_state: &InputState,
         _data: &WindowData,
-        _flags: &mut WindowFlags,
+        flags: &mut WindowFlags,
         seconds_delta: f64,
     ) -> Result<StateTransition> {
-        let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
-        let new_delta = self.player.move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
+        if self.ui.should_update_camera() {
+            let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
+            let new_delta = self.player.move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
 
-        self.camera.position += new_delta;
-        if self.player.intersect_world(&self.world) {
-            println!("Collision");
+            self.camera.position += new_delta;
+            if self.player.intersect_world(&self.world) {
+                println!("Collision");
+            }
         }
+        flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
-        //flags.hide_and_center_cursor = true;
-        Ok(StateTransition::KeepCurrent)
+        if self.ui.should_exit() {
+            Ok(StateTransition::CloseWindow)
+        } else {
+            Ok(StateTransition::KeepCurrent)
+        }
     }
 
     fn render(
@@ -116,10 +122,20 @@ impl State for SinglePlayer {
     }
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
-        self.camera.update_cursor(delta.0, delta.1);
+        if self.ui.should_update_camera() {
+            self.camera.update_cursor(delta.0, delta.1);
+        }
     }
 
     fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition) {
         self.ui.cursor_moved(logical_position);
+    }
+
+    fn handle_mouse_state_changes(&mut self, changes: Vec<(glutin::MouseButton, glutin::ElementState)>) {
+        self.ui.handle_mouse_state_changes(changes);
+    }
+
+    fn handle_key_state_changes(&mut self, changes: Vec<(u32, glutin::ElementState)>) {
+        self.ui.handle_key_state_changes(changes);
     }
 }
