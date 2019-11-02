@@ -17,9 +17,9 @@ pub(super) enum BlockGroup {
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
+/// position of the chunk in the world
 pub struct ChunkPos {
     pub px: i64,
-    // position of the chunkc in the world
     pub py: i64,
     pub pz: i64,
 }

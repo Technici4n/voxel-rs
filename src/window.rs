@@ -49,6 +49,7 @@ pub trait State {
         data: &WindowData,
         flags: &mut WindowFlags,
         seconds_delta: f64,
+        gfx : &mut Gfx,
     ) -> Result<StateTransition>;
     /// Render.
     ///
@@ -239,6 +240,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                 &window_data,
                 &mut window_flags,
                 seconds_delta,
+                &mut gfx,
             )
             .context("Failed to `update` the current window state")?;
 

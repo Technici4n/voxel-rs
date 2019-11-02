@@ -4,16 +4,11 @@ use anyhow::Result;
 use gfx::Device;
 use nalgebra::Vector3;
 
+use crate::{fps::FpsCounter, input::InputState, physics::aabb::AABB, settings::Settings, ui::{renderer::UiRenderer, Ui}, window::{Gfx, State, StateTransition, WindowData, WindowFlags}, world::{renderer::WorldRenderer, World}, world};
+use crate::mesh::Mesh;
 use crate::world::camera::Camera;
-use crate::{
-    fps::FpsCounter,
-    input::InputState,
-    physics::aabb::AABB,
-    settings::Settings,
-    ui::{renderer::UiRenderer, Ui},
-    window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{renderer::WorldRenderer, World},
-};
+use crate::world::chunk::{CHUNK_SIZE, ChunkPos};
+use crate::world::meshing::greedy_meshing as meshing;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -33,9 +28,9 @@ impl SinglePlayer {
 
         let t1 = Instant::now();
         println!("Generating the world ...");
-        for i in -4..4 {
-            for j in -4..4 {
-                for k in -4..4 {
+        for i in -1..1 {
+            for j in -1..1 {
+                for k in -1..1 {
                     // generating the chunks
                     world.gen_chunk(i, j, k);
                 }
@@ -58,7 +53,7 @@ impl SinglePlayer {
                 cam.position = Vector3::new(0.4, 1.6, 0.4);
                 cam
             },
-            player: AABB::new(Vector3::new(0.0,0.0,0.0), (0.8, 1.8, 0.8)),
+            player: AABB::new(Vector3::new(0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
         }))
     }
 }
@@ -71,6 +66,7 @@ impl State for SinglePlayer {
         _data: &WindowData,
         flags: &mut WindowFlags,
         seconds_delta: f64,
+        gfx: &mut Gfx,
     ) -> Result<StateTransition> {
         if self.ui.should_update_camera() {
             let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
@@ -79,6 +75,52 @@ impl State for SinglePlayer {
                 .move_check_collision(&self.world, delta_move);
 
             self.camera.position += new_delta;
+
+
+            let ix = self.player.pos.x.floor() as i64;
+            let iy = self.player.pos.y.floor() as i64;
+            let iz = self.player.pos.z.floor() as i64;
+
+            let (cx, cy, cz) = world::World::get_chunk_coord(ix, iy, iz);
+
+            for i in -1..=1 {
+                for j in -1..=1 {
+                    for k in -1..=1 {
+                        if !self.world.has_chunk(cx+i, cy+j, cz+k) {
+                            self.world.gen_chunk(cx+i, cy+j, cz+k);
+                        }
+                    }
+                }
+            }
+
+            let chunks_to_remesh =  self.world.chunks_to_remesh.clone();
+            self.world.chunks_to_remesh.clear();
+
+            for chunk_pos in chunks_to_remesh.iter() {
+                let chunk = self.world.get_chunk(chunk_pos.px, chunk_pos.py, chunk_pos.pz);
+                match chunk {
+                    None => (),
+                    Some(chunk) => {
+                        let Gfx {
+                            ref mut factory, ..
+                        } = gfx;
+
+                        let (vertices, indices, _, _) = meshing(
+                            chunk,
+                            Some(self.world.create_adj_chunk_occl(chunk.pos.px, chunk.pos.py, chunk.pos.pz)),
+                        );
+
+                        let pos = (
+                            (chunk.pos.px * CHUNK_SIZE as i64) as f32,
+                            (chunk.pos.py * CHUNK_SIZE as i64) as f32,
+                            (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
+                        );
+                        let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
+                        self.world_renderer.update_chunk_mesh(chunk.pos, chunk_mesh);
+                    }
+                }
+            }
+
         }
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 

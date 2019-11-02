@@ -1,26 +1,31 @@
 #![allow(dead_code)]
+
+use std::collections::HashSet;
 use std::collections::HashMap;
+
+use crate::world::chunk::{Chunk, CHUNK_SIZE, ChunkPos};
+use crate::world::meshing::AdjChunkOccl;
 
 pub mod camera;
 pub mod chunk;
 pub mod meshing;
 pub mod renderer;
 
-use crate::world::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
-use crate::world::meshing::AdjChunkOccl;
-
 pub struct World {
     pub chunks: HashMap<ChunkPos, Chunk>,
+    pub chunks_to_remesh: HashSet<ChunkPos>,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
+            chunks_to_remesh: HashSet::new(),
         }
     }
 
     /// If the chunk at position x,y,z does not exist, create and generate it
+    /// Set the adjacent chunks "to remesh"
     pub fn gen_chunk(&mut self, x: i64, y: i64, z: i64) {
         match self.get_chunk(x, y, z) {
             Some(_chunk) => (),
@@ -33,6 +38,16 @@ impl World {
                     pz: z,
                 };
                 self.chunks.insert(pos, chunk);
+
+                for i in -1..=1 {
+                    for j in -1..=1 {
+                        for k in -1..=1 {
+                            if self.has_chunk(x + i, y + j, z + k) {
+                                self.chunks_to_remesh.insert(ChunkPos { px: x + i, py: y + j, pz: z + k });
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -53,6 +68,10 @@ impl World {
             py: y,
             pz: z,
         })
+    }
+    /// Return true if there exists a chunk at chunk position (x,y,z)
+    pub fn has_chunk(&self, x: i64, y: i64, z: i64) -> bool {
+        return self.chunks.contains_key(&ChunkPos { px: x, py: y, pz: z });
     }
 
     /// Return data at position x,y,z

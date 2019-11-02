@@ -11,6 +11,8 @@ use gfx::traits::FactoryExt;
 use gfx_device_gl::Resources;
 use nalgebra::{convert, Matrix4};
 use std::time::Instant;
+use std::collections::HashMap;
+use crate::world::chunk::ChunkPos;
 
 // TODO: add images
 
@@ -41,7 +43,7 @@ type PsoType = gfx::PipelineState<gfx_device_gl::Resources, pipe::Meta>;
 pub struct WorldRenderer {
     pub pso_fill: PsoType,
     pub pso_wireframe: PsoType,
-    pub meshes: Vec<Mesh>,
+    pub chunk_meshes: HashMap<ChunkPos, Mesh>,
     pub transform: Buffer<Resources, Transform>,
 }
 
@@ -79,7 +81,7 @@ impl WorldRenderer {
             pipe::new(),
         )?;
 
-        let mut meshes = Vec::new(); // all the mesh to be rendered
+        let mut chunk_meshes : HashMap<ChunkPos, Mesh> = HashMap::new(); // all the mesh to be rendered
 
         let t1 = Instant::now();
 
@@ -96,7 +98,7 @@ impl WorldRenderer {
             );
 
             let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
-            meshes.push(chunk_mesh);
+            chunk_meshes.insert(chunk.pos, chunk_mesh);
         }
 
         let t2 = Instant::now();
@@ -105,7 +107,7 @@ impl WorldRenderer {
         Ok(Self {
             pso_fill,
             pso_wireframe,
-            meshes,
+            chunk_meshes,
             transform: factory.create_constant_buffer(1),
         })
     }
@@ -130,7 +132,7 @@ impl WorldRenderer {
             convert::<Matrix4<f64>, Matrix4<f32>>(camera.get_view_projection(aspect_ratio)).into();
 
         // drawing all the mesh
-        for mesh in &self.meshes {
+        for mesh in self.chunk_meshes.values() {
             let transform = Transform {
                 view_proj,
                 model: [
@@ -156,5 +158,15 @@ impl WorldRenderer {
         }
 
         Ok(())
+    }
+
+    /// Add a new chunk mesh to the rendering or update one if already exists
+    pub fn update_chunk_mesh(&mut self, pos :ChunkPos, mesh : Mesh){
+        self.chunk_meshes.insert(pos, mesh);
+    }
+
+    /// Drop the mesh of the chunk at the position given (if the chunk exists)
+    pub fn drop_mesh(&mut self, pos :ChunkPos){
+        self.chunk_meshes.remove(&pos);
     }
 }

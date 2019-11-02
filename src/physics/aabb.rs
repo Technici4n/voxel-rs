@@ -8,8 +8,6 @@ pub struct AABB {
     pub size_z: f64,
 }
 
-// TODO : use nalgebra Vector3
-
 impl AABB {
     /// Create a new AABB box
     pub fn new(pos: Vector3<f64>, (s_x, s_y, s_z): (f64, f64, f64)) -> Self {
@@ -89,12 +87,13 @@ impl AABB {
         world: &World,
         delta : Vector3<f64>,
     ) -> Vector3<f64> {
-        let mut res = Vector3::new(0.0, 0.0, 0.0);
+
 
         if self.intersect_world(world) {
             self.pos += delta;
-            return res;
+            return delta;
         }
+        let mut res = Vector3::new(0.0, 0.0, 0.0);
 
         let x_step = (delta.x.abs() / self.size_x).ceil() as u32;
         let y_step = (delta.y.abs() / self.size_y).ceil() as u32;
