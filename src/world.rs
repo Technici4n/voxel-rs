@@ -52,6 +52,23 @@ impl World {
         }
     }
 
+    // TODO : Save the chunk
+    /// Remove the chunk from the world
+    pub fn drop_chunk(&mut self, x: i64, y: i64, z: i64) {
+        let pos = ChunkPos { px: x, py: y, pz: z };
+        self.chunks.remove(&pos);
+        self.chunks_to_remesh.remove(&pos);
+        for i in -1..=1 {
+            for j in -1..=1 {
+                for k in -1..=1 {
+                    if self.has_chunk(x + i, y + j, z + k) {
+                        self.chunks_to_remesh.insert(ChunkPos { px: x + i, py: y + j, pz: z + k });
+                    }
+                }
+            }
+        }
+    }
+
     ///Return a reference to the chunk if it exists, None otherwise
     pub fn get_chunk(&self, x: i64, y: i64, z: i64) -> Option<&Chunk> {
         self.chunks.get(&ChunkPos {

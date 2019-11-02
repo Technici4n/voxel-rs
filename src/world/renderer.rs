@@ -166,7 +166,7 @@ impl WorldRenderer {
     }
 
     /// Drop the mesh of the chunk at the position given (if the chunk exists)
-    pub fn drop_mesh(&mut self, pos :ChunkPos){
-        self.chunk_meshes.remove(&pos);
+    pub fn drop_mesh(&mut self, pos : &ChunkPos){
+        self.chunk_meshes.remove(pos);
     }
 }

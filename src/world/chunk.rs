@@ -129,7 +129,7 @@ impl Chunk {
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if noise[(k * 32 * 32 + j * 32 + i) as usize] > 0.5
+                    if noise[(k * 32 * 32 + j * 32 + i) as usize] > (py + j as f32 + 10.0)/110.0
                     // warning : indexing order
                     {
                         self.set_data(i, j, k, 1);

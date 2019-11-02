@@ -7,7 +7,7 @@ use nalgebra::Vector3;
 use crate::{fps::FpsCounter, input::InputState, physics::aabb::AABB, settings::Settings, ui::{renderer::UiRenderer, Ui}, window::{Gfx, State, StateTransition, WindowData, WindowFlags}, world::{renderer::WorldRenderer, World}, world};
 use crate::mesh::Mesh;
 use crate::world::camera::Camera;
-use crate::world::chunk::{CHUNK_SIZE, ChunkPos};
+use crate::world::chunk::CHUNK_SIZE;
 use crate::world::meshing::greedy_meshing as meshing;
 
 /// State of a singleplayer world
@@ -77,6 +77,7 @@ impl State for SinglePlayer {
             self.camera.position += new_delta;
 
 
+            // Generating new chunks
             let ix = self.player.pos.x.floor() as i64;
             let iy = self.player.pos.y.floor() as i64;
             let iz = self.player.pos.z.floor() as i64;
@@ -93,6 +94,23 @@ impl State for SinglePlayer {
                 }
             }
 
+            // Unloading the chunk too far
+            let mut chunks_to_dispose = Vec::new();
+            for chunk in self.world.chunks.values(){
+                let dx = self.player.pos.x - (chunk.pos.px as f64 * CHUNK_SIZE as f64);
+                let dy = self.player.pos.y - (chunk.pos.py as f64 * CHUNK_SIZE as f64);
+                let dz = self.player.pos.z - (chunk.pos.pz as f64 * CHUNK_SIZE as f64);
+                if (dx*dx + dy*dy + dz*dz).sqrt() > 200.0{
+                    chunks_to_dispose.push(chunk.pos.clone());
+                }
+            }
+
+            for pos in chunks_to_dispose{
+                self.world.drop_chunk(pos.px, pos.py, pos.pz);
+                self.world_renderer.drop_mesh(&pos);
+            }
+
+            // Update meshing
             let chunks_to_remesh =  self.world.chunks_to_remesh.clone();
             self.world.chunks_to_remesh.clear();
 
@@ -121,7 +139,10 @@ impl State for SinglePlayer {
                 }
             }
 
+
         }
+
+
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
         if self.ui.should_exit() {
