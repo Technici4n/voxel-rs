@@ -220,13 +220,12 @@ impl UiRenderer {
         // Text
         for TextPrimitive { layout: l, text, font_size, z, centered } in primitive_buffer.text.into_iter() {
             use gfx_glyph::{ HorizontalAlign, Layout, VerticalAlign };
-            // TODO: use HiDPI factor to adjust the position of the text
-            // (gfx_glyph probably expects the physical size, but currently it's given the logical size)
+            let dpi = data.hidpi_factor as f32;
             let section = if centered {
                 Section {
                     text: &text,
-                    screen_position: (l.x + l.width/2.0, l.y + l.height/2.0),
-                    bounds: (l.width, l.height),
+                    screen_position: ((l.x + l.width/2.0) * dpi, (l.y + l.height/2.0)*dpi),
+                    bounds: (l.width*dpi, l.height*dpi),
                     scale: font_size,
                     z,
                     layout: Layout::Wrap {
