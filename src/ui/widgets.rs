@@ -2,11 +2,6 @@ use super::renderer::PrimitiveBuffer;
 use gfx_glyph::Scale;
 use quint::{Event, Layout, Position, Style, Widget};
 
-pub struct Rectangle {
-    pub color: [f32; 4],
-    pub z: f32,
-}
-
 pub struct Text {
     pub text: String,
     pub font_size: Scale,
@@ -24,16 +19,6 @@ where
     pub text: String,
     pub font_size: Scale,
     pub style: Style,
-}
-
-impl<T> Widget<PrimitiveBuffer, T> for Rectangle {
-    fn style(&self) -> Style {
-        Style::default().percent_size(1.0, 1.0)
-    }
-
-    fn render(&self, buffer: &mut PrimitiveBuffer, _cursor_position: Position, layout: Layout) {
-        buffer.draw_rectangle(self.color.clone(), layout, self.z);
-    }
 }
 
 impl<T> Widget<PrimitiveBuffer, T> for Text {
@@ -78,14 +63,14 @@ where
         cursor_position: Position,
         messages: &mut Vec<T>,
     ) {
-        if let Event::MouseInput { button, state } = event {
-            if let quint::MouseButton::Left = button {
-                if let quint::ButtonState::Pressed = state {
-                    if layout.is_position_inside(cursor_position) {
-                        messages.push(self.message.clone());
-                    }
+        let Event::MouseInput { button, state } = event;
+        if let quint::MouseButton::Left = button {
+            if let quint::ButtonState::Pressed = state {
+                if layout.is_position_inside(cursor_position) {
+                    messages.push(self.message.clone());
                 }
             }
         }
+        }
     }
-}
+

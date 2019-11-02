@@ -1,7 +1,7 @@
-use self::widgets::{Rectangle, Text, WithStyle};
+use self::widgets::{Text, WithStyle};
 use crate::ui::widgets::Button;
 use crate::world::camera::Camera;
-use crate::{window::WindowData, world::World};
+use crate::window::WindowData;
 use anyhow::Result;
 use gfx_glyph::Scale;
 use glutin::dpi::LogicalPosition;

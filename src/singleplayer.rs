@@ -45,7 +45,7 @@ impl SinglePlayer {
         let t2 = Instant::now();
         println!("Generating the world : {} ms", (t2 - t1).subsec_millis());
 
-        let mut world_renderer = WorldRenderer::new(gfx, &world);
+        let world_renderer = WorldRenderer::new(gfx, &world);
 
         Ok(Box::new(Self {
             fps_counter: FpsCounter::new(),
@@ -79,9 +79,6 @@ impl State for SinglePlayer {
                 .move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
 
             self.camera.position += new_delta;
-            if self.player.intersect_world(&self.world) {
-                println!("Collision");
-            }
         }
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 

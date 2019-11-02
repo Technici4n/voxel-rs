@@ -51,11 +51,11 @@ impl Chunk {
             + (py / GROUP_LEN) * CHUNK_LEN
             + (pz / GROUP_LEN)) as usize]
         {
-            BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) => match (px % 2) * 2 + pz % 2 {
+            BlockGroup::Compressed(bxz, bxzz, bxxz, bxxzz) => match (px % 2) * 2 + pz % 2 {
                 0 => *bxz,
-                1 => *bxZ,
-                2 => *bXz,
-                3 => *bXZ,
+                1 => *bxzz,
+                2 => *bxxz,
+                3 => *bxxzz,
                 _ => unreachable!(),
             }, // if compressed return the compressed type
             BlockGroup::Uncompressed(blocks) => {
@@ -69,12 +69,12 @@ impl Chunk {
             + (py / GROUP_LEN) * CHUNK_LEN
             + (pz / GROUP_LEN)) as usize];
 
-        if let BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) = x {
+        if let BlockGroup::Compressed(bxz, bxzz, bxxz, bxxzz) = x {
             let btype = match (px % 2) * 2 + pz % 2 {
                 0 => *bxz,
-                1 => *bxZ,
-                2 => *bXz,
-                3 => *bXZ,
+                1 => *bxzz,
+                2 => *bxxz,
+                3 => *bxxzz,
                 _ => unreachable!(),
             };
             if btype != data {
@@ -84,12 +84,12 @@ impl Chunk {
                 // hardcoded for GROUP_LEN = 2
                 fill[0] = *bxz;
                 fill[2] = *bxz;
-                fill[1] = *bxZ;
-                fill[3] = *bxZ;
-                fill[4] = *bXz;
-                fill[6] = *bXz;
-                fill[5] = *bXZ;
-                fill[7] = *bXZ;
+                fill[1] = *bxzz;
+                fill[3] = *bxzz;
+                fill[4] = *bxxz;
+                fill[6] = *bxxz;
+                fill[5] = *bxxzz;
+                fill[7] = *bxxzz;
 
                 fill[((px % GROUP_LEN) * GROUP_LEN * GROUP_LEN
                     + (py % GROUP_LEN) * GROUP_LEN

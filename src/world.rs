@@ -6,7 +6,6 @@ pub mod chunk;
 pub mod meshing;
 pub mod renderer;
 
-use self::camera::Camera;
 use crate::world::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
 use crate::world::meshing::AdjChunkOccl;
 

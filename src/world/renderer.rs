@@ -90,14 +90,12 @@ impl WorldRenderer {
                 (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
             );
 
-            let (vertices, indices, tot_quad, act_quad) = meshing(
+            let (vertices, indices, _, _) = meshing(
                 chunk,
                 Some(world.create_adj_chunk_occl(chunk.pos.px, chunk.pos.py, chunk.pos.pz)),
             );
 
             let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
-            let t3 = Instant::now();
-
             meshes.push(chunk_mesh);
         }
 

@@ -14,19 +14,19 @@ pub struct AABB {
 
 impl AABB {
     /// Create a new AABB box
-    pub fn new((px, py, pz): (f64, f64, f64), (sX, sY, sZ): (f64, f64, f64)) -> Self {
+    pub fn new((px, py, pz): (f64, f64, f64), (s_x, s_y, s_z): (f64, f64, f64)) -> Self {
         AABB {
             x: px,
             y: py,
             z: pz,
-            size_x: sX,
-            size_y: sY,
-            size_z: sZ,
+            size_x: s_x,
+            size_y: s_y,
+            size_z: s_z,
         }
     }
 
     /// Create an AABB box of cubic shape
-    pub fn new_cube((px, py, pz): (f64, f64, f64), size: f64) -> Self {
+    pub fn _new_cube((px, py, pz): (f64, f64, f64), size: f64) -> Self {
         AABB {
             x: px,
             y: py,
@@ -38,7 +38,7 @@ impl AABB {
     }
 
     /// return true is the AABB box intersect with the other box
-    pub fn intersect(&self, other: &AABB) -> bool {
+    pub fn _intersect(&self, other: &AABB) -> bool {
         if (other.x >= self.x + self.size_x)
             || (other.x + other.size_x <= self.x)
             || (other.y >= self.y + self.size_y)
@@ -53,7 +53,7 @@ impl AABB {
     }
 
     /// Return true if point (px, py, pz) is in the AABB box
-    pub fn intersect_point(&self, (px, py, pz): (f64, f64, f64)) -> bool {
+    pub fn _intersect_point(&self, (px, py, pz): (f64, f64, f64)) -> bool {
         if px >= self.x
             && px <= self.x + self.size_x
             && py >= self.y
@@ -114,7 +114,7 @@ impl AABB {
 
         let old_x = self.x;
 
-        for i in 0..x_step {
+        for _ in 0..x_step {
             self.x += ddx;
             if self.intersect_world(world) {
                 self.x -= ddx; // canceling the last step
@@ -142,7 +142,7 @@ impl AABB {
         res.x = self.x - old_x;
         let old_y = self.y;
 
-        for j in 0..y_step {
+        for _ in 0..y_step {
             self.y += ddy;
             if self.intersect_world(world) {
                 self.y -= ddy;
@@ -168,7 +168,7 @@ impl AABB {
         res.y = self.y - old_y;
         let old_z = self.z;
 
-        for k in 0..z_step {
+        for _ in 0..z_step {
             self.z += ddz;
             if self.intersect_world(world) {
                 self.z -= ddz;
