@@ -18,5 +18,8 @@ pub enum MouseButton {
 #[derive(Debug, Clone, Copy)]
 pub enum Event {
     /// A change in the state of a mouse button.
-    MouseInput { state: ButtonState, button: MouseButton },
+    MouseInput {
+        state: ButtonState,
+        button: MouseButton,
+    },
 }

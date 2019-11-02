@@ -1,16 +1,16 @@
 use crate::{
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
-    world::{chunk::CHUNK_SIZE, World, camera::Camera},
+    world::{camera::Camera, chunk::CHUNK_SIZE, World},
 };
-use std::time::Instant;
 use anyhow::Result;
 use gfx;
 use gfx::handle::Buffer;
+use gfx::state::RasterMethod;
 use gfx::traits::FactoryExt;
 use gfx_device_gl::Resources;
 use nalgebra::{convert, Matrix4};
-use gfx::state::RasterMethod;
+use std::time::Instant;
 
 // TODO: add images
 
@@ -40,19 +40,18 @@ type PsoType = gfx::PipelineState<gfx_device_gl::Resources, pipe::Meta>;
 
 pub struct WorldRenderer {
     pub pso_fill: PsoType,
-    pub pso_wireframe : PsoType,
+    pub pso_wireframe: PsoType,
     pub meshes: Vec<Mesh>,
     pub transform: Buffer<Resources, Transform>,
 }
 
 impl WorldRenderer {
-    pub fn new(gfx: &mut Gfx, world : &World) -> Result<Self> {
+    pub fn new(gfx: &mut Gfx, world: &World) -> Result<Self> {
         use super::meshing::greedy_meshing as meshing;
 
         let Gfx {
             ref mut factory, ..
         } = gfx;
-
 
         let shader_set = factory.create_shader_set(
             include_bytes!("../../shader/world.vert"),
@@ -91,10 +90,10 @@ impl WorldRenderer {
                 (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
             );
 
-            let (vertices, indices, tot_quad, act_quad) = meshing(chunk,
-                                              Some(world.create_adj_chunk_occl(
-                                                  chunk.pos.px,chunk.pos.py, chunk.pos.pz
-                                              )));
+            let (vertices, indices, tot_quad, act_quad) = meshing(
+                chunk,
+                Some(world.create_adj_chunk_occl(chunk.pos.px, chunk.pos.py, chunk.pos.pz)),
+            );
 
             let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
             let t3 = Instant::now();
@@ -104,7 +103,6 @@ impl WorldRenderer {
 
         let t2 = Instant::now();
         println!("Creating the meshes : {} ms", (t2 - t1).subsec_millis());
-
 
         Ok(Self {
             pso_fill,

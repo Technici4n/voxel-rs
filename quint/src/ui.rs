@@ -1,15 +1,6 @@
-use crate::{
-    Event,
-    Layout,
-    Position,
-    Size,
-    Style,
-};
+use crate::{Event, Layout, Position, Size, Style};
 use std::collections::HashMap;
-use stretch::{
-    node::Node,
-    Stretch,
-};
+use stretch::{node::Node, Stretch};
 
 struct UiLayer<Renderer, Message> {
     pub(self) root_node: Node,
@@ -54,39 +45,67 @@ impl<Renderer, Message> Ui<Renderer, Message> {
             while let Some(current_node) = node_stack.pop() {
                 // Update widget if it exists
                 if let Some(widget) = layer.widgets.get(&current_node) {
-                    let layout = layer.stretch.layout(current_node).expect("Couldn't get Node layout");
-                    widget.on_event(event, Layout::from_stretch(*layout), self.cursor_position, messages);
+                    let layout = layer
+                        .stretch
+                        .layout(current_node)
+                        .expect("Couldn't get Node layout");
+                    widget.on_event(
+                        event,
+                        Layout::from_stretch(*layout),
+                        self.cursor_position,
+                        messages,
+                    );
                 }
 
                 // Push child widgets onto the stack
-                node_stack.extend(layer.stretch.children(current_node).expect("Couldn't get Node children").into_iter());
+                node_stack.extend(
+                    layer
+                        .stretch
+                        .children(current_node)
+                        .expect("Couldn't get Node children")
+                        .into_iter(),
+                );
             }
         }
     }
 
     /// Recursively register a WidgetTree
-    fn register_widget_tree(stretch: &mut Stretch, widgets: &mut HashMap<Node, Box<dyn Widget<Renderer, Message>>>, widget_tree: WidgetTree<Renderer, Message>) -> Node {
+    fn register_widget_tree(
+        stretch: &mut Stretch,
+        widgets: &mut HashMap<Node, Box<dyn Widget<Renderer, Message>>>,
+        widget_tree: WidgetTree<Renderer, Message>,
+    ) -> Node {
         let WidgetTree { root, children } = widget_tree;
-        let child_nodes: Vec<Node> = children.into_iter().map(|child| Self::register_widget_tree(stretch, widgets, child)).collect();
+        let child_nodes: Vec<Node> = children
+            .into_iter()
+            .map(|child| Self::register_widget_tree(stretch, widgets, child))
+            .collect();
         let style = root.style();
-        let node_id = stretch.new_node(style.style, child_nodes).expect("Couldn't create node");
+        let node_id = stretch
+            .new_node(style.style, child_nodes)
+            .expect("Couldn't create node");
         widgets.insert(node_id, root);
         node_id
     }
 
     /// Rebuild the Ui using the provided layers. The layers are rendered last-to-first.
     pub fn rebuild(&mut self, layers: Vec<WidgetTree<Renderer, Message>>, dimensions: Size) {
-        self.layers = layers.into_iter().map(|tree| {
-            let mut stretch = Stretch::new();
-            let mut widgets = HashMap::new();
-            let root_node = Self::register_widget_tree(&mut stretch, &mut widgets, tree);
-            stretch.compute_layout(root_node, dimensions.into_stretch()).expect("Couldn't compute layout");
-            UiLayer {
-                stretch,
-                widgets,
-                root_node,
-            }
-        }).collect();
+        self.layers = layers
+            .into_iter()
+            .map(|tree| {
+                let mut stretch = Stretch::new();
+                let mut widgets = HashMap::new();
+                let root_node = Self::register_widget_tree(&mut stretch, &mut widgets, tree);
+                stretch
+                    .compute_layout(root_node, dimensions.into_stretch())
+                    .expect("Couldn't compute layout");
+                UiLayer {
+                    stretch,
+                    widgets,
+                    root_node,
+                }
+            })
+            .collect();
     }
 
     /// Render the Ui using the provided `Renderer`.
@@ -97,18 +116,27 @@ impl<Renderer, Message> Ui<Renderer, Message> {
             while let Some(current_node) = render_stack.pop() {
                 // Draw widget if it exists
                 if let Some(widget) = layer.widgets.get(&current_node) {
-                    let layout = layer.stretch.layout(current_node).expect("Couldn't get Node layout");
-                    widget.render(renderer, self.cursor_position, Layout::from_stretch(*layout));
+                    let layout = layer
+                        .stretch
+                        .layout(current_node)
+                        .expect("Couldn't get Node layout");
+                    widget.render(
+                        renderer,
+                        self.cursor_position,
+                        Layout::from_stretch(*layout),
+                    );
                 }
 
                 // Push child widgets onto the stack
-                let children = layer.stretch.children(current_node).expect("Couldn't get Node children");
+                let children = layer
+                    .stretch
+                    .children(current_node)
+                    .expect("Couldn't get Node children");
                 render_stack.extend(children.into_iter());
             }
         }
     }
 }
-
 
 /// A generic Widget.
 pub trait Widget<Renderer, Message> {
@@ -118,7 +146,14 @@ pub trait Widget<Renderer, Message> {
     /// Render the widget using the renderer
     fn render(&self, _renderer: &mut Renderer, _cursor_position: Position, _layout: Layout) {}
     /// Process one event
-    fn on_event(&self, _event: Event, _layout: Layout, _cursor_position: Position, _messages: &mut Vec<Message>) {}
+    fn on_event(
+        &self,
+        _event: Event,
+        _layout: Layout,
+        _cursor_position: Position,
+        _messages: &mut Vec<Message>,
+    ) {
+    }
 }
 
 /// A tree of widgets
@@ -137,10 +172,11 @@ impl<Renderer, Message> WidgetTree<Renderer, Message> {
     }
 
     /// Create a new node
-    pub fn new(root: Box<dyn Widget<Renderer, Message>>, children: Vec<WidgetTree<Renderer, Message>>) -> Self {
-        Self {
-            root, children
-        }
+    pub fn new(
+        root: Box<dyn Widget<Renderer, Message>>,
+        children: Vec<WidgetTree<Renderer, Message>>,
+    ) -> Self {
+        Self { root, children }
     }
 }
 

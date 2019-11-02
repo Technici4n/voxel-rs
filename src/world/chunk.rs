@@ -38,7 +38,10 @@ impl Chunk {
                 py: y,
                 pz: z,
             },
-            data: vec![BlockGroup::Compressed(0, 0, 0, 0); (CHUNK_LEN * CHUNK_LEN * CHUNK_LEN) as usize],
+            data: vec![
+                BlockGroup::Compressed(0, 0, 0, 0);
+                (CHUNK_LEN * CHUNK_LEN * CHUNK_LEN) as usize
+            ],
             // chunk is empty
         }
     }
@@ -47,20 +50,18 @@ impl Chunk {
         match &self.data[((px / GROUP_LEN) * CHUNK_LEN * CHUNK_LEN
             + (py / GROUP_LEN) * CHUNK_LEN
             + (pz / GROUP_LEN)) as usize]
-            {
-                BlockGroup::Compressed(bxz, bxZ, bXz, bXZ ) => {
-                    match (px%2)*2 + pz%2{
-                        0 => *bxz,
-                        1 => *bxZ,
-                        2 => *bXz,
-                        3 => *bXZ,
-                        _ => unreachable!(),
-                    }
-                }, // if compressed return the compressed type
-                BlockGroup::Uncompressed(blocks) => {
-                    blocks[((px % GROUP_LEN) * 4 + (py % GROUP_LEN) * 2 + (pz % GROUP_LEN)) as usize]
-                } // if not compressed, return the data stored in the full array
-            }
+        {
+            BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) => match (px % 2) * 2 + pz % 2 {
+                0 => *bxz,
+                1 => *bxZ,
+                2 => *bXz,
+                3 => *bXZ,
+                _ => unreachable!(),
+            }, // if compressed return the compressed type
+            BlockGroup::Uncompressed(blocks) => {
+                blocks[((px % GROUP_LEN) * 4 + (py % GROUP_LEN) * 2 + (pz % GROUP_LEN)) as usize]
+            } // if not compressed, return the data stored in the full array
+        }
     }
 
     pub fn set_data(&mut self, px: u32, py: u32, pz: u32, data: u16) {
@@ -69,7 +70,7 @@ impl Chunk {
             + (pz / GROUP_LEN)) as usize];
 
         if let BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) = x {
-            let btype = match (px%2)*2 + pz%2{
+            let btype = match (px % 2) * 2 + pz % 2 {
                 0 => *bxz,
                 1 => *bxZ,
                 2 => *bXz,
@@ -100,19 +101,20 @@ impl Chunk {
                 + (py % GROUP_LEN) * GROUP_LEN
                 + (pz % GROUP_LEN)) as usize] = data;
 
-            if blocks[0] != blocks[2]{
+            if blocks[0] != blocks[2] {
                 return;
             }
-            if blocks[1] != blocks[3]{
+            if blocks[1] != blocks[3] {
                 return;
             }
-            if blocks[4] != blocks[6]{
+            if blocks[4] != blocks[6] {
                 return;
             }
-            if blocks[7] != blocks[5]{
+            if blocks[7] != blocks[5] {
                 return;
             }
-            *x = BlockGroup::Compressed(blocks[0], blocks[1], blocks[4], blocks[5]); // merging all block in four columns
+            *x = BlockGroup::Compressed(blocks[0], blocks[1], blocks[4], blocks[5]);
+            // merging all block in four columns
         }
     }
 
@@ -121,13 +123,14 @@ impl Chunk {
         let px = (self.pos.px * CHUNK_SIZE as i64) as f32;
         let py = (self.pos.py * CHUNK_SIZE as i64) as f32;
         let pz = (self.pos.pz * CHUNK_SIZE as i64) as f32;
-        let freq = 1.0/32.0;
-        let noise = perlin(px,py,pz,CHUNK_SIZE as usize, freq, 4, 0.4, 42);
+        let freq = 1.0 / 32.0;
+        let noise = perlin(px, py, pz, CHUNK_SIZE as usize, freq, 4, 0.4, 42);
 
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if noise[(k* 32*32 + j*32 + i) as usize] > 0.5 // warning : indexing order
+                    if noise[(k * 32 * 32 + j * 32 + i) as usize] > 0.5
+                    // warning : indexing order
                     {
                         self.set_data(i, j, k, 1);
                     }

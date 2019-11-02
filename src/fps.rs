@@ -1,7 +1,4 @@
-use std::{
-    collections::VecDeque,
-    time::Instant,
-};
+use std::{collections::VecDeque, time::Instant};
 
 const SECONDS_DIFFERENCE: u64 = 2;
 
@@ -22,7 +19,7 @@ impl FpsCounter {
             if (new_frame - *frame).as_secs() >= SECONDS_DIFFERENCE {
                 self.frames.pop_front();
             } else {
-                break
+                break;
             }
         }
         self.frames.push_back(new_frame);

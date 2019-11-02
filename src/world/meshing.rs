@@ -39,9 +39,8 @@ struct Quad {
     v4: u32, // i = 1 j = 1 => (y, z) = (1, 1)
 }
 
-impl Quad{
-
-    fn is_same(&self) -> bool{
+impl Quad {
+    fn is_same(&self) -> bool {
         return self.v1 == self.v2 && self.v2 == self.v3 && self.v3 == self.v4;
     }
 }
@@ -157,13 +156,65 @@ const MESH_SOUTH: [[f32; 3]; 4] = [
 ];
 const MESH_SOUTH_INDEX: [usize; 6] = [0, 1, 2, 2, 1, 3];
 
-
-const D: [[i32; 3]; 6] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-const MESH_DIR: [[[f32; 3]; 4]; 6] = [MESH_EAST, MESH_WEST, MESH_UP, MESH_DOWN, MESH_SOUTH, MESH_NORTH];
-const MESH_INDEX: [[usize; 6]; 6] = [MESH_EAST_INDEX, MESH_WEST_INDEX, MESH_UP_INDEX, MESH_DOWN_INDEX, MESH_SOUTH_INDEX, MESH_NORTH_INDEX];
+const D: [[i32; 3]; 6] = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1],
+];
+const MESH_DIR: [[[f32; 3]; 4]; 6] = [
+    MESH_EAST, MESH_WEST, MESH_UP, MESH_DOWN, MESH_SOUTH, MESH_NORTH,
+];
+const MESH_INDEX: [[usize; 6]; 6] = [
+    MESH_EAST_INDEX,
+    MESH_WEST_INDEX,
+    MESH_UP_INDEX,
+    MESH_DOWN_INDEX,
+    MESH_SOUTH_INDEX,
+    MESH_NORTH_INDEX,
+];
 
 // good luck understanding this, future me !
-const OCC_POS_CHECK: [[[(i32, i32, i32, bool); 3]; 4]; 6] = [[[(1, -1, -1, false, ), (1, -1, 0, true, ), (1, 0, -1, true, ), ], [(1, 0, -1, true, ), (1, 1, -1, false, ), (1, 1, 0, true, ), ], [(1, -1, 0, true, ), (1, -1, 1, false, ), (1, 0, 1, true, ), ], [(1, 0, 1, true, ), (1, 1, 0, true, ), (1, 1, 1, false, ), ], ], [[(-1, -1, -1, false, ), (-1, -1, 0, true, ), (-1, 0, -1, true, ), ], [(-1, 0, -1, true, ), (-1, 1, -1, false, ), (-1, 1, 0, true, ), ], [(-1, -1, 0, true, ), (-1, -1, 1, false, ), (-1, 0, 1, true, ), ], [(-1, 0, 1, true, ), (-1, 1, 0, true, ), (-1, 1, 1, false, ), ], ], [[(-1, 1, -1, false, ), (-1, 1, 0, true, ), (0, 1, -1, true, ), ], [(0, 1, -1, true, ), (1, 1, -1, false, ), (1, 1, 0, true, ), ], [(-1, 1, 0, true, ), (-1, 1, 1, false, ), (0, 1, 1, true, ), ], [(0, 1, 1, true, ), (1, 1, 0, true, ), (1, 1, 1, false, ), ], ], [[(-1, -1, -1, false, ), (-1, -1, 0, true, ), (0, -1, -1, true, ), ], [(0, -1, -1, true, ), (1, -1, -1, false, ), (1, -1, 0, true, ), ], [(-1, -1, 0, true, ), (-1, -1, 1, false, ), (0, -1, 1, true, ), ], [(0, -1, 1, true, ), (1, -1, 0, true, ), (1, -1, 1, false, ), ], ], [[(-1, -1, 1, false, ), (-1, 0, 1, true, ), (0, -1, 1, true, ), ], [(0, -1, 1, true, ), (1, -1, 1, false, ), (1, 0, 1, true, ), ], [(-1, 0, 1, true, ), (-1, 1, 1, false, ), (0, 1, 1, true, ), ], [(0, 1, 1, true, ), (1, 0, 1, true, ), (1, 1, 1, false, ), ], ], [[(-1, -1, -1, false, ), (-1, 0, -1, true, ), (0, -1, -1, true, ), ], [(0, -1, -1, true, ), (1, -1, -1, false, ), (1, 0, -1, true, ), ], [(-1, 0, -1, true, ), (-1, 1, -1, false, ), (0, 1, -1, true, ), ], [(0, 1, -1, true, ), (1, 0, -1, true, ), (1, 1, -1, false, ), ], ], ];
+const OCC_POS_CHECK: [[[(i32, i32, i32, bool); 3]; 4]; 6] = [
+    [
+        [(1, -1, -1, false), (1, -1, 0, true), (1, 0, -1, true)],
+        [(1, 0, -1, true), (1, 1, -1, false), (1, 1, 0, true)],
+        [(1, -1, 0, true), (1, -1, 1, false), (1, 0, 1, true)],
+        [(1, 0, 1, true), (1, 1, 0, true), (1, 1, 1, false)],
+    ],
+    [
+        [(-1, -1, -1, false), (-1, -1, 0, true), (-1, 0, -1, true)],
+        [(-1, 0, -1, true), (-1, 1, -1, false), (-1, 1, 0, true)],
+        [(-1, -1, 0, true), (-1, -1, 1, false), (-1, 0, 1, true)],
+        [(-1, 0, 1, true), (-1, 1, 0, true), (-1, 1, 1, false)],
+    ],
+    [
+        [(-1, 1, -1, false), (-1, 1, 0, true), (0, 1, -1, true)],
+        [(0, 1, -1, true), (1, 1, -1, false), (1, 1, 0, true)],
+        [(-1, 1, 0, true), (-1, 1, 1, false), (0, 1, 1, true)],
+        [(0, 1, 1, true), (1, 1, 0, true), (1, 1, 1, false)],
+    ],
+    [
+        [(-1, -1, -1, false), (-1, -1, 0, true), (0, -1, -1, true)],
+        [(0, -1, -1, true), (1, -1, -1, false), (1, -1, 0, true)],
+        [(-1, -1, 0, true), (-1, -1, 1, false), (0, -1, 1, true)],
+        [(0, -1, 1, true), (1, -1, 0, true), (1, -1, 1, false)],
+    ],
+    [
+        [(-1, -1, 1, false), (-1, 0, 1, true), (0, -1, 1, true)],
+        [(0, -1, 1, true), (1, -1, 1, false), (1, 0, 1, true)],
+        [(-1, 0, 1, true), (-1, 1, 1, false), (0, 1, 1, true)],
+        [(0, 1, 1, true), (1, 0, 1, true), (1, 1, 1, false)],
+    ],
+    [
+        [(-1, -1, -1, false), (-1, 0, -1, true), (0, -1, -1, true)],
+        [(0, -1, -1, true), (1, -1, -1, false), (1, 0, -1, true)],
+        [(-1, 0, -1, true), (-1, 1, -1, false), (0, 1, -1, true)],
+        [(0, 1, -1, true), (1, 0, -1, true), (1, 1, -1, false)],
+    ],
+];
 
 /// Return True if full block (taking into account adjacent chunks)
 fn is_full(chunk: &Chunk, (i, j, k): (i32, i32, i32), adj: Option<AdjChunkOccl>) -> bool {
@@ -248,7 +299,13 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
     for i in 0..IN_SIZE {
         for j in 0..IN_SIZE {
             for k in 0..IN_SIZE {
-                if i == 0 || i == IN_SIZE - 1 || j == 0 || j == IN_SIZE - 1 || k == 0 || k == IN_SIZE - 1 {
+                if i == 0
+                    || i == IN_SIZE - 1
+                    || j == 0
+                    || j == IN_SIZE - 1
+                    || k == 0
+                    || k == IN_SIZE - 1
+                {
                     chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj);
                 }
             }
@@ -270,7 +327,10 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
                             for k2 in 0..2 {
                                 if obs[i2 * 2 + k2] {
                                     for j2 in 0..2 {
-                                        chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = true;
+                                        chunk_mask[world_index
+                                            + UN_SIZE * UN_SIZE * i2
+                                            + UN_SIZE * j2
+                                            + k2] = true;
                                     }
                                 }
                             }
@@ -280,7 +340,10 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
                         for i2 in 0..2 {
                             for j2 in 0..2 {
                                 for k2 in 0..2 {
-                                    chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = data[i2 * 4 + j2 * 2 + k2] != 0;
+                                    chunk_mask[world_index
+                                        + UN_SIZE * UN_SIZE * i2
+                                        + UN_SIZE * j2
+                                        + k2] = data[i2 * 4 + j2 * 2 + k2] != 0;
                                 }
                             }
                         }
@@ -290,14 +353,14 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
         }
     }
 
-
     for i in 0..(CHUNK_SIZE as i32) {
         for j in 0..(CHUNK_SIZE as i32) {
             for k in 0..(CHUNK_SIZE as i32) {
                 if chunk_mask[ind(i + 1, j + 1, k + 1)] {
                     //checking if not void
 
-                    for s in 0..6 { // each direction
+                    for s in 0..6 {
+                        // each direction
                         if !chunk_mask[ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])] {
                             for l in 0..4 {
                                 let px = i as f32 + MESH_DIR[s][l][0];
@@ -307,19 +370,22 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
                                     pos: [px, py, pz],
                                     normal: (s as u32)
                                         + ({
-                                        let mut coins = 0;
-                                        let mut edge = 0;
-                                        for (p1, p2, p3, is_edge) in OCC_POS_CHECK[s][l].iter() {
-                                            if chunk_mask[ind(i + 1 + *p1, j + 1 + *p2, k + 1 + *p3)] {
-                                                if *is_edge {
-                                                    edge += 1;
-                                                } else {
-                                                    coins += 1;
+                                            let mut coins = 0;
+                                            let mut edge = 0;
+                                            for (p1, p2, p3, is_edge) in OCC_POS_CHECK[s][l].iter()
+                                            {
+                                                if chunk_mask
+                                                    [ind(i + 1 + *p1, j + 1 + *p2, k + 1 + *p3)]
+                                                {
+                                                    if *is_edge {
+                                                        edge += 1;
+                                                    } else {
+                                                        coins += 1;
+                                                    }
                                                 }
                                             }
-                                        }
-                                        ambiant_occl(coins, edge)
-                                    } << 3),
+                                            ambiant_occl(coins, edge)
+                                        } << 3),
                                 });
                             }
 
@@ -338,9 +404,11 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
     (res_vertex, res_index)
 }
 
-
 // Greedy meshing : compressed adjacent quads, retourn the number of uncompressed and compressed quads
-pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
+pub fn greedy_meshing(
+    chunk: &Chunk,
+    adj: Option<AdjChunkOccl>,
+) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
@@ -348,7 +416,6 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
     let mut act_quad = 0;
 
     let mut n_of_different_vertex = 0;
-
 
     const N_SIZE: usize = (CHUNK_SIZE + 2) as usize;
     let mut chunk_mask = [false; N_SIZE * N_SIZE * N_SIZE];
@@ -363,7 +430,13 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
     for i in 0..IN_SIZE {
         for j in 0..IN_SIZE {
             for k in 0..IN_SIZE {
-                if i == 0 || i == IN_SIZE - 1 || j == 0 || j == IN_SIZE - 1 || k == 0 || k == IN_SIZE - 1 {
+                if i == 0
+                    || i == IN_SIZE - 1
+                    || j == 0
+                    || j == IN_SIZE - 1
+                    || k == 0
+                    || k == IN_SIZE - 1
+                {
                     chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj);
                 }
             }
@@ -385,7 +458,10 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
                             for k2 in 0..2 {
                                 if obs[i2 * 2 + k2] {
                                     for j2 in 0..2 {
-                                        chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = true;
+                                        chunk_mask[world_index
+                                            + UN_SIZE * UN_SIZE * i2
+                                            + UN_SIZE * j2
+                                            + k2] = true;
                                     }
                                 }
                             }
@@ -395,7 +471,10 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
                         for i2 in 0..2 {
                             for j2 in 0..2 {
                                 for k2 in 0..2 {
-                                    chunk_mask[world_index + UN_SIZE * UN_SIZE * i2 + UN_SIZE * j2 + k2] = data[i2 * 4 + j2 * 2 + k2] != 0;
+                                    chunk_mask[world_index
+                                        + UN_SIZE * UN_SIZE * i2
+                                        + UN_SIZE * j2
+                                        + k2] = data[i2 * 4 + j2 * 2 + k2] != 0;
                                 }
                             }
                         }
@@ -405,14 +484,41 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
         }
     }
 
+    let d_delta0 = [
+        [1, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [0, 0, 1],
+    ];
+    let d_delta1 = [
+        [0, 1, 0],
+        [0, 1, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+    ];
+    let d_delta2 = [
+        [0, 0, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+        [0, 0, 1],
+        [0, 1, 0],
+        [0, 1, 0],
+    ];
 
-    let d_delta0 = [[1, 0, 0], [1, 0, 0], [0, 1, 0], [0, 1, 0], [0, 0, 1], [0, 0, 1]];
-    let d_delta1 = [[0, 1, 0], [0, 1, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]];
-    let d_delta2 = [[0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
-
-    let mut quads = vec![Quad { v1: 0, v2: 0, v3: 0, v4: 0 }; 6*(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize];
+    let mut quads = vec![
+        Quad {
+            v1: 0,
+            v2: 0,
+            v3: 0,
+            v4: 0
+        };
+        6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize
+    ];
     let mut to_mesh = vec![false; 6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize];
-
 
     #[inline(always)]
     fn ind_mesh(s: usize, x: i32, y: i32, z: i32) -> usize {
@@ -420,8 +526,8 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
         (((s2 * CHUNK_SIZE + a) * CHUNK_SIZE + b) * CHUNK_SIZE + c) as usize
     }
 
-
-    for s in 0..6 { // each direction
+    for s in 0..6 {
+        // each direction
         for i in 0..(CHUNK_SIZE as i32) {
             for j in 0..(CHUNK_SIZE as i32) {
                 for k in 0..(CHUNK_SIZE as i32) {
@@ -433,16 +539,27 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
 
                             for i2 in -1..=1 {
                                 for j2 in -1..=1 {
-                                    let dx = 1 + D[s][0] + d_delta1[s][0] * i2 + d_delta2[s][0] * j2;
-                                    let dy = 1 + D[s][1] + d_delta1[s][1] * i2 + d_delta2[s][1] * j2;
-                                    let dz = 1 + D[s][2] + d_delta1[s][2] * i2 + d_delta2[s][2] * j2;
+                                    let dx =
+                                        1 + D[s][0] + d_delta1[s][0] * i2 + d_delta2[s][0] * j2;
+                                    let dy =
+                                        1 + D[s][1] + d_delta1[s][1] * i2 + d_delta2[s][1] * j2;
+                                    let dz =
+                                        1 + D[s][2] + d_delta1[s][2] * i2 + d_delta2[s][2] * j2;
 
                                     if chunk_mask[ind(i + dx, j + dy, k + dz)] {
                                         match (i2, j2) {
-                                            (-1, -1) => { coins[0] += 1; }
-                                            (-1, 1) => { coins[1] += 1; }
-                                            (1, -1) => { coins[2] += 1; }
-                                            (1, 1) => { coins[3] += 1; }
+                                            (-1, -1) => {
+                                                coins[0] += 1;
+                                            }
+                                            (-1, 1) => {
+                                                coins[1] += 1;
+                                            }
+                                            (1, -1) => {
+                                                coins[2] += 1;
+                                            }
+                                            (1, 1) => {
+                                                coins[3] += 1;
+                                            }
                                             (-1, 0) => {
                                                 egde[0] += 1;
                                                 egde[1] += 1;
@@ -459,7 +576,7 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
                                                 egde[1] += 1;
                                                 egde[3] += 1;
                                             }
-                                            _ => ()
+                                            _ => (),
                                         }
                                     }
                                 }
@@ -483,7 +600,14 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
 
     let order_pair = [0, 1, 2, 1, 3, 2];
     let order_impair = [0, 2, 1, 1, 2, 3];
-    let order = [order_impair, order_pair, order_pair, order_impair, order_impair, order_pair];
+    let order = [
+        order_impair,
+        order_pair,
+        order_pair,
+        order_impair,
+        order_impair,
+        order_pair,
+    ];
 
     for s in 0..6 {
         // each direction
@@ -495,69 +619,85 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
             (x, y, z)
         };
 
-
-        for i in 0..(CHUNK_SIZE as i32) {  // x x y y z z
-            for j in 0..(CHUNK_SIZE as i32) { // y y x x x x
-                for k in 0..(CHUNK_SIZE as i32) {// z z z z y y
-                    let (px,py,pz) = ijk_to_pos(i, j, k);
+        for i in 0..(CHUNK_SIZE as i32) {
+            // x x y y z z
+            for j in 0..(CHUNK_SIZE as i32) {
+                // y y x x x x
+                for k in 0..(CHUNK_SIZE as i32) {
+                    // z z z z y y
+                    let (px, py, pz) = ijk_to_pos(i, j, k);
                     if to_mesh[ind_mesh(s, px, py, pz)] {
                         to_mesh[ind_mesh(s, px, py, pz)] = false;
                         let current_quad = quads[ind_mesh(s, px, py, pz)];
                         let mut j_end = j + 1; // + y + x + x
                         let mut k_end = k + 1; // +z + z + x
 
-                        if current_quad.v1 == current_quad.v3 && current_quad.v2 == current_quad.v4 { // meshing along j
+                        if current_quad.v1 == current_quad.v3 && current_quad.v2 == current_quad.v4
+                        {
+                            // meshing along j
                             let mut j2 = j + 1;
                             let mut pos = ijk_to_pos(i, j2, k);
 
-                            while j2 < CHUNK_SIZE as i32 && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] {
+                            while j2 < CHUNK_SIZE as i32
+                                && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
+                            {
                                 let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
-                                if next_quad.v1 == current_quad.v1 && next_quad.v2 == current_quad.v2
-                                    && next_quad.v1 == next_quad.v3 && next_quad.v2 == next_quad.v4 {
+                                if next_quad.v1 == current_quad.v1
+                                    && next_quad.v2 == current_quad.v2
+                                    && next_quad.v1 == next_quad.v3
+                                    && next_quad.v2 == next_quad.v4
+                                {
                                     to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     j2 += 1;
                                     pos = ijk_to_pos(i, j2, k);
-                                }else{
+                                } else {
                                     break;
                                 }
                             }
                             j_end = j2;
 
-                            if current_quad.v1 == current_quad.v2{ // 2D greedy meshing
+                            if current_quad.v1 == current_quad.v2 {
+                                // 2D greedy meshing
                                 let mut k2 = k + 1;
-                                'wloop:while k2 < CHUNK_SIZE as i32{
-                                    for j3 in j..j_end{
+                                'wloop: while k2 < CHUNK_SIZE as i32 {
+                                    for j3 in j..j_end {
                                         let pos = ijk_to_pos(i, j3, k2);
                                         let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
                                         if !(to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
-                                            && next_quad.is_same() && next_quad.v1 == current_quad.v1){
-                                                break 'wloop;
+                                            && next_quad.is_same()
+                                            && next_quad.v1 == current_quad.v1)
+                                        {
+                                            break 'wloop;
                                         }
                                     }
 
-                                    for j3 in j..j_end{
+                                    for j3 in j..j_end {
                                         let pos = ijk_to_pos(i, j3, k2);
                                         to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     }
                                     k2 += 1;
-
                                 }
                                 k_end = k2;
-
                             }
-
-                        } else if current_quad.v1 == current_quad.v2 && current_quad.v3 == current_quad.v4 { // meshing along k
+                        } else if current_quad.v1 == current_quad.v2
+                            && current_quad.v3 == current_quad.v4
+                        {
+                            // meshing along k
                             let mut k2 = k + 1;
                             let mut pos = ijk_to_pos(i, j, k2);
-                            while k2 < CHUNK_SIZE as i32 && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] {
+                            while k2 < CHUNK_SIZE as i32
+                                && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
+                            {
                                 let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
-                                if next_quad.v1 == current_quad.v1 && next_quad.v3 == current_quad.v3
-                                    && next_quad.v1 == next_quad.v2 && next_quad.v3 == next_quad.v4 {
+                                if next_quad.v1 == current_quad.v1
+                                    && next_quad.v3 == current_quad.v3
+                                    && next_quad.v1 == next_quad.v2
+                                    && next_quad.v3 == next_quad.v4
+                                {
                                     to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     k2 += 1;
                                     pos = ijk_to_pos(i, j, k2);
-
-                                }else{
+                                } else {
                                     break;
                                 }
                             }
@@ -571,37 +711,42 @@ pub fn greedy_meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>,
                         let mut px_ = [px as f32, px2 as f32, px3 as f32, px4 as f32];
                         let mut py_ = [py as f32, py2 as f32, py3 as f32, py4 as f32];
                         let mut pz_ = [pz as f32, pz2 as f32, pz3 as f32, pz4 as f32];
-                        let v = [current_quad.v1, current_quad.v2, current_quad.v3, current_quad.v4];
+                        let v = [
+                            current_quad.v1,
+                            current_quad.v2,
+                            current_quad.v3,
+                            current_quad.v4,
+                        ];
 
-                        if s == 0{ // 1x
-                            for kk in 0..4{
+                        if s == 0 {
+                            // 1x
+                            for kk in 0..4 {
                                 px_[kk] = px_[kk] + 1.0;
                             }
-                        }else if s == 2{ // 1y
-                            for kk in 0..4{
+                        } else if s == 2 {
+                            // 1y
+                            for kk in 0..4 {
                                 py_[kk] = py_[kk] + 1.0;
                             }
-                        }else if s == 4{ // 1z
-                            for kk in 0..4{
+                        } else if s == 4 {
+                            // 1z
+                            for kk in 0..4 {
                                 pz_[kk] = pz_[kk] + 1.0;
                             }
                         }
 
-                        for kk in 0..4{
-                            res_vertex.push(Vertex{
+                        for kk in 0..4 {
+                            res_vertex.push(Vertex {
                                 pos: [px_[kk], py_[kk], pz_[kk]],
                                 normal: v[kk],
-                            }
-
-                            );
+                            });
                         }
 
-                        for kk in 0..6{
+                        for kk in 0..6 {
                             res_index.push(n_of_different_vertex + order[s][kk]);
                         }
                         n_of_different_vertex += 4;
                         act_quad += 1;
-
                     }
                 }
             }

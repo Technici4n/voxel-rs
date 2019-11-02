@@ -4,16 +4,16 @@ use anyhow::Result;
 use gfx::Device;
 use nalgebra::Vector3;
 
+use crate::world::camera::Camera;
 use crate::{
     fps::FpsCounter,
     input::InputState,
-    physics::{aabb::AABB},
+    physics::aabb::AABB,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
     world::{renderer::WorldRenderer, World},
 };
-use crate::world::camera::Camera;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -24,7 +24,6 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     camera: Camera,
     player: AABB,
-
 }
 
 impl SinglePlayer {
@@ -75,7 +74,9 @@ impl State for SinglePlayer {
     ) -> Result<StateTransition> {
         if self.ui.should_update_camera() {
             let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
-            let new_delta = self.player.move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
+            let new_delta = self
+                .player
+                .move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
 
             self.camera.position += new_delta;
             if self.player.intersect_world(&self.world) {
@@ -111,7 +112,8 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
-        self.ui.rebuild(&self.camera, self.fps_counter.fps(), data)?;
+        self.ui
+            .rebuild(&self.camera, self.fps_counter.fps(), data)?;
         self.ui_renderer.render(gfx, &data, &mut self.ui)?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);
@@ -131,7 +133,10 @@ impl State for SinglePlayer {
         self.ui.cursor_moved(logical_position);
     }
 
-    fn handle_mouse_state_changes(&mut self, changes: Vec<(glutin::MouseButton, glutin::ElementState)>) {
+    fn handle_mouse_state_changes(
+        &mut self,
+        changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
+    ) {
         self.ui.handle_mouse_state_changes(changes);
     }
 

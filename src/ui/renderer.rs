@@ -97,11 +97,23 @@ impl PrimitiveBuffer {
     }
 
     pub fn draw_text(&mut self, text: String, font_size: Scale, layout: Layout, z: f32) {
-        self.text.push(TextPrimitive { text, font_size, layout, z, centered: false });
+        self.text.push(TextPrimitive {
+            text,
+            font_size,
+            layout,
+            z,
+            centered: false,
+        });
     }
 
     pub fn draw_text_centered(&mut self, text: String, font_size: Scale, layout: Layout, z: f32) {
-        self.text.push(TextPrimitive { text, font_size, layout, z, centered: true });
+        self.text.push(TextPrimitive {
+            text,
+            font_size,
+            layout,
+            z,
+            centered: true,
+        });
     }
 }
 
@@ -191,7 +203,12 @@ impl UiRenderer {
         let mut rect_indices: Vec<u32> = Vec::new();
 
         // Rectangles
-        for RectanglePrimitive { layout: l, color, z } in primitive_buffer.rectangle.into_iter() {
+        for RectanglePrimitive {
+            layout: l,
+            color,
+            z,
+        } in primitive_buffer.rectangle.into_iter()
+        {
             let a = Vertex {
                 pos: [l.x, l.y, z],
                 color: color.clone(),
@@ -213,19 +230,24 @@ impl UiRenderer {
             let c_index = b_index + 1;
             let d_index = c_index + 1;
             rect_vertices.extend([a, b, c, d].into_iter());
-            rect_indices.extend(
-                [b_index, a_index, c_index, b_index, c_index, d_index].into_iter(),
-            );
+            rect_indices.extend([b_index, a_index, c_index, b_index, c_index, d_index].into_iter());
         }
         // Text
-        for TextPrimitive { layout: l, text, font_size, z, centered } in primitive_buffer.text.into_iter() {
-            use gfx_glyph::{ HorizontalAlign, Layout, VerticalAlign };
+        for TextPrimitive {
+            layout: l,
+            text,
+            font_size,
+            z,
+            centered,
+        } in primitive_buffer.text.into_iter()
+        {
+            use gfx_glyph::{HorizontalAlign, Layout, VerticalAlign};
             let dpi = data.hidpi_factor as f32;
             let section = if centered {
                 Section {
                     text: &text,
-                    screen_position: ((l.x + l.width/2.0) * dpi, (l.y + l.height/2.0)*dpi),
-                    bounds: (l.width*dpi, l.height*dpi),
+                    screen_position: ((l.x + l.width / 2.0) * dpi, (l.y + l.height / 2.0) * dpi),
+                    bounds: (l.width * dpi, l.height * dpi),
                     scale: font_size,
                     z,
                     layout: Layout::Wrap {
@@ -250,7 +272,10 @@ impl UiRenderer {
 
         // Draw rectangles
         {
-            let (win_w, win_h) = (data.logical_window_size.width, data.logical_window_size.height);
+            let (win_w, win_h) = (
+                data.logical_window_size.width,
+                data.logical_window_size.height,
+            );
             // Update the uniform buffer to map (w, h) coordinates to [-1, 1]
             let transformation_matrix = [
                 [2.0 / win_w as f32, 0.0, 0.0, 0.0],

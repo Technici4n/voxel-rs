@@ -1,13 +1,11 @@
+use self::widgets::{Rectangle, Text, WithStyle};
+use crate::ui::widgets::Button;
+use crate::world::camera::Camera;
 use crate::{window::WindowData, world::World};
 use anyhow::Result;
 use gfx_glyph::Scale;
 use glutin::dpi::LogicalPosition;
-use quint::{Style, WidgetTree, Size, wt};
-use self::{
-    widgets::{Rectangle, Text, WithStyle},
-};
-use crate::world::camera::Camera;
-use crate::ui::widgets::Button;
+use quint::{wt, Size, Style, WidgetTree};
 
 pub mod renderer;
 pub mod widgets;
@@ -63,13 +61,26 @@ impl Ui {
             layers.push(self.draw_menu());
         }
 
-        let (win_w, win_h) = (data.logical_window_size.width, data.logical_window_size.height);
-        self.ui.rebuild(layers, Size { width: win_w as f32, height: win_h as f32 });
+        let (win_w, win_h) = (
+            data.logical_window_size.width,
+            data.logical_window_size.height,
+        );
+        self.ui.rebuild(
+            layers,
+            Size {
+                width: win_w as f32,
+                height: win_h as f32,
+            },
+        );
 
         Ok(())
     }
 
-    fn draw_debug_info(&self, camera: &Camera, fps: usize) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
+    fn draw_debug_info(
+        &self,
+        camera: &Camera,
+        fps: usize,
+    ) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
         let text = format!(
             "\
 Welcome to voxel-rs
@@ -83,7 +94,7 @@ x = {:.2}
 y = {:.2}
 z = {:.2}
 ",
-            fps, camera.yaw, camera.pitch,camera.position.x, camera.position.y, camera.position.z
+            fps, camera.yaw, camera.pitch, camera.position.x, camera.position.y, camera.position.z
         );
 
         wt! {
@@ -95,19 +106,24 @@ z = {:.2}
     }
 
     fn draw_menu(&self) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
-        let menu_button = |text: &'static str, message| wt! {
-            Button {
-                text: text.to_owned(),
-                font_size: Scale::uniform(40.0),
-                message,
-                style: Style::default().absolute_size(400.0, 100.0),
-            },
+        let menu_button = |text: &'static str, message| {
+            wt! {
+                Button {
+                    text: text.to_owned(),
+                    font_size: Scale::uniform(40.0),
+                    message,
+                    style: Style::default().absolute_size(400.0, 100.0),
+                },
+            }
         };
-
 
         let buttons_container = WidgetTree::new(
             Box::new(WithStyle {
-                style: Style::default().percent_size(1.0, 1.0).center_cross().center_main().vertical(),
+                style: Style::default()
+                    .percent_size(1.0, 1.0)
+                    .center_cross()
+                    .center_main()
+                    .vertical(),
             }),
             vec![
                 menu_button("Resume", Message::ExitMenu),
@@ -117,10 +133,17 @@ z = {:.2}
         buttons_container
     }
 
-    pub fn handle_mouse_state_changes(&mut self, changes: Vec<(glutin::MouseButton, glutin::ElementState)>) {
-        let changes = changes.into_iter().map(|(button, state)|
-            quint::Event::MouseInput { button: quint_mouse_button(button), state: quint_element_state(state) }
-        ).collect();
+    pub fn handle_mouse_state_changes(
+        &mut self,
+        changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
+    ) {
+        let changes = changes
+            .into_iter()
+            .map(|(button, state)| quint::Event::MouseInput {
+                button: quint_mouse_button(button),
+                state: quint_element_state(state),
+            })
+            .collect();
         self.messages.extend(self.ui.update(changes));
     }
 

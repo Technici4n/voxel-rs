@@ -27,8 +27,8 @@ impl Layout {
         Self {
             x: self.x + padding_pixels,
             y: self.y + padding_pixels,
-            width: self.width - 2.0* padding_pixels,
-            height: self.height - 2.0* padding_pixels,
+            width: self.width - 2.0 * padding_pixels,
+            height: self.height - 2.0 * padding_pixels,
         }
     }
 }

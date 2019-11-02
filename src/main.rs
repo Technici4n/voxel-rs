@@ -9,12 +9,12 @@ mod fps;
 mod input;
 mod mesh;
 mod perlin;
+mod physics;
 mod settings;
 mod singleplayer;
 mod ui;
 mod window;
 mod world;
-mod physics;
 
 fn main() -> Result<()> {
     env_logger::init();

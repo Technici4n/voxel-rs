@@ -168,16 +168,19 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                             if input_state.process_keyboard_input(input) {
                                 key_state_changes.push((input.scancode, input.state));
                             }
-                        },
+                        }
                         CursorMoved { position, .. } => state.handle_cursor_movement(position),
-                        CursorEntered { .. }
-                        | CursorLeft { .. }
-                        | MouseWheel { .. } => (),
-                        MouseInput { button, state: element_state, modifiers, .. } => {
+                        CursorEntered { .. } | CursorLeft { .. } | MouseWheel { .. } => (),
+                        MouseInput {
+                            button,
+                            state: element_state,
+                            modifiers,
+                            ..
+                        } => {
                             if input_state.process_mouse_input(element_state, button, modifiers) {
                                 mouse_state_changes.push((button, element_state));
                             }
-                        },
+                        }
                         // weird events
                         TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
                         Refresh => (),

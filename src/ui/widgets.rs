@@ -1,6 +1,6 @@
-use gfx_glyph::Scale;
-use quint::{Event, Layout, Style, Widget, Position};
 use super::renderer::PrimitiveBuffer;
+use gfx_glyph::Scale;
+use quint::{Event, Layout, Position, Style, Widget};
 
 pub struct Rectangle {
     pub color: [f32; 4],
@@ -17,7 +17,9 @@ pub struct WithStyle {
 }
 
 pub struct Button<Message>
-    where Message: Clone {
+where
+    Message: Clone,
+{
     pub message: Message,
     pub text: String,
     pub font_size: Scale,
@@ -51,8 +53,12 @@ impl<T> Widget<PrimitiveBuffer, T> for WithStyle {
 }
 
 impl<T> Widget<PrimitiveBuffer, T> for Button<T>
-    where T: Clone {
-    fn style(&self) -> Style { self.style.clone() }
+where
+    T: Clone,
+{
+    fn style(&self) -> Style {
+        self.style.clone()
+    }
 
     fn render(&self, buffer: &mut PrimitiveBuffer, cursor_position: Position, layout: Layout) {
         let background_color = if layout.is_position_inside(cursor_position) {
@@ -65,7 +71,13 @@ impl<T> Widget<PrimitiveBuffer, T> for Button<T>
         buffer.draw_text_centered(self.text.clone(), self.font_size, layout, 0.1);
     }
 
-    fn on_event(&self, event: Event, layout: Layout, cursor_position: Position, messages: &mut Vec<T>) {
+    fn on_event(
+        &self,
+        event: Event,
+        layout: Layout,
+        cursor_position: Position,
+        messages: &mut Vec<T>,
+    ) {
         if let Event::MouseInput { button, state } = event {
             if let quint::MouseButton::Left = button {
                 if let quint::ButtonState::Pressed = state {
