@@ -8,6 +8,7 @@ use crate::{
 };
 use anyhow::Result;
 use gfx::Device;
+use crate::world::camera::Camera;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -16,6 +17,7 @@ pub struct SinglePlayer {
     ui_renderer: UiRenderer,
     world: World,
     world_renderer: WorldRenderer,
+    camera: Camera,
 }
 
 impl SinglePlayer {
@@ -26,6 +28,7 @@ impl SinglePlayer {
             ui_renderer: UiRenderer::new(gfx)?,
             world: World::new(),
             world_renderer: WorldRenderer::new(gfx)?,
+            camera: Camera::new(),
         }))
     }
 }
@@ -39,7 +42,7 @@ impl State for SinglePlayer {
         _flags: &mut WindowFlags,
         seconds_delta: f64,
     ) -> Result<StateTransition> {
-        self.world.camera.tick(seconds_delta, keyboard_state);
+        self.camera.tick(seconds_delta, keyboard_state);
         //flags.hide_and_center_cursor = true;
         Ok(StateTransition::KeepCurrent)
     }
@@ -59,12 +62,12 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
-        self.world_renderer.render(gfx, data, &self.world)?;
+        self.world_renderer.render(gfx, data, &self.camera)?;
         // Clear depth
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
-        self.ui.rebuild(&self.world, self.fps_counter.fps(), data)?;
+        self.ui.rebuild(&self.camera, self.fps_counter.fps(), data)?;
         self.ui_renderer.render(gfx, &data, &mut self.ui)?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);
@@ -75,7 +78,7 @@ impl State for SinglePlayer {
     }
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
-        self.world.camera.update_cursor(delta.0, delta.1);
+        self.camera.update_cursor(delta.0, delta.1);
     }
 
     fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition) {

@@ -13,14 +13,12 @@ use self::camera::Camera;
 
 
 pub struct World {
-    pub camera: Camera,
     pub chunks: HashMap<ChunkPos, Chunk>,
 }
 
 impl World {
     pub fn new() -> Self {
         Self {
-            camera: Camera::new(),
             chunks: HashMap::new(),
         }
     }
@@ -61,7 +59,7 @@ impl World {
     }
 
     /// Return data at position x,y,z
-    pub fn _get_data(&self, x: i64, y: i64, z: i64) -> u16 {
+    pub fn get_data(&self, x: i64, y: i64, z: i64) -> u16 {
         let (cx, cy, cz) = World::get_chunk_coord(x, y, z);
         let (dx, dy, dz) = (
             (x - cx * CHUNK_SIZE as i64) as u32,
@@ -76,7 +74,7 @@ impl World {
 
     /// Set data at position x,y,z
     /// Enventually create a new chunk if necessary
-    pub fn _set_data(&mut self, x: i64, y: i64, z: i64, data: u16) {
+    pub fn set_data(&mut self, x: i64, y: i64, z: i64, data: u16) {
         let (cx, cy, cz) = World::get_chunk_coord(x, y, z);
         let (dx, dy, dz) = (
             (x - cx * CHUNK_SIZE as i64) as u32,

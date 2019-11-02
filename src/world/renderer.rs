@@ -1,7 +1,7 @@
 use crate::{
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
-    world::{chunk::CHUNK_SIZE, World},
+    world::{chunk::CHUNK_SIZE, World, camera::Camera},
 };
 use std::time::Instant;
 use anyhow::Result;
@@ -126,7 +126,7 @@ impl WorldRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, world: &World) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, camera: &Camera) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref color_buffer,
@@ -142,7 +142,6 @@ impl WorldRenderer {
             win_w / win_h
         };
 
-        let camera = &world.camera;
         let view_proj =
             convert::<Matrix4<f64>, Matrix4<f32>>(camera.get_view_projection(aspect_ratio)).into();
 

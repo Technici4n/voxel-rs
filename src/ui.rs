@@ -6,6 +6,7 @@ use quint::{Style, WidgetTree, Size};
 use self::{
     widgets::{Text, WithStyle},
 };
+use crate::world::camera::Camera;
 
 pub mod renderer;
 pub mod widgets;
@@ -30,8 +31,7 @@ impl Ui {
     }
 
     /// Rebuild the Ui if it changed
-    pub fn rebuild(&mut self, world: &World, fps: usize, data: &WindowData) -> Result<()> {
-        let camera = &world.camera;
+    pub fn rebuild(&mut self, camera: &Camera, fps: usize, data: &WindowData) -> Result<()> {
         let text = {
             let text = format!(
                 "\
