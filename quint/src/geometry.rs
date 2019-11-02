@@ -1,3 +1,4 @@
+/// Some size.
 #[derive(Debug, Clone, Copy)]
 pub struct Size {
     pub width: f32,
@@ -13,7 +14,8 @@ impl Size {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+/// Some position.
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Position {
     pub x: f32,
     pub y: f32,

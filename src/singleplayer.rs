@@ -1,6 +1,6 @@
 use crate::{
     fps::FpsCounter,
-    input::KeyboardState,
+    input::InputState,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
@@ -34,14 +34,21 @@ impl State for SinglePlayer {
     fn update(
         &mut self,
         _settings: &mut Settings,
-        keyboard_state: &KeyboardState,
+        keyboard_state: &InputState,
         _data: &WindowData,
-        _flags: &mut WindowFlags,
+        flags: &mut WindowFlags,
         seconds_delta: f64,
     ) -> Result<StateTransition> {
-        self.world.camera.tick(seconds_delta, keyboard_state);
-        //flags.hide_and_center_cursor = true;
-        Ok(StateTransition::KeepCurrent)
+        if self.ui.should_update_camera() {
+            self.world.camera.tick(seconds_delta, keyboard_state);
+        }
+        flags.hide_and_center_cursor = self.ui.should_capture_mouse();
+
+        if self.ui.should_exit() {
+            Ok(StateTransition::CloseWindow)
+        } else {
+            Ok(StateTransition::KeepCurrent)
+        }
     }
 
     fn render(
@@ -75,10 +82,20 @@ impl State for SinglePlayer {
     }
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
-        self.world.camera.update_cursor(delta.0, delta.1);
+        if self.ui.should_update_camera() {
+            self.world.camera.update_cursor(delta.0, delta.1);
+        }
     }
 
     fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition) {
         self.ui.cursor_moved(logical_position);
+    }
+
+    fn handle_mouse_state_changes(&mut self, changes: Vec<(glutin::MouseButton, glutin::ElementState)>) {
+        self.ui.handle_mouse_state_changes(changes);
+    }
+
+    fn handle_key_state_changes(&mut self, changes: Vec<(u32, glutin::ElementState)>) {
+        self.ui.handle_key_state_changes(changes);
     }
 }

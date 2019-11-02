@@ -1,4 +1,4 @@
-use crate::input::KeyboardState;
+use crate::input::InputState;
 use glutin::ElementState;
 use nalgebra::{Matrix4, Perspective3, Vector3};
 
@@ -52,7 +52,7 @@ impl Camera {
         }
     }
 
-    pub fn tick(&mut self, dt: f64, keyboard_state: &KeyboardState) {
+    pub fn tick(&mut self, dt: f64, keyboard_state: &InputState) {
         const SPEED: f64 = 10.0;
         if let ElementState::Pressed = keyboard_state.get_key_state(MOVE_FORWARD) {
             self.position += self.movement_direction(0.0) * (dt * SPEED) as f64;

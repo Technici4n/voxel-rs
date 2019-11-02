@@ -1,11 +1,11 @@
+/// The state of a button.
 #[derive(Debug, Clone, Copy)]
 pub enum ButtonState {
     Pressed,
     Released,
 }
 
-pub type ScanCode = u32;
-
+/// A mouse button.
 #[derive(Debug, Clone, Copy)]
 pub enum MouseButton {
     Left,
@@ -14,12 +14,9 @@ pub enum MouseButton {
     Other(u8),
 }
 
+/// A Ui event.
 #[derive(Debug, Clone, Copy)]
 pub enum Event {
-    KeyboardInput { state: ButtonState, code: ScanCode },
-    CharInput(char),
-    CursorEntered,
-    CursorExited,
-    CursorMoved { x: f32, y: f32 },
+    /// A change in the state of a mouse button.
     MouseInput { state: ButtonState, button: MouseButton },
 }
