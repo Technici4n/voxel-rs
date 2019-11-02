@@ -2,13 +2,16 @@ use std::time::Instant;
 
 use anyhow::Result;
 use gfx::Device;
+use log::info;
 use nalgebra::Vector3;
 
 use crate::world::camera::Camera;
 use crate::{
+    block::Block,
     fps::FpsCounter,
     input::InputState,
     physics::aabb::AABB,
+    registry::Registry,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
@@ -24,28 +27,32 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     camera: Camera,
     player: AABB,
+    block_registry: Registry<Block>,
 }
 
 impl SinglePlayer {
     pub fn new(_settings: &mut Settings, gfx: &mut Gfx) -> Result<Box<dyn State>> {
+        // Load data
+        let data = crate::data::load_data(&mut gfx.factory, "data/".into())?;
+
         // Generating the world
         let mut world = World::new();
 
         let t1 = Instant::now();
-        println!("Generating the world ...");
+        info!("Generating the world ...");
         for i in -4..4 {
             for j in -4..4 {
                 for k in -4..4 {
                     // generating the chunks
-                    world.gen_chunk(i, j, k);
+                    world.gen_chunk(i, j, k, &data.blocks);
                 }
             }
         }
 
         let t2 = Instant::now();
-        println!("Generating the world : {} ms", (t2 - t1).subsec_millis());
+        info!("Generating the world : {} ms", (t2 - t1).subsec_millis());
 
-        let mut world_renderer = WorldRenderer::new(gfx, &world);
+        let world_renderer = WorldRenderer::new(gfx, &world, data.meshes, data.texture_atlas);
 
         Ok(Box::new(Self {
             fps_counter: FpsCounter::new(),
@@ -59,6 +66,7 @@ impl SinglePlayer {
                 cam
             },
             player: AABB::new((0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
+            block_registry: data.blocks,
         }))
     }
 }

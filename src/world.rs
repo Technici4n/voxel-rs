@@ -7,6 +7,8 @@ pub mod meshing;
 pub mod renderer;
 
 use self::camera::Camera;
+use crate::block::Block;
+use crate::registry::Registry;
 use crate::world::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
 use crate::world::meshing::AdjChunkOccl;
 
@@ -22,12 +24,12 @@ impl World {
     }
 
     /// If the chunk at position x,y,z does not exist, create and generate it
-    pub fn gen_chunk(&mut self, x: i64, y: i64, z: i64) {
+    pub fn gen_chunk(&mut self, x: i64, y: i64, z: i64, block_registry: &Registry<Block>) {
         match self.get_chunk(x, y, z) {
             Some(_chunk) => (),
             None => {
                 let mut chunk = Chunk::new(x, y, z);
-                chunk.fill_perlin();
+                chunk.fill_perlin(block_registry);
                 let pos = ChunkPos {
                     px: x,
                     py: y,

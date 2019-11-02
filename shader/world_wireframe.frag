@@ -2,6 +2,8 @@
 
 in vec3 v_Norm;
 in float occl;
+in uint v_UvScaling;
+in vec2 v_Uv;
 
 out vec4 ColorBuffer;
 
