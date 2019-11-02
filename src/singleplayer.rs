@@ -9,6 +9,7 @@ use crate::{
 use anyhow::Result;
 use gfx::Device;
 use crate::world::camera::Camera;
+use std::time::Instant;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -22,12 +23,30 @@ pub struct SinglePlayer {
 
 impl SinglePlayer {
     pub fn new(_settings: &mut Settings, gfx: &mut Gfx) -> Result<Box<dyn State>> {
+        // Generating the world
+        let mut world = World::new();
+
+        let t1 = Instant::now();
+        println!("Generating the world ...");
+        for i in -4..4 {
+            for j in -4..4 {
+                for k in -4..4 {
+                    // generating the chunks
+                    world.gen_chunk(i,j,k);
+                }
+            }
+        }
+        let t2 = Instant::now();
+        println!("Generating the world : {} ms", (t2 -t1).subsec_millis());
+
+        let mut world_renderer = WorldRenderer::new(gfx, &world);
+
         Ok(Box::new(Self {
             fps_counter: FpsCounter::new(),
             ui: Ui::new(),
             ui_renderer: UiRenderer::new(gfx)?,
-            world: World::new(),
-            world_renderer: WorldRenderer::new(gfx)?,
+            world,
+            world_renderer : world_renderer?,
             camera: Camera::new(),
         }))
     }

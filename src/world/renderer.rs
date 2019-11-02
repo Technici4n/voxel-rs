@@ -46,7 +46,7 @@ pub struct WorldRenderer {
 }
 
 impl WorldRenderer {
-    pub fn new(gfx: &mut Gfx) -> Result<Self> {
+    pub fn new(gfx: &mut Gfx, world : &World) -> Result<Self> {
         use super::meshing::greedy_meshing as meshing;
 
         let Gfx {
@@ -81,17 +81,9 @@ impl WorldRenderer {
         )?;
 
         let mut meshes = Vec::new(); // all the mesh to be rendered
-        let mut world = World::new();
 
-        for i in -4..4 {
-            for j in -4..4 {
-                for k in -4..4 {
-                    // generating the chunks
-                    println!("Generating chunk at pos ({}, {}, {})",i,j,k);
-                    world.gen_chunk(i,j,k);
-                }
-            }
-        }
+        let t1 = Instant::now();
+
         for chunk in world.chunks.values() {
             let pos = (
                 (chunk.pos.px * CHUNK_SIZE as i64) as f32,
@@ -99,23 +91,19 @@ impl WorldRenderer {
                 (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
             );
 
-            println!("Meshing chunk at pos ({}, {}, {})", pos.0,pos.1,pos.2);
-            let t1 = Instant::now();
             let (vertices, indices, tot_quad, act_quad) = meshing(chunk,
                                               Some(world.create_adj_chunk_occl(
                                                   chunk.pos.px,chunk.pos.py, chunk.pos.pz
                                               )));
-            let t2 = Instant::now();
-            println!("Creating mesh : {} ms", (t2 - t1).subsec_millis());
-            println!("Compression factor : {} %", 100.0 * (act_quad as f32)/(tot_quad as f32));
-
-
 
             let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
             let t3 = Instant::now();
-            println!("Sending chunk to GPU : {} ms", (t3 - t2).subsec_millis());
+
             meshes.push(chunk_mesh);
         }
+
+        let t2 = Instant::now();
+        println!("Creating the meshes : {} ms", (t2 - t1).subsec_millis());
 
 
         Ok(Self {
