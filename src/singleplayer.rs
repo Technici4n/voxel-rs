@@ -58,7 +58,7 @@ impl SinglePlayer {
                 cam.position = Vector3::new(0.4, 1.6, 0.4);
                 cam
             },
-            player: AABB::new((0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
+            player: AABB::new(Vector3::new(0.0,0.0,0.0), (0.8, 1.8, 0.8)),
         }))
     }
 }
@@ -76,7 +76,7 @@ impl State for SinglePlayer {
             let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
             let new_delta = self
                 .player
-                .move_check_collision(&self.world, (delta_move.x, delta_move.y, delta_move.z));
+                .move_check_collision(&self.world, delta_move);
 
             self.camera.position += new_delta;
         }
