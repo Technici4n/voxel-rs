@@ -54,7 +54,7 @@ where
         MAX_TEXTURE_SIZE as u16,
         gfx::texture::AaMode::Single,
     );
-    let (_, texture_view) = factory.create_texture_immutable_u8::<gfx::format::Srgba8>(
+    let (_, texture_view) = factory.create_texture_immutable_u8::<gfx::format::Rgba8>(
         texture_kind,
         gfx::texture::Mipmap::Provided,
         &[&texture_buffer],

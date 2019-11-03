@@ -616,15 +616,30 @@ pub fn greedy_meshing(
         }
     }
 
-    let order_pair = [0, 1, 2, 1, 3, 2];
-    let order_impair = [0, 2, 1, 1, 2, 3];
     let order = [
-        order_impair,
-        order_pair,
-        order_pair,
-        order_impair,
-        order_impair,
-        order_pair,
+        [0, 2, 1, 1, 2, 3],
+        [0, 1, 2, 1, 3, 2],
+        [0, 1, 2, 1, 3, 2],
+        [0, 2, 1, 1, 2, 3],
+        [3, 1, 2, 2, 1, 0],
+        [3, 2, 1, 2, 0, 1],
+    ];
+
+    let uvs = [
+        [[1.0, 1.0], [0.0, 1.0], [1.0, 0.0], [0.0, 0.0]],
+        [[0.0, 1.0], [1.0, 1.0], [0.0, 0.0], [1.0, 0.0]],
+        [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]],
+        [[1.0, 0.0], [1.0, 1.0], [0.0, 0.0], [0.0, 1.0]],
+        [[0.0, 1.0], [0.0, 0.0], [1.0, 1.0], [1.0, 0.0]],
+        [[1.0, 1.0], [1.0, 0.0], [0.0, 1.0], [0.0, 0.0]],
+    ];
+    let uv_directions = [
+        [1, 0],
+        [1, 0],
+        [0, 1],
+        [0, 1],
+        [0, 1],
+        [0, 1],
     ];
 
     for s in 0..6 {
@@ -763,14 +778,13 @@ pub fn greedy_meshing(
 
                         let uv_pos = [uv.x, uv.y];
                         let uv_size = [uv.width, uv.height];
+                        let uv_factors = [(j_end - j) as f32, (k_end - k) as f32];
+                        let uv_factors = [uv_factors[uv_directions[s][0]], uv_factors[uv_directions[s][1]]];
                         let uvs = [
-                            [0.0, 0.0],
-                            [0.0, uv.height * (k_end - k) as f32],
-                            [uv.width * (j_end - j) as f32, 0.0],
-                            [
-                                uv.width * (j_end - j) as f32,
-                                uv.height * (k_end - k) as f32,
-                            ],
+                            [uvs[s][0][0] * uv.width * uv_factors[0], uvs[s][0][1] * uv.height * uv_factors[1]],
+                            [uvs[s][1][0] * uv.width * uv_factors[0], uvs[s][1][1] * uv.height * uv_factors[1]],
+                            [uvs[s][2][0] * uv.width * uv_factors[0], uvs[s][2][1] * uv.height * uv_factors[1]],
+                            [uvs[s][3][0] * uv.width * uv_factors[0], uvs[s][3][1] * uv.height * uv_factors[1]],
                         ];
 
                         for kk in 0..4 {
