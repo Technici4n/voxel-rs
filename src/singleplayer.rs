@@ -166,7 +166,7 @@ impl State for SinglePlayer {
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
         if self.ui.should_exit() {
-            Ok(StateTransition::CloseWindow)
+            Ok(StateTransition::ReplaceCurrent(Box::new(crate::mainmenu::MainMenu::new)))
         } else {
             Ok(StateTransition::KeepCurrent)
         }
@@ -194,7 +194,7 @@ impl State for SinglePlayer {
         // Draw ui
         self.ui
             .rebuild(&self.camera, self.fps_counter.fps(), data)?;
-        self.ui_renderer.render(gfx, &data, &mut self.ui)?;
+        self.ui_renderer.render(gfx, &data, &self.ui.ui)?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);
         gfx.context.swap_buffers()?;

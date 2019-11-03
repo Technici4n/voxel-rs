@@ -1,7 +1,4 @@
-use crate::{
-    ui::Ui,
-    window::{Gfx, WindowData},
-};
+use crate::window::{Gfx, WindowData};
 use anyhow::{Context, Result};
 use gfx;
 use gfx::{
@@ -186,7 +183,7 @@ impl UiRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, ui: &mut Ui) -> Result<()> {
+    pub fn render<Message>(&mut self, gfx: &mut Gfx, data: &WindowData, ui: &quint::Ui<PrimitiveBuffer, Message>) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref mut factory,
@@ -196,7 +193,7 @@ impl UiRenderer {
         } = gfx;
 
         let mut primitive_buffer = PrimitiveBuffer::default();
-        ui.ui.render(&mut primitive_buffer);
+        ui.render(&mut primitive_buffer);
 
         // Render primitives
         let mut rect_vertices: Vec<Vertex> = Vec::new();

@@ -9,6 +9,7 @@ mod block;
 mod data;
 mod fps;
 mod input;
+mod mainmenu;
 mod mesh;
 mod perlin;
 mod physics;
@@ -28,6 +29,6 @@ fn main() -> Result<()> {
     let config_file = Path::new("config/Settings.ron");
     let mut settings = settings::load_settings(&config_folder, &config_file)?;
     info!("Current settings: {:?}", settings);
-    window::open_window(&mut settings, Box::new(singleplayer::SinglePlayer::new))?;
+    window::open_window(&mut settings, Box::new(mainmenu::MainMenu::new))?;
     Ok(())
 }

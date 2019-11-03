@@ -22,9 +22,14 @@ impl Style {
         self.style.align_items = AlignItems::Center;
         self
     }
-    /// Center main axis
+    /// Center main axis by spacing around
     pub fn center_main(mut self) -> Self {
         self.style.justify_content = JustifyContent::SpaceAround;
+        self
+    }
+    /// Center main axis by spacing between
+    pub fn space_between(mut self) -> Self {
+        self.style.justify_content = JustifyContent::SpaceBetween;
         self
     }
     /// Set width relative to parent in percent (from 0.0 to 1.0)

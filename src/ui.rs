@@ -11,14 +11,13 @@ pub mod renderer;
 pub mod widgets;
 
 #[derive(Debug, Clone, Copy)]
-pub(self) enum Message {
-    ShowMenu,
+pub enum Message {
     ExitMenu,
     ExitGame,
 }
 
 pub struct Ui {
-    pub(self) ui: quint::Ui<renderer::PrimitiveBuffer, Message>,
+    pub ui: quint::Ui<renderer::PrimitiveBuffer, Message>,
     messages: Vec<Message>,
     show_menu: bool,
     should_exit: bool,
@@ -161,7 +160,6 @@ z = {:.2}
     fn update(&mut self) {
         for message in self.messages.drain(..) {
             match message {
-                Message::ShowMenu => self.show_menu = true,
                 Message::ExitMenu => self.show_menu = false,
                 Message::ExitGame => self.should_exit = true,
             }
@@ -177,7 +175,7 @@ z = {:.2}
     }
 }
 
-fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
+pub fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
     use glutin::MouseButton::*;
     match button {
         Left => quint::MouseButton::Left,
@@ -187,7 +185,7 @@ fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
     }
 }
 
-fn quint_element_state(state: glutin::ElementState) -> quint::ButtonState {
+pub fn quint_element_state(state: glutin::ElementState) -> quint::ButtonState {
     match state {
         glutin::ElementState::Pressed => quint::ButtonState::Pressed,
         glutin::ElementState::Released => quint::ButtonState::Released,
