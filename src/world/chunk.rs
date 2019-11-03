@@ -1,4 +1,4 @@
-use crate::perlin::perlin;
+use crate::{block::Block, perlin::perlin, registry::Registry};
 
 /// Number of blocks of data in a chunk axis
 pub const CHUNK_LEN: u32 = 16;
@@ -119,7 +119,8 @@ impl Chunk {
     }
 
     /// Fill the chunk with perlin noise
-    pub fn fill_perlin(&mut self) {
+    pub fn fill_perlin(&mut self, block_registry: &Registry<Block>) {
+        let stone_block = block_registry.get_id_by_name(&"stone".to_owned()).unwrap() as u16;
         let px = (self.pos.px * CHUNK_SIZE as i64) as f32;
         let py = (self.pos.py * CHUNK_SIZE as i64) as f32;
         let pz = (self.pos.pz * CHUNK_SIZE as i64) as f32;
@@ -129,10 +130,10 @@ impl Chunk {
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if noise[(k * 32 * 32 + j * 32 + i) as usize] > (py + j as f32 + 10.0)/110.0
+                    if noise[(k * 32 * 32 + j * 32 + i) as usize] > (py + j as f32 + 10.0) / 110.0
                     // warning : indexing order
                     {
-                        self.set_data(i, j, k, 1);
+                        self.set_data(i, j, k, stone_block);
                     }
                 }
             }

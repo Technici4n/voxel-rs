@@ -2,13 +2,24 @@ use std::time::Instant;
 
 use anyhow::Result;
 use gfx::Device;
+use log::info;
 use nalgebra::Vector3;
 
-use crate::{fps::FpsCounter, input::InputState, physics::aabb::AABB, settings::Settings, ui::{renderer::UiRenderer, Ui}, window::{Gfx, State, StateTransition, WindowData, WindowFlags}, world::{renderer::WorldRenderer, World}, world};
-use crate::mesh::Mesh;
 use crate::world::camera::Camera;
-use crate::world::chunk::CHUNK_SIZE;
-use crate::world::meshing::greedy_meshing as meshing;
+use crate::{
+    block::Block,
+    fps::FpsCounter,
+    input::InputState,
+    mesh::Mesh,
+    physics::aabb::AABB,
+    registry::Registry,
+    settings::Settings,
+    ui::{renderer::UiRenderer, Ui},
+    window::{Gfx, State, StateTransition, WindowData, WindowFlags},
+    world::{
+        chunk::CHUNK_SIZE, meshing::greedy_meshing as meshing, renderer::WorldRenderer, World,
+    },
+};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -19,28 +30,34 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     camera: Camera,
     player: AABB,
+    block_registry: Registry<Block>,
 }
 
 impl SinglePlayer {
     pub fn new(_settings: &mut Settings, gfx: &mut Gfx) -> Result<Box<dyn State>> {
+        // Load data
+        let data = crate::data::load_data(&mut gfx.factory, "data/".into())?;
+
         // Generating the world
         let mut world = World::new();
 
         let t1 = Instant::now();
-        println!("Generating the world ...");
         for i in -1..1 {
             for j in -1..1 {
                 for k in -1..1 {
                     // generating the chunks
-                    world.gen_chunk(i, j, k);
+                    world.gen_chunk(i, j, k, &data.blocks);
                 }
             }
         }
 
         let t2 = Instant::now();
-        println!("Generating the world : {} ms", (t2 - t1).subsec_millis());
+        info!(
+            "Generating the first part of the world took {} ms",
+            (t2 - t1).subsec_millis()
+        );
 
-        let world_renderer = WorldRenderer::new(gfx, &world);
+        let world_renderer = WorldRenderer::new(gfx, &world, data.meshes, data.texture_atlas);
 
         Ok(Box::new(Self {
             fps_counter: FpsCounter::new(),
@@ -54,6 +71,7 @@ impl SinglePlayer {
                 cam
             },
             player: AABB::new(Vector3::new(0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
+            block_registry: data.blocks,
         }))
     }
 }
@@ -70,25 +88,23 @@ impl State for SinglePlayer {
     ) -> Result<StateTransition> {
         if self.ui.should_update_camera() {
             let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
-            let new_delta = self
-                .player
-                .move_check_collision(&self.world, delta_move);
+            let new_delta = self.player.move_check_collision(&self.world, delta_move);
 
             self.camera.position += new_delta;
-
 
             // Generating new chunks
             let ix = self.player.pos.x.floor() as i64;
             let iy = self.player.pos.y.floor() as i64;
             let iz = self.player.pos.z.floor() as i64;
 
-            let (cx, cy, cz) = world::World::get_chunk_coord(ix, iy, iz);
+            let (cx, cy, cz) = World::get_chunk_coord(ix, iy, iz);
 
             for i in -1..=1 {
                 for j in -1..=1 {
                     for k in -1..=1 {
-                        if !self.world.has_chunk(cx+i, cy+j, cz+k) {
-                            self.world.gen_chunk(cx+i, cy+j, cz+k);
+                        if !self.world.has_chunk(cx + i, cy + j, cz + k) {
+                            self.world
+                                .gen_chunk(cx + i, cy + j, cz + k, &self.block_registry);
                         }
                     }
                 }
@@ -96,26 +112,28 @@ impl State for SinglePlayer {
 
             // Unloading the chunk too far
             let mut chunks_to_dispose = Vec::new();
-            for chunk in self.world.chunks.values(){
+            for chunk in self.world.chunks.values() {
                 let dx = self.player.pos.x - (chunk.pos.px as f64 * CHUNK_SIZE as f64);
                 let dy = self.player.pos.y - (chunk.pos.py as f64 * CHUNK_SIZE as f64);
                 let dz = self.player.pos.z - (chunk.pos.pz as f64 * CHUNK_SIZE as f64);
-                if (dx*dx + dy*dy + dz*dz).sqrt() > 200.0{
+                if (dx * dx + dy * dy + dz * dz).sqrt() > 200.0 {
                     chunks_to_dispose.push(chunk.pos.clone());
                 }
             }
 
-            for pos in chunks_to_dispose{
+            for pos in chunks_to_dispose {
                 self.world.drop_chunk(pos.px, pos.py, pos.pz);
                 self.world_renderer.drop_mesh(&pos);
             }
 
             // Update meshing
-            let chunks_to_remesh =  self.world.chunks_to_remesh.clone();
+            let chunks_to_remesh = self.world.chunks_to_remesh.clone();
             self.world.chunks_to_remesh.clear();
 
             for chunk_pos in chunks_to_remesh.iter() {
-                let chunk = self.world.get_chunk(chunk_pos.px, chunk_pos.py, chunk_pos.pz);
+                let chunk = self
+                    .world
+                    .get_chunk(chunk_pos.px, chunk_pos.py, chunk_pos.pz);
                 match chunk {
                     None => (),
                     Some(chunk) => {
@@ -125,7 +143,12 @@ impl State for SinglePlayer {
 
                         let (vertices, indices, _, _) = meshing(
                             chunk,
-                            Some(self.world.create_adj_chunk_occl(chunk.pos.px, chunk.pos.py, chunk.pos.pz)),
+                            Some(self.world.create_adj_chunk_occl(
+                                chunk.pos.px,
+                                chunk.pos.py,
+                                chunk.pos.pz,
+                            )),
+                            &self.world_renderer.block_meshes,
                         );
 
                         let pos = (
@@ -138,10 +161,7 @@ impl State for SinglePlayer {
                     }
                 }
             }
-
-
         }
-
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 

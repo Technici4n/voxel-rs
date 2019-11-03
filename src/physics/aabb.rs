@@ -2,7 +2,7 @@ use crate::world::World;
 use nalgebra::Vector3;
 
 pub struct AABB {
-   pub pos : Vector3<f64>,
+    pub pos: Vector3<f64>,
     pub size_x: f64,
     pub size_y: f64,
     pub size_z: f64,
@@ -82,13 +82,7 @@ impl AABB {
 
     /// Try to move the box in the world and stop the movement if it goes trough a block
     /// Return the actual deplacement
-    pub fn move_check_collision(
-        &mut self,
-        world: &World,
-        delta : Vector3<f64>,
-    ) -> Vector3<f64> {
-
-
+    pub fn move_check_collision(&mut self, world: &World, delta: Vector3<f64>) -> Vector3<f64> {
         if self.intersect_world(world) {
             self.pos += delta;
             return delta;

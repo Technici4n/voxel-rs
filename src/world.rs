@@ -1,15 +1,18 @@
 #![allow(dead_code)]
 
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
-use crate::world::chunk::{Chunk, CHUNK_SIZE, ChunkPos};
+use crate::world::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
 use crate::world::meshing::AdjChunkOccl;
 
 pub mod camera;
 pub mod chunk;
 pub mod meshing;
 pub mod renderer;
+
+use crate::block::Block;
+use crate::registry::Registry;
 
 pub struct World {
     pub chunks: HashMap<ChunkPos, Chunk>,
@@ -26,12 +29,12 @@ impl World {
 
     /// If the chunk at position x,y,z does not exist, create and generate it
     /// Set the adjacent chunks "to remesh"
-    pub fn gen_chunk(&mut self, x: i64, y: i64, z: i64) {
+    pub fn gen_chunk(&mut self, x: i64, y: i64, z: i64, block_registry: &Registry<Block>) {
         match self.get_chunk(x, y, z) {
             Some(_chunk) => (),
             None => {
                 let mut chunk = Chunk::new(x, y, z);
-                chunk.fill_perlin();
+                chunk.fill_perlin(block_registry);
                 let pos = ChunkPos {
                     px: x,
                     py: y,
@@ -43,7 +46,11 @@ impl World {
                     for j in -1..=1 {
                         for k in -1..=1 {
                             if self.has_chunk(x + i, y + j, z + k) {
-                                self.chunks_to_remesh.insert(ChunkPos { px: x + i, py: y + j, pz: z + k });
+                                self.chunks_to_remesh.insert(ChunkPos {
+                                    px: x + i,
+                                    py: y + j,
+                                    pz: z + k,
+                                });
                             }
                         }
                     }
@@ -55,14 +62,22 @@ impl World {
     // TODO : Save the chunk
     /// Remove the chunk from the world
     pub fn drop_chunk(&mut self, x: i64, y: i64, z: i64) {
-        let pos = ChunkPos { px: x, py: y, pz: z };
+        let pos = ChunkPos {
+            px: x,
+            py: y,
+            pz: z,
+        };
         self.chunks.remove(&pos);
         self.chunks_to_remesh.remove(&pos);
         for i in -1..=1 {
             for j in -1..=1 {
                 for k in -1..=1 {
                     if self.has_chunk(x + i, y + j, z + k) {
-                        self.chunks_to_remesh.insert(ChunkPos { px: x + i, py: y + j, pz: z + k });
+                        self.chunks_to_remesh.insert(ChunkPos {
+                            px: x + i,
+                            py: y + j,
+                            pz: z + k,
+                        });
                     }
                 }
             }
@@ -88,7 +103,11 @@ impl World {
     }
     /// Return true if there exists a chunk at chunk position (x,y,z)
     pub fn has_chunk(&self, x: i64, y: i64, z: i64) -> bool {
-        return self.chunks.contains_key(&ChunkPos { px: x, py: y, pz: z });
+        return self.chunks.contains_key(&ChunkPos {
+            px: x,
+            py: y,
+            pz: z,
+        });
     }
 
     /// Return data at position x,y,z

@@ -49,7 +49,7 @@ pub trait State {
         data: &WindowData,
         flags: &mut WindowFlags,
         seconds_delta: f64,
-        gfx : &mut Gfx,
+        gfx: &mut Gfx,
     ) -> Result<StateTransition>;
     /// Render.
     ///

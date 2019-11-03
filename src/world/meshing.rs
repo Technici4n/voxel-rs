@@ -1,5 +1,6 @@
 use super::chunk::{Chunk, CHUNK_SIZE};
 use super::renderer::Vertex;
+use crate::block::mesh::BlockMesh;
 
 // The constant associated to the normal direction
 /*
@@ -37,6 +38,7 @@ struct Quad {
     v3: u32,
     // i = 1 j = 0 => (y, z) = (1, 0)
     v4: u32, // i = 1 j = 1 => (y, z) = (1, 1)
+    block_id: u16,
 }
 
 impl Quad {
@@ -217,10 +219,15 @@ const OCC_POS_CHECK: [[[(i32, i32, i32, bool); 3]; 4]; 6] = [
 ];
 
 /// Return True if full block (taking into account adjacent chunks)
-fn is_full(chunk: &Chunk, (i, j, k): (i32, i32, i32), adj: Option<AdjChunkOccl>) -> bool {
+fn is_full(
+    chunk: &Chunk,
+    (i, j, k): (i32, i32, i32),
+    adj: Option<AdjChunkOccl>,
+    meshes: &Vec<BlockMesh>,
+) -> bool {
     let size = CHUNK_SIZE as i32;
     if i >= 0 && j >= 0 && k >= 0 && i < size && j < size && k < size {
-        return chunk.get_data(i as u32, j as u32, k as u32) != 0;
+        return meshes[chunk.get_data(i as u32, j as u32, k as u32) as usize].is_opaque();
     } else {
         match adj {
             Some(_adj) => _adj.is_full(i, j, k),
@@ -250,6 +257,7 @@ fn ambiant_occl(coins: u32, edge: u32) -> u32 {
     }
 }
 
+/*
 /// Return a list of vertex a (3*n) indexes array (for n quads)
 /// which contains the index of the corresponding quads
 /// in the first array
@@ -321,8 +329,8 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
                 let world_index = ((2 * i + 1) * UN_SIZE + 2 * j + 1) * UN_SIZE + 2 * k + 1;
                 use super::chunk::BlockGroup;
                 match &chunk.data[index] {
-                    BlockGroup::Compressed(bxz, bxzz, bxxz, bxxzz) => {
-                        let obs = [*bxz != 0, *bxzz != 0, *bxxz != 0, *bxxzz != 0];
+                    BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) => {
+                        let obs = [*bxz != 0, *bxZ != 0, *bXz != 0, *bXZ != 0];
                         for i2 in 0..2 {
                             for k2 in 0..2 {
                                 if obs[i2 * 2 + k2] {
@@ -403,11 +411,13 @@ pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u3
     let res_index: Vec<u32> = res_index.iter().map(|x| *x as u32).collect();
     (res_vertex, res_index)
 }
+*/
 
-// Greedy meshing : compressed adjacent quads, retourn the number of uncompressed and compressed quads
+// Greedy meshing : compressed adjacent quads, return the number of uncompressed and compressed quads
 pub fn greedy_meshing(
     chunk: &Chunk,
     adj: Option<AdjChunkOccl>,
+    meshes: &Vec<BlockMesh>,
 ) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
@@ -437,7 +447,7 @@ pub fn greedy_meshing(
                     || k == 0
                     || k == IN_SIZE - 1
                 {
-                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj);
+                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj, meshes);
                 }
             }
         }
@@ -453,7 +463,12 @@ pub fn greedy_meshing(
                 use super::chunk::BlockGroup;
                 match &chunk.data[index] {
                     BlockGroup::Compressed(bxz, bxzz, bxxz, bxxzz) => {
-                        let obs = [*bxz != 0, *bxzz != 0, *bxxz != 0, *bxxzz != 0];
+                        let obs = [
+                            meshes[*bxz as usize].is_opaque(),
+                            meshes[*bxzz as usize].is_opaque(),
+                            meshes[*bxxz as usize].is_opaque(),
+                            meshes[*bxxzz as usize].is_opaque(),
+                        ];
                         for i2 in 0..2 {
                             for k2 in 0..2 {
                                 if obs[i2 * 2 + k2] {
@@ -474,7 +489,8 @@ pub fn greedy_meshing(
                                     chunk_mask[world_index
                                         + UN_SIZE * UN_SIZE * i2
                                         + UN_SIZE * j2
-                                        + k2] = data[i2 * 4 + j2 * 2 + k2] != 0;
+                                        + k2] =
+                                        meshes[data[i2 * 4 + j2 * 2 + k2] as usize].is_opaque();
                                 }
                             }
                         }
@@ -514,7 +530,8 @@ pub fn greedy_meshing(
             v1: 0,
             v2: 0,
             v3: 0,
-            v4: 0
+            v4: 0,
+            block_id: 0,
         };
         6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize
     ];
@@ -535,7 +552,7 @@ pub fn greedy_meshing(
                         //checking if not void
                         if !chunk_mask[ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])] {
                             let mut coins = [0; 4];
-                            let mut egde = [0; 4];
+                            let mut edge = [0; 4];
 
                             for i2 in -1..=1 {
                                 for j2 in -1..=1 {
@@ -561,20 +578,20 @@ pub fn greedy_meshing(
                                                 coins[3] += 1;
                                             }
                                             (-1, 0) => {
-                                                egde[0] += 1;
-                                                egde[1] += 1;
+                                                edge[0] += 1;
+                                                edge[1] += 1;
                                             }
                                             (1, 0) => {
-                                                egde[2] += 1;
-                                                egde[3] += 1;
+                                                edge[2] += 1;
+                                                edge[3] += 1;
                                             }
                                             (0, -1) => {
-                                                egde[0] += 1;
-                                                egde[2] += 1;
+                                                edge[0] += 1;
+                                                edge[2] += 1;
                                             }
                                             (0, 1) => {
-                                                egde[1] += 1;
-                                                egde[3] += 1;
+                                                edge[1] += 1;
+                                                edge[3] += 1;
                                             }
                                             _ => (),
                                         }
@@ -583,10 +600,11 @@ pub fn greedy_meshing(
                             }
 
                             let quad = Quad {
-                                v1: (s as u32) + (ambiant_occl(coins[0], egde[0]) << 3),
-                                v2: (s as u32) + (ambiant_occl(coins[1], egde[1]) << 3),
-                                v3: (s as u32) + (ambiant_occl(coins[2], egde[2]) << 3),
-                                v4: (s as u32) + (ambiant_occl(coins[3], egde[3]) << 3),
+                                v1: (s as u32) + (ambiant_occl(coins[0], edge[0]) << 3),
+                                v2: (s as u32) + (ambiant_occl(coins[1], edge[1]) << 3),
+                                v3: (s as u32) + (ambiant_occl(coins[2], edge[2]) << 3),
+                                v4: (s as u32) + (ambiant_occl(coins[3], edge[3]) << 3),
+                                block_id: chunk.get_data(i as u32, j as u32, k as u32),
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
                             to_mesh[ind_mesh(s, i, j, k)] = true;
@@ -646,6 +664,7 @@ pub fn greedy_meshing(
                                     && next_quad.v2 == current_quad.v2
                                     && next_quad.v1 == next_quad.v3
                                     && next_quad.v2 == next_quad.v4
+                                    && current_quad.block_id == next_quad.block_id
                                 {
                                     to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     j2 += 1;
@@ -665,7 +684,8 @@ pub fn greedy_meshing(
                                         let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
                                         if !(to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
                                             && next_quad.is_same()
-                                            && next_quad.v1 == current_quad.v1)
+                                            && next_quad.v1 == current_quad.v1
+                                            && next_quad.block_id == current_quad.block_id)
                                         {
                                             break 'wloop;
                                         }
@@ -693,6 +713,7 @@ pub fn greedy_meshing(
                                     && next_quad.v3 == current_quad.v3
                                     && next_quad.v1 == next_quad.v2
                                     && next_quad.v3 == next_quad.v4
+                                    && next_quad.block_id == current_quad.block_id
                                 {
                                     to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     k2 += 1;
@@ -735,9 +756,29 @@ pub fn greedy_meshing(
                             }
                         }
 
+                        let uv = match meshes[current_quad.block_id as usize] {
+                            BlockMesh::Empty => continue,
+                            BlockMesh::FullCube { textures } => textures[s],
+                        };
+
+                        let uv_pos = [uv.x, uv.y];
+                        let uv_size = [uv.width, uv.height];
+                        let uvs = [
+                            [0.0, 0.0],
+                            [0.0, uv.height * (k_end - k) as f32],
+                            [uv.width * (j_end - j) as f32, 0.0],
+                            [
+                                uv.width * (j_end - j) as f32,
+                                uv.height * (k_end - k) as f32,
+                            ],
+                        ];
+
                         for kk in 0..4 {
                             res_vertex.push(Vertex {
                                 pos: [px_[kk], py_[kk], pz_[kk]],
+                                uv_pos,
+                                uv_offset: uvs[kk],
+                                uv_size,
                                 normal: v[kk],
                             });
                         }

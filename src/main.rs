@@ -5,13 +5,17 @@ use anyhow::Result;
 use log::info;
 use std::path::Path;
 
+mod block;
+mod data;
 mod fps;
 mod input;
 mod mesh;
 mod perlin;
 mod physics;
+mod registry;
 mod settings;
 mod singleplayer;
+mod texture;
 mod ui;
 mod window;
 mod world;

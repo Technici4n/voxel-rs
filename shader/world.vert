@@ -1,6 +1,9 @@
 #version 150 core
 
 in vec3 a_Pos;
+in vec2 a_UvPos;
+in vec2 a_UvOffset;
+in vec2 a_UvSize;
 in uint a_Norm;
 
 uniform Transform {
@@ -10,6 +13,9 @@ uniform Transform {
 
 out vec3 v_Norm;
 out float occl;
+out vec2 v_UvPos;
+out vec2 v_UvOffset;
+out vec2 v_UvSize;
 
 
 uint get_occl_code(uint code){
@@ -57,4 +63,8 @@ void main() {
     }else{
       occl = 0.6;
     }
+
+    v_UvPos = a_UvPos;
+    v_UvOffset = a_UvOffset;
+    v_UvSize = a_UvSize;
 }
