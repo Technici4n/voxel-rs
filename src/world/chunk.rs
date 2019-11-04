@@ -121,19 +121,33 @@ impl Chunk {
     /// Fill the chunk with perlin noise
     pub fn fill_perlin(&mut self, block_registry: &Registry<Block>) {
         let stone_block = block_registry.get_id_by_name(&"stone".to_owned()).unwrap() as u16;
+        let grass_block = block_registry.get_id_by_name(&"grass".to_owned()).unwrap() as u16;
+        let dirt_block = block_registry.get_id_by_name(&"dirt".to_owned()).unwrap() as u16;
         let px = (self.pos.px * CHUNK_SIZE as i64) as f32;
         let py = (self.pos.py * CHUNK_SIZE as i64) as f32;
         let pz = (self.pos.pz * CHUNK_SIZE as i64) as f32;
         let freq = 1.0 / 32.0;
-        let noise = perlin(px, py, pz, CHUNK_SIZE as usize, freq, 4, 0.4, 42);
+
+        let s = (CHUNK_SIZE + 3) as usize;
+
+        let noise = perlin(px, py, pz, s, freq, 4, 0.4, 42);
 
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
-                    if noise[(k * 32 * 32 + j * 32 + i) as usize] > (py + j as f32 + 10.0) / 110.0
                     // warning : indexing order
+                    if noise[(k * s * s + j * s + i) as usize] > (py + j as f32 + 10.0) / 110.0
                     {
-                        self.set_data(i, j, k, stone_block);
+                        if noise[(k * s * s + (j+1) * s + i) as usize] > (py + j as f32 + 11.0) / 110.0{
+                            if noise[(k * s * s + (j+2) * s + i) as usize] > (py + j as f32 + 12.0) / 110.0
+                                && noise[(k * s * s + (j+3) * s + i) as usize] > (py + j as f32 + 13.0) / 110.0{
+                                self.set_data(i as u32, j as u32, k as u32, stone_block);
+                            }else{
+                                self.set_data(i as u32, j as u32, k as u32, dirt_block);
+                            }
+                        }else{
+                            self.set_data(i as u32, j as u32, k as u32, grass_block);
+                        }
                     }
                 }
             }

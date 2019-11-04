@@ -1,0 +1,4 @@
+BlockData(
+    type: NormalCube,
+    mesh_data: NormalCube(["dirt", "dirt", "dirt", "dirt", "dirt", "dirt"]),
+)
