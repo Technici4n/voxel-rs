@@ -31,8 +31,5 @@ quint = { path = "quint" }
 # Math
 nalgebra = "0.18"
 
-# Noise
-simdnoise = "3.1.1"
-
 [profile.release]
 debug = true

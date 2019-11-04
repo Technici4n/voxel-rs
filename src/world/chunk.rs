@@ -126,21 +126,21 @@ impl Chunk {
         let px = (self.pos.px * CHUNK_SIZE as i64) as f32;
         let py = (self.pos.py * CHUNK_SIZE as i64) as f32;
         let pz = (self.pos.pz * CHUNK_SIZE as i64) as f32;
-        let freq = 1.0 / 32.0;
+        let freq = 1.0 / 64.0;
 
         let s = (CHUNK_SIZE + 3) as usize;
 
-        let noise = perlin(px, py, pz, s, freq, 4, 0.4, 42);
+        let noise = perlin(px, py, pz, s,freq,freq*2.0, freq, 5, 0.4, 42);
 
         for i in 0..32 {
             for j in 0..32 {
                 for k in 0..32 {
                     // warning : indexing order
-                    if noise[(k * s * s + j * s + i) as usize] > (py + j as f32 + 10.0) / 110.0
+                    if noise[(i * s * s + j * s + k) as usize] > (py + j as f32 + 10.0) / 110.0
                     {
-                        if noise[(k * s * s + (j+1) * s + i) as usize] > (py + j as f32 + 11.0) / 110.0{
-                            if noise[(k * s * s + (j+2) * s + i) as usize] > (py + j as f32 + 12.0) / 110.0
-                                && noise[(k * s * s + (j+3) * s + i) as usize] > (py + j as f32 + 13.0) / 110.0{
+                        if noise[(i * s * s + (j+1) * s + k) as usize] > (py + j as f32 + 11.0) / 110.0{
+                            if noise[(i * s * s + (j+2) * s + k) as usize] > (py + j as f32 + 12.0) / 110.0
+                                && noise[(i * s * s + (j+3) * s + k) as usize] > (py + j as f32 + 13.0) / 110.0{
                                 self.set_data(i as u32, j as u32, k as u32, stone_block);
                             }else{
                                 self.set_data(i as u32, j as u32, k as u32, dirt_block);

@@ -42,9 +42,9 @@ impl SinglePlayer {
         let mut world = World::new();
 
         let t1 = Instant::now();
-        for i in -1..1 {
-            for j in -1..1 {
-                for k in -1..1 {
+        for i in -6..6 {
+            for j in -1..3 {
+                for k in -6..6 {
                     // generating the chunks
                     world.gen_chunk(i, j, k, &data.blocks);
                 }
@@ -116,7 +116,7 @@ impl State for SinglePlayer {
                 let dx = self.player.pos.x - (chunk.pos.px as f64 * CHUNK_SIZE as f64);
                 let dy = self.player.pos.y - (chunk.pos.py as f64 * CHUNK_SIZE as f64);
                 let dz = self.player.pos.z - (chunk.pos.pz as f64 * CHUNK_SIZE as f64);
-                if (dx * dx + dy * dy + dz * dz).sqrt() > 200.0 {
+                if (dx * dx + dy * dy + dz * dz).sqrt() > 500.0 {
                     chunks_to_dispose.push(chunk.pos.clone());
                 }
             }
