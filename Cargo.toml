@@ -1,2 +1,5 @@
 [workspace]
 members = ["client", "common", "quint", "server"]
+
+[profile.release]
+debug = true
