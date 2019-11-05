@@ -1,13 +1,12 @@
 #version 150 core
 
-in vec3 a_Pos;
 
-uniform Transform {
-    mat4 u_ViewProj;
-    mat4 u_Model;
-};
+in float pos_y;
+out vec4 ColorBuffer;
+
 
 
 void main() {
-    gl_Position = u_ViewProj * u_Model * vec4(a_Pos, 1.0);
+    float frac = (pos_y+900.0)/1800;
+    ColorBuffer = vec4(0.55, 0.84, 0.92, 1.0)*frac + 0.7*(1-frac)*vec4(0.1, 0.4, 1, 1.0);
 }

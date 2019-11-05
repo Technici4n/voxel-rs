@@ -10,6 +10,7 @@ pub mod camera;
 pub mod chunk;
 pub mod meshing;
 pub mod renderer;
+pub mod skybox;
 
 use crate::block::Block;
 use crate::registry::Registry;

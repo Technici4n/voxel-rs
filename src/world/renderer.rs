@@ -3,7 +3,7 @@ use crate::{
     block::mesh::BlockMesh,
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
-    world::{camera::Camera, chunk::CHUNK_SIZE, World},
+    world::{camera::Camera, chunk::CHUNK_SIZE, World, skybox::Skybox},
 };
 use anyhow::Result;
 use gfx;
@@ -27,6 +27,10 @@ gfx_defines! {
         normal: u32 = "a_Norm",
     }
 
+    vertex VertexSkyBox {
+        pos: [f32; 3] = "a_Pos",
+    }
+
     constant Transform {
         view_proj: [[f32; 4]; 4] = "u_ViewProj",
         model: [[f32; 4]; 4] = "u_Model",
@@ -40,18 +44,29 @@ gfx_defines! {
         depth_buffer: gfx::DepthTarget<DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
     }
+
+    pipeline pipe_skybox{
+        vbuf: gfx::VertexBuffer<VertexSkyBox> = (),
+        transform: gfx::ConstantBuffer<Transform> = "Transform",
+        color_buffer: gfx::RenderTarget<ColorFormat> = "ColorBuffer",
+        depth_buffer: gfx::DepthTarget<DepthFormat> =
+            gfx::preset::depth::LESS_EQUAL_WRITE,
+    }
 }
 
 type PsoType = gfx::PipelineState<gfx_device_gl::Resources, pipe::Meta>;
+type PsoSkyboxType = gfx::PipelineState<gfx_device_gl::Resources, pipe_skybox::Meta>;
 
 pub struct WorldRenderer {
     pub pso_fill: PsoType,
     pub pso_wireframe: PsoType,
+    pub pso_skybox : PsoSkyboxType,
     pub chunk_meshes: HashMap<ChunkPos, Mesh>,
     pub transform: Buffer<Resources, Transform>,
     pub block_meshes: Vec<BlockMesh>,
     pub texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
     pub texture_sampler: gfx::handle::Sampler<gfx_device_gl::Resources>,
+    pub skybox : Skybox,
 }
 
 impl WorldRenderer {
@@ -93,6 +108,17 @@ impl WorldRenderer {
             pipe::new(),
         )?;
 
+        let shader_set_skybox = factory.create_shader_set(
+            include_bytes!("../../shader/skybox.vert"),
+            include_bytes!("../../shader/skybox.frag"),
+        )?;
+        let pso_skybox = factory.create_pipeline_state(
+            &shader_set_skybox,
+            gfx::Primitive::TriangleList,
+            gfx::state::Rasterizer::new_fill(),
+            pipe_skybox::new(),
+        )?;
+
         let mut chunk_meshes: HashMap<ChunkPos, Mesh> = HashMap::new(); // all the mesh to be rendered
 
         let t1 = Instant::now();
@@ -132,14 +158,18 @@ impl WorldRenderer {
             })
         };
 
+        let skybox = Skybox::new(factory);
+
         Ok(Self {
             pso_fill,
             pso_wireframe,
+            pso_skybox,
             chunk_meshes,
             transform: factory.create_constant_buffer(1),
             block_meshes,
             texture_atlas,
             texture_sampler,
+            skybox,
         })
     }
 
@@ -188,6 +218,30 @@ impl WorldRenderer {
             // (index buffer, pso, full data with vertex buffer and uniform buffer inside)
             encoder.draw(&mesh.indices, &self.pso_fill, &data);
         }
+
+        // drawing the Skybox
+        let transform = Transform {
+            view_proj,
+            model: [
+                // warning matrix is transposed
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [camera.position.x as f32, camera.position.y as f32, camera.position.z as f32, 1.0], // set skybox center at camera
+            ],
+        };
+
+        let data = pipe_skybox::Data {
+            vbuf: self.skybox.v_buffer.clone(),
+            transform: self.transform.clone(),
+            color_buffer: color_buffer.clone(),
+            depth_buffer: depth_buffer.clone(),
+        };
+
+        encoder.update_buffer(&data.transform, &[transform], 0)?;
+        encoder.draw(&self.skybox.indices,
+                     &self.pso_skybox,
+                     &data);
 
         Ok(())
     }
