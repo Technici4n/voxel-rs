@@ -17,7 +17,8 @@ impl std::fmt::Display for RegistryError {
 
 impl std::error::Error for RegistryError {}
 
-/// A way to sort elements by name
+/// A way to store elements by name or by id
+#[derive(Debug, Clone)]
 pub struct Registry<T> {
     name_to_id: HashMap<String, u32>,
     id_to_name: Vec<String>,

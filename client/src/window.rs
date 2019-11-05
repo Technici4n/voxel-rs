@@ -12,6 +12,7 @@ pub enum StateTransition {
     /// Don't transition, keep the current state.
     KeepCurrent,
     /// Transition to another state using its `StateFactory`.
+    #[allow(dead_code)] // TODO: remove when it will be used again
     ReplaceCurrent(StateFactory),
     /// Don't transition, close the current window.
     CloseWindow,

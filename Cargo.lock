@@ -1332,7 +1332,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "voxel-rs"
+name = "voxel-rs-client"
 version = "0.1.0"
 dependencies = [
  "anyhow 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1350,6 +1350,30 @@ dependencies = [
  "ron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
  "texture_packer 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "voxel-rs-common 0.1.0",
+ "voxel-rs-server 0.1.0",
+]
+
+[[package]]
+name = "voxel-rs-common"
+version = "0.1.0"
+dependencies = [
+ "anyhow 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "image 0.22.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ron 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.102 (registry+https://github.com/rust-lang/crates.io-index)",
+ "texture_packer 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "voxel-rs-server"
+version = "0.1.0"
+dependencies = [
+ "anyhow 1.0.18 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "voxel-rs-common 0.1.0",
 ]
 
 [[package]]

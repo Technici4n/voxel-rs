@@ -1,9 +1,7 @@
-use crate::world::chunk::ChunkPos;
 use crate::{
-    block::mesh::BlockMesh,
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
-    world::{camera::Camera, chunk::CHUNK_SIZE, World},
+    world::camera::Camera,
 };
 use anyhow::Result;
 use gfx;
@@ -11,12 +9,9 @@ use gfx::handle::Buffer;
 use gfx::state::RasterMethod;
 use gfx::traits::{Factory, FactoryExt};
 use gfx_device_gl::Resources;
-use log::info;
 use nalgebra::{convert, Matrix4};
 use std::collections::HashMap;
-use std::time::Instant;
-
-// TODO: add images
+use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
 
 gfx_defines! {
     vertex Vertex {
@@ -57,12 +52,9 @@ pub struct WorldRenderer {
 impl WorldRenderer {
     pub fn new(
         gfx: &mut Gfx,
-        world: &World,
         block_meshes: Vec<BlockMesh>,
         texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
     ) -> Result<Self> {
-        use super::meshing::greedy_meshing as meshing;
-
         let Gfx {
             ref mut factory, ..
         } = gfx;
@@ -93,33 +85,6 @@ impl WorldRenderer {
             pipe::new(),
         )?;
 
-        let mut chunk_meshes: HashMap<ChunkPos, Mesh> = HashMap::new(); // all the mesh to be rendered
-
-        let t1 = Instant::now();
-
-        for chunk in world.chunks.values() {
-            let pos = (
-                (chunk.pos.px * CHUNK_SIZE as i64) as f32,
-                (chunk.pos.py * CHUNK_SIZE as i64) as f32,
-                (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
-            );
-
-            let (vertices, indices, _, _) = meshing(
-                chunk,
-                Some(world.create_adj_chunk_occl(chunk.pos.px, chunk.pos.py, chunk.pos.pz)),
-                &block_meshes,
-            );
-
-            let chunk_mesh = Mesh::new(pos, vertices, indices, factory);
-            chunk_meshes.insert(chunk.pos, chunk_mesh);
-        }
-
-        let t2 = Instant::now();
-        info!(
-            "Creating the first part of the meshes took {} ms",
-            (t2 - t1).subsec_millis()
-        );
-
         let texture_sampler = {
             use gfx::texture::*;
             factory.create_sampler(SamplerInfo {
@@ -135,7 +100,7 @@ impl WorldRenderer {
         Ok(Self {
             pso_fill,
             pso_wireframe,
-            chunk_meshes,
+            chunk_meshes: HashMap::new(),
             transform: factory.create_constant_buffer(1),
             block_meshes,
             texture_atlas,
@@ -198,6 +163,7 @@ impl WorldRenderer {
     }
 
     /// Drop the mesh of the chunk at the position given (if the chunk exists)
+    #[allow(dead_code)] // TODO: drop mesh
     pub fn drop_mesh(&mut self, pos: &ChunkPos) {
         self.chunk_meshes.remove(pos);
     }
