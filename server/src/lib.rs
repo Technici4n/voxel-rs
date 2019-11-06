@@ -10,6 +10,7 @@ use voxel_rs_common::{
         Server, ServerEvent,
     },
     world::{
+        BlockPos,
         chunk::{ChunkPos, CompressedChunk},
         World,
     },
@@ -106,23 +107,32 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             });
         }
 
-        // Drop chunks that are far from all players
-        let is_chunk_visible = |&chunk_pos: &ChunkPos| {
+        // Drop chunks that are far from all players (and update chunk priorities)
+        world.chunks.retain(|chunk_pos, _| {
             for (player_position, render_distance) in player_positions.iter() {
-                if render_distance.is_chunk_visible(*player_position, chunk_pos) {
+                if render_distance.is_chunk_visible(*player_position, *chunk_pos) {
                     return true;
                 }
             }
             false
-        };
-        world.chunks.retain(|chunk_pos, _| is_chunk_visible(chunk_pos));
+        });
         generating_chunks.retain(|chunk_pos| {
-            if is_chunk_visible(chunk_pos) {
-                true
-            } else {
-                world_generator.dequeue_chunk(*chunk_pos);
-                false
+            let mut min_distance = 1_000_000_000;
+            let mut retain = false;
+            for (player_position, render_distance) in player_positions.iter() {
+                if render_distance.is_chunk_visible(*player_position, *chunk_pos) {
+                    min_distance = min_distance.min(
+                        chunk_pos.squared_euclidian_distance(BlockPos::from(*player_position).containing_chunk_pos())
+                    );
+                    retain = true;
+                }
             }
+            if !retain {
+                world_generator.dequeue_chunk(*chunk_pos);
+            } else {
+                world_generator.set_chunk_priority(*chunk_pos, min_distance);
+            }
+            retain
         });
 
         // Nothing else to do for now :-)

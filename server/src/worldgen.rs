@@ -1,11 +1,14 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, BTreeMap};
 use std::sync::mpsc::{channel, Receiver, Sender};
-use voxel_rs_common::block::Block;
-use voxel_rs_common::registry::Registry;
-use voxel_rs_common::world::chunk::{Chunk, ChunkPos};
-use voxel_rs_common::world::WorldGenerator;
+use voxel_rs_common::{
+    world::chunk::{Chunk, ChunkPos},
+    registry::Registry,
+    block::Block,
+    world::WorldGenerator,
+};
 
 /// A worker that runs the world generation on one or more other threads.
+/// Chunks are processed lowest priority first.
 pub struct WorldGenerationWorker {
     sender: Sender<ToOtherThread>,
     receiver: Receiver<Chunk>,
@@ -15,6 +18,7 @@ pub struct WorldGenerationWorker {
 enum ToOtherThread {
     Enqueue(ChunkPos),
     Dequeue(ChunkPos),
+    SetPriority(ChunkPos, u64),
 }
 
 impl WorldGenerationWorker {
@@ -47,6 +51,12 @@ impl WorldGenerationWorker {
         self.sender.send(ToOtherThread::Dequeue(pos)).unwrap();
     }
 
+    /// Set the priority of a chunk.
+    /// Has no effect if the chunk is not queued
+    pub fn set_chunk_priority(&mut self, pos: ChunkPos, priority: u64) {
+        self.sender.send(ToOtherThread::SetPriority(pos, priority)).unwrap();
+    }
+
     /// Get the processed chunks
     pub fn get_processed_chunks(&mut self) -> Vec<Chunk> {
         let mut processed_chunks = Vec::new();
@@ -66,6 +76,7 @@ fn launch_worker(
     block_registry: Registry<Block>,
 ) {
     let mut queued_chunks = HashSet::new();
+    let mut priorities = BTreeMap::new();
     loop {
         // Process all messages
         while let Some(message) = {
@@ -80,18 +91,30 @@ fn launch_worker(
             match message {
                 ToOtherThread::Enqueue(pos) => {
                     queued_chunks.insert(pos);
+                    priorities.entry(u64::max_value()).or_insert_with(Vec::new).push(pos);
                 }
                 ToOtherThread::Dequeue(pos) => {
                     queued_chunks.remove(&pos);
                 }
+                ToOtherThread::SetPriority(pos, priority) => {
+                    priorities.entry(priority).or_insert_with(Vec::new).push(pos);
+                }
             }
         }
 
-        // Mesh the first chunk
-        if let Some(&chunk_pos) = queued_chunks.iter().next() {
-            queued_chunks.remove(&chunk_pos);
-            let chunk = world_generator.generate_chunk(chunk_pos, &block_registry);
-            sender.send(chunk).unwrap();
+        // Find chunk with the lowest priority
+        'outer: while let Some((&priority, positions)) = priorities.iter_mut().next() {
+            while let Some(pos) = positions.pop() {
+                if queued_chunks.remove(&pos) {
+                    // Generate the chunk it if it is still queued
+                    let chunk = world_generator.generate_chunk(pos, &block_registry);
+                    sender.send(chunk).unwrap();
+                    break 'outer
+                }
+            }
+
+            priorities.remove(&priority);
+            break;
         }
     }
 }
