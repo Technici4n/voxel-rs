@@ -19,9 +19,13 @@ use crate::{
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{meshing::greedy_meshing as meshing, renderer::WorldRenderer},
+    world::{
+        meshing::{greedy_meshing as meshing, AdjChunkOccl},
+        renderer::WorldRenderer,
+    },
 };
 use std::collections::HashSet;
+use std::time::Instant;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -126,19 +130,25 @@ impl State for SinglePlayer {
         }
 
         // Update meshing
+        let mut quad_buffer = Vec::new();
         for chunk_pos in chunk_updates.into_iter() {
             if let Some(chunk) = self.world.get_chunk(chunk_pos) {
+                let t1 = Instant::now();
                 let (vertices, indices, _, _) = meshing(
                     chunk,
-                    Some(crate::world::create_adj_chunk_occl(&self.world, chunk_pos)),
+                    Some(AdjChunkOccl::create_from_world(&self.world, chunk_pos, &self.world_renderer.block_meshes)),
                     &self.world_renderer.block_meshes,
+                    &mut quad_buffer,
                 );
+                let t2 = Instant::now();
                 let pos = (
                     (chunk.pos.px * CHUNK_SIZE as i64) as f32,
                     (chunk.pos.py * CHUNK_SIZE as i64) as f32,
                     (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
                 );
                 let chunk_mesh = Mesh::new(pos, vertices, indices, &mut gfx.factory);
+                let t3 = Instant::now();
+                info!("Meshing took {} ms\nUpdating the mesh took {} ms", (t2 - t1).as_millis(), (t3 - t2).as_millis());
                 self.world_renderer.update_chunk_mesh(chunk.pos, chunk_mesh);
             }
         }

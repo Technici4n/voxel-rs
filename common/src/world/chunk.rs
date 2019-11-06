@@ -20,10 +20,21 @@ impl ChunkPos {
             pz: self.pz + dz,
         }
     }
+
+    /// Offset the current chunk position by some amount of chunks
+    pub fn offset_by_pos(self, other: ChunkPos) -> Self {
+        self.offset(other.px, other.py, other.pz)
+    }
 }
 
 impl From<(i64, i64, i64)> for ChunkPos {
     fn from((px, py, pz): (i64, i64, i64)) -> Self {
+        Self { px, py, pz }
+    }
+}
+
+impl From<[i64; 3]> for ChunkPos {
+    fn from([px, py, pz]: [i64; 3]) -> Self {
         Self { px, py, pz }
     }
 }

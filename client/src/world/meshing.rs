@@ -1,22 +1,10 @@
 use super::renderer::Vertex;
 use voxel_rs_common::{
     block::BlockMesh,
-    world::chunk::{Chunk, CHUNK_SIZE},
+    collections::zero_initialized_vec,
+    world::World,
+    world::chunk::{Chunk, ChunkPos, CHUNK_SIZE},
 };
-
-// The constant associated to the normal direction
-/*
-const EAST: u32 = 0;
-// 1x
-const WEST: u32 = 1;
-// -1x
-const UP: u32 = 2;
-// 1y
-const DOWN: u32 = 3;
-// -1y
-const SOUTH: u32 = 4;
-// 1z
-const NORTH: u32 = 5; // -1z*/
 
 /// Structure containing information about adjacent chunks for the meshing
 /// Order of face 1x, -1x, 1y, -1y, 1z, -1z => the two order component are in the (x,y,z) order
@@ -24,15 +12,15 @@ const NORTH: u32 = 5; // -1z*/
 /// ( xy means variation along z with x, y = (1+chunk_size, 1+chunk_size), -x y means variation along z with x, y= (-1, 1)
 /// Order of coins (1,1,1), (1, 1 -1), (1, -1, 1), (1, -1, -1),
 ///  ... (-1,1,1), (-1, 1 -1), (-1, -1, 1), (-1, -1, -1),
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct AdjChunkOccl {
-    pub faces: [[[bool; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6],
-    pub edges: [[bool; CHUNK_SIZE as usize]; 12],
-    pub coins: [bool; 8],
+    faces: [[[bool; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6],
+    edges: [[bool; CHUNK_SIZE as usize]; 12],
+    corners: [bool; 8],
 }
 
 #[derive(Clone, Copy, Default)]
-struct Quad {
+pub struct Quad {
     v1: u32,
     // i = 0 j = 0 Ex si 1x => (y, z) = 0
     v2: u32,
@@ -49,20 +37,139 @@ impl Quad {
     }
 }
 
-fn delta(x: i32) -> usize {
-    if x == CHUNK_SIZE as i32 {
-        0
-    } else if x == -1 {
-        1
-    } else {
-        0 // unreachable
-    }
-}
-
 impl AdjChunkOccl {
+    /// Generate the AdjChunkOccl struct used in the meshing containing the
+    /// informations about adjacent chunks
+    pub fn create_from_world(world: &World, pos: ChunkPos, meshes: &Vec<BlockMesh>) -> AdjChunkOccl {
+        const ICHUNK_SIZE: i64 = CHUNK_SIZE as i64;
+        // Transform every number to 0 except -1.
+        // This allows us to transform chunk deltas into block deltas.
+        #[inline(always)]
+        fn f(x: i64) -> i64 {
+            if x == -1 { -1 } else { 0 }
+        }
+        // faces
+        let da = [
+            [1, 0, 0],
+            [-1, 0, 0],
+            [0, 1, 0],
+            [0, -1, 0],
+            [0, 0, 1],
+            [0, 0, -1],
+        ];
+        let mut faces = [[[false; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6];
+        for i in 0..6 {
+            faces[i] = match world.get_chunk(pos.offset_by_pos(da[i].into())) {
+                Some(chunk) => {
+                    let mut res = [[false; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
+                    for j in 0..CHUNK_SIZE {
+                        for k in 0..CHUNK_SIZE {
+                            let (ux, uy, uz);
+                            if i / 2 == 0 {
+                                ux = (ICHUNK_SIZE + f(da[i][0])) as u32 % CHUNK_SIZE;
+                                uy = j;
+                                uz = k;
+                            } else if i / 2 == 1 {
+                                ux = j;
+                                uy = (ICHUNK_SIZE + f(da[i][1])) as u32 % CHUNK_SIZE;
+                                uz = k;
+                            } else {
+                                ux = j;
+                                uy = k;
+                                uz = (ICHUNK_SIZE + f(da[i][2])) as u32 % CHUNK_SIZE;
+                            }
+                            res[j as usize][k as usize] = meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
+                        }
+                    }
+                    res
+                }
+                None => [[false; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
+            };
+        }
+        // edges
+        let mut edges = [[false; CHUNK_SIZE as usize]; 12];
+        let de = [
+            [0, 1, 1],
+            [0, 1, -1],
+            [0, -1, 1],
+            [0, -1, -1],
+            [1, 0, 1],
+            [1, 0, -1],
+            [-1, 0, 1],
+            [-1, 0, -1],
+            [1, 1, 0],
+            [1, -1, 0],
+            [-1, 1, 0],
+            [-1, -1, 0],
+        ];
+        for i in 0..12 {
+            edges[i] = match world.get_chunk(pos.offset_by_pos(de[i].into())) {
+                Some(chunk) => {
+                    let mut res = [false; CHUNK_SIZE as usize];
+                    for j in 0..CHUNK_SIZE {
+                        let (ux, uy, uz);
+                        if i / 4 == 0 {
+                            ux = j;
+                            uy = (ICHUNK_SIZE + f(de[i][1])) as u32 % CHUNK_SIZE;
+                            uz = (ICHUNK_SIZE + f(de[i][2])) as u32 % CHUNK_SIZE;
+                        } else if i / 4 == 1 {
+                            ux = (ICHUNK_SIZE + f(de[i][0])) as u32 % CHUNK_SIZE;
+                            uy = j;
+                            uz = (ICHUNK_SIZE + f(de[i][2])) as u32 % CHUNK_SIZE;
+                        } else {
+                            ux = (ICHUNK_SIZE + f(de[i][0])) as u32 % CHUNK_SIZE;
+                            uy = (ICHUNK_SIZE + f(de[i][1])) as u32 % CHUNK_SIZE;
+                            uz = j;
+                        }
+                        res[j as usize] = meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
+                    }
+                    res
+                }
+                None => [false; CHUNK_SIZE as usize],
+            };
+        }
+        // corners
+        let mut corners = [false; 8];
+        let dc = [
+            [1, 1, 1],
+            [1, 1, -1],
+            [1, -1, 1],
+            [1, -1, -1],
+            [-1, 1, 1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [-1, -1, -1],
+        ];
+        for i in 0..8 {
+            corners[i] = match world.get_chunk(pos.offset_by_pos(dc[i].into())) {
+                None => false,
+                Some(chunk) => {
+                    let ux = (ICHUNK_SIZE + f(dc[i][0])) as u32 % CHUNK_SIZE;
+                    let uy = (ICHUNK_SIZE + f(dc[i][1])) as u32 % CHUNK_SIZE;
+                    let uz = (ICHUNK_SIZE + f(dc[i][2])) as u32 % CHUNK_SIZE;
+                    meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque()
+                }
+            };
+        }
+        AdjChunkOccl {
+            faces,
+            edges,
+            corners,
+        }
+    }
     /// x, y, z are the position relative to the chunk (0, 0, 0)
     /// Return if the block outside the chunk is opaque
     pub fn is_full(&self, x: i32, y: i32, z: i32) -> bool {
+        fn delta(x: i32) -> usize {
+            if x == CHUNK_SIZE as i32 {
+                0
+            } else if x == -1 {
+                1
+            } else {
+                unreachable!()
+            }
+        }
+
         let mut n_outside = 0;
         if x == -1 || x == CHUNK_SIZE as i32 {
             n_outside += 1;
@@ -101,9 +208,9 @@ impl AdjChunkOccl {
             }
         } else if n_outside == 3 {
             let i = delta(x) * 4 + delta(y) * 2 + delta(z);
-            return self.coins[i];
+            return self.corners[i];
         }
-        return false;
+        unreachable!();
     }
 }
 
@@ -120,7 +227,7 @@ const D: [[i32; 3]; 6] = [
 fn is_full(
     chunk: &Chunk,
     (i, j, k): (i32, i32, i32),
-    adj: Option<AdjChunkOccl>,
+    adj: &Option<AdjChunkOccl>,
     meshes: &Vec<BlockMesh>,
 ) -> bool {
     let size = CHUNK_SIZE as i32;
@@ -143,179 +250,26 @@ fn _in_block((i, j, k): (i32, i32, i32), (x, y, z): (f32, f32, f32)) -> bool {
 }
 
 /// Ambient occlusion code (cf : https://0fps.net/2013/07/03/ambient-occlusion-for-minecraft-like-worlds/)
-fn ambiant_occl(coins: u32, edge: u32) -> u32 {
+fn ambiant_occl(corners: u32, edge: u32) -> u32 {
     if edge == 2 {
         return 0;
-    } else if edge == 1 && coins == 1 {
+    } else if edge == 1 && corners == 1 {
         return 1;
-    } else if edge + coins == 1 {
+    } else if edge + corners == 1 {
         return 2;
     } else {
         return 3;
     }
 }
 
-/*
-/// Return a list of vertex a (3*n) indexes array (for n quads)
-/// which contains the index of the corresponding quads
-/// in the first array
-/// Each vertex contains its position and the normal associated to the quad
-pub fn meshing(chunk: &Chunk, adj: Option<AdjChunkOccl>) -> (Vec<Vertex>, Vec<u32>) {
-    let mut res_vertex: Vec<Vertex> = Vec::new();
-    let mut res_index: Vec<usize> = Vec::new();
-
-    let mut n_of_different_vertex = 0;
-
-    /*
-    let d_delta1 = [[0, 1, 0], [0, 1, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0], [1, 0, 0]];
-    let d_delta2 = [[0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 0, 1], [0, 1, 0], [0, 1, 0]];
-    let mut occ_pos_check: [[Vec<(i32, i32, i32, bool)>; 4]; 6] = Default::default();
-
-    for i in 0..6 {
-        for j in 0..4 {
-            let px = mesh_dir[i][j][0];
-            let py = mesh_dir[i][j][1];
-            let pz = mesh_dir[i][j][2];
-            for delta1 in -1..=1 {
-                for delta2 in -1..=1 {
-                    if delta1 != delta2 || delta1 != 0 {
-                        let d1 = D[i][0] + delta1 * d_delta1[i][0] + delta2 * d_delta2[i][0];
-                        let d2 = D[i][1] + delta1 * d_delta1[i][1] + delta2 * d_delta2[i][1];
-                        let d3 = D[i][2] + delta1 * d_delta1[i][2] + delta2 * d_delta2[i][2];
-                        if in_block((d1, d2, d3), (px, py, pz)) {
-                            occ_pos_check[i][j].push((d1, d2, d3, (delta1.abs() + delta2.abs()) == 1));
-                        }
-                    }
-                }
-            }
-        }
-    }
-    dbg!(&occ_pos_check); => code used to generate the OCC_POS_CHECK struct*/
-
-    const N_SIZE: usize = (CHUNK_SIZE + 2) as usize;
-    let mut chunk_mask = [false; N_SIZE * N_SIZE * N_SIZE];
-
-    #[inline(always)]
-    fn ind(x: i32, y: i32, z: i32) -> usize {
-        let (a, b, c) = (x as usize, y as usize, z as usize);
-        (a * N_SIZE * N_SIZE + b * N_SIZE + c) as usize
-    }
-
-    const IN_SIZE: i32 = N_SIZE as i32;
-    for i in 0..IN_SIZE {
-        for j in 0..IN_SIZE {
-            for k in 0..IN_SIZE {
-                if i == 0
-                    || i == IN_SIZE - 1
-                    || j == 0
-                    || j == IN_SIZE - 1
-                    || k == 0
-                    || k == IN_SIZE - 1
-                {
-                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj);
-                }
-            }
-        }
-    }
-
-    const UCHUNK_LEN: usize = super::chunk::CHUNK_LEN as usize;
-    const UN_SIZE: usize = N_SIZE as usize;
-    for i in 0..UCHUNK_LEN {
-        for j in 0..UCHUNK_LEN {
-            for k in 0..UCHUNK_LEN {
-                let index = (i * UCHUNK_LEN + j) * UCHUNK_LEN + k;
-                let world_index = ((2 * i + 1) * UN_SIZE + 2 * j + 1) * UN_SIZE + 2 * k + 1;
-                use super::chunk::BlockGroup;
-                match &chunk.data[index] {
-                    BlockGroup::Compressed(bxz, bxZ, bXz, bXZ) => {
-                        let obs = [*bxz != 0, *bxZ != 0, *bXz != 0, *bXZ != 0];
-                        for i2 in 0..2 {
-                            for k2 in 0..2 {
-                                if obs[i2 * 2 + k2] {
-                                    for j2 in 0..2 {
-                                        chunk_mask[world_index
-                                            + UN_SIZE * UN_SIZE * i2
-                                            + UN_SIZE * j2
-                                            + k2] = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    BlockGroup::Uncompressed(data) => {
-                        for i2 in 0..2 {
-                            for j2 in 0..2 {
-                                for k2 in 0..2 {
-                                    chunk_mask[world_index
-                                        + UN_SIZE * UN_SIZE * i2
-                                        + UN_SIZE * j2
-                                        + k2] = data[i2 * 4 + j2 * 2 + k2] != 0;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    for i in 0..(CHUNK_SIZE as i32) {
-        for j in 0..(CHUNK_SIZE as i32) {
-            for k in 0..(CHUNK_SIZE as i32) {
-                if chunk_mask[ind(i + 1, j + 1, k + 1)] {
-                    //checking if not void
-
-                    for s in 0..6 {
-                        // each direction
-                        if !chunk_mask[ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])] {
-                            for l in 0..4 {
-                                let px = i as f32 + MESH_DIR[s][l][0];
-                                let py = j as f32 + MESH_DIR[s][l][1];
-                                let pz = k as f32 + MESH_DIR[s][l][2];
-                                res_vertex.push(Vertex {
-                                    pos: [px, py, pz],
-                                    normal: (s as u32)
-                                        + ({
-                                            let mut coins = 0;
-                                            let mut edge = 0;
-                                            for (p1, p2, p3, is_edge) in OCC_POS_CHECK[s][l].iter()
-                                            {
-                                                if chunk_mask
-                                                    [ind(i + 1 + *p1, j + 1 + *p2, k + 1 + *p3)]
-                                                {
-                                                    if *is_edge {
-                                                        edge += 1;
-                                                    } else {
-                                                        coins += 1;
-                                                    }
-                                                }
-                                            }
-                                            ambiant_occl(coins, edge)
-                                        } << 3),
-                                });
-                            }
-
-                            for l in 0..6 {
-                                res_index.push(n_of_different_vertex + MESH_INDEX[s][l]);
-                            }
-                            n_of_different_vertex += 4;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let res_index: Vec<u32> = res_index.iter().map(|x| *x as u32).collect();
-    (res_vertex, res_index)
-}
-*/
-
-// Greedy meshing : compressed adjacent quads, return the number of uncompressed and compressed quads
+/// Greedy meshing : compressed adjacent quads, return the number of uncompressed and compressed quads
+///
+/// `quads`: Buffer that is reused every time.
 pub fn greedy_meshing(
     chunk: &Chunk,
     adj: Option<AdjChunkOccl>,
     meshes: &Vec<BlockMesh>,
+    quads: &mut Vec<Quad>,
 ) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
     let mut res_vertex: Vec<Vertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
@@ -345,7 +299,7 @@ pub fn greedy_meshing(
                     || k == 0
                     || k == IN_SIZE - 1
                 {
-                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), adj, meshes);
+                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), &adj, meshes);
                 }
             }
         }
@@ -360,7 +314,7 @@ pub fn greedy_meshing(
         }
     }
 
-    let d_delta0 = [
+    const D_DELTA0: [[i32; 3]; 6] = [
         [1, 0, 0],
         [1, 0, 0],
         [0, 1, 0],
@@ -368,7 +322,7 @@ pub fn greedy_meshing(
         [0, 0, 1],
         [0, 0, 1],
     ];
-    let d_delta1 = [
+    const D_DELTA1: [[i32; 3]; 6] = [
         [0, 1, 0],
         [0, 1, 0],
         [1, 0, 0],
@@ -376,7 +330,7 @@ pub fn greedy_meshing(
         [1, 0, 0],
         [1, 0, 0],
     ];
-    let d_delta2 = [
+    const D_DELTA2: [[i32; 3]; 6] = [
         [0, 0, 1],
         [0, 0, 1],
         [0, 0, 1],
@@ -385,17 +339,8 @@ pub fn greedy_meshing(
         [0, 1, 0],
     ];
 
-    let mut quads = vec![
-        Quad {
-            v1: 0,
-            v2: 0,
-            v3: 0,
-            v4: 0,
-            block_id: 0,
-        };
-        6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize
-    ];
-    let mut to_mesh = vec![false; 6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize];
+    quads.resize(6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize, Quad::default());
+    let mut to_mesh = unsafe { zero_initialized_vec(6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize) };
 
     #[inline(always)]
     fn ind_mesh(s: usize, x: i32, y: i32, z: i32) -> usize {
@@ -417,11 +362,11 @@ pub fn greedy_meshing(
                             for i2 in -1..=1 {
                                 for j2 in -1..=1 {
                                     let dx =
-                                        1 + D[s][0] + d_delta1[s][0] * i2 + d_delta2[s][0] * j2;
+                                        1 + D[s][0] + D_DELTA1[s][0] * i2 + D_DELTA2[s][0] * j2;
                                     let dy =
-                                        1 + D[s][1] + d_delta1[s][1] * i2 + d_delta2[s][1] * j2;
+                                        1 + D[s][1] + D_DELTA1[s][1] * i2 + D_DELTA2[s][1] * j2;
                                     let dz =
-                                        1 + D[s][2] + d_delta1[s][2] * i2 + d_delta2[s][2] * j2;
+                                        1 + D[s][2] + D_DELTA1[s][2] * i2 + D_DELTA2[s][2] * j2;
 
                                     if chunk_mask[ind(i + dx, j + dy, k + dz)] {
                                         match (i2, j2) {
@@ -498,10 +443,11 @@ pub fn greedy_meshing(
     for s in 0..6 {
         // each direction
 
-        let ijk_to_pos = |i: i32, j: i32, k: i32| {
-            let x = i * d_delta0[s][0] + j * d_delta1[s][0] + k * d_delta2[s][0];
-            let y = i * d_delta0[s][1] + j * d_delta1[s][1] + k * d_delta2[s][1];
-            let z = i * d_delta0[s][2] + j * d_delta1[s][2] + k * d_delta2[s][2];
+        #[inline(always)]
+        fn ijk_to_pos(s: usize, i: i32, j: i32, k: i32) -> (i32, i32, i32) {
+            let x = i * D_DELTA0[s][0] + j * D_DELTA1[s][0] + k * D_DELTA2[s][0];
+            let y = i * D_DELTA0[s][1] + j * D_DELTA1[s][1] + k * D_DELTA2[s][1];
+            let z = i * D_DELTA0[s][2] + j * D_DELTA1[s][2] + k * D_DELTA2[s][2];
             (x, y, z)
         };
 
@@ -511,7 +457,7 @@ pub fn greedy_meshing(
                 // y y x x x x
                 for k in 0..(CHUNK_SIZE as i32) {
                     // z z z z y y
-                    let (px, py, pz) = ijk_to_pos(i, j, k);
+                    let (px, py, pz) = ijk_to_pos(s, i, j, k);
                     if to_mesh[ind_mesh(s, px, py, pz)] {
                         to_mesh[ind_mesh(s, px, py, pz)] = false;
                         let current_quad = quads[ind_mesh(s, px, py, pz)];
@@ -522,7 +468,7 @@ pub fn greedy_meshing(
                         {
                             // meshing along j
                             let mut j2 = j + 1;
-                            let mut pos = ijk_to_pos(i, j2, k);
+                            let mut pos = ijk_to_pos(s, i, j2, k);
 
                             while j2 < CHUNK_SIZE as i32
                                 && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
@@ -536,7 +482,7 @@ pub fn greedy_meshing(
                                 {
                                     to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     j2 += 1;
-                                    pos = ijk_to_pos(i, j2, k);
+                                    pos = ijk_to_pos(s, i, j2, k);
                                 } else {
                                     break;
                                 }
@@ -548,7 +494,7 @@ pub fn greedy_meshing(
                                 let mut k2 = k + 1;
                                 'wloop: while k2 < CHUNK_SIZE as i32 {
                                     for j3 in j..j_end {
-                                        let pos = ijk_to_pos(i, j3, k2);
+                                        let pos = ijk_to_pos(s, i, j3, k2);
                                         let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
                                         if !(to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
                                             && next_quad.is_same()
@@ -560,7 +506,7 @@ pub fn greedy_meshing(
                                     }
 
                                     for j3 in j..j_end {
-                                        let pos = ijk_to_pos(i, j3, k2);
+                                        let pos = ijk_to_pos(s, i, j3, k2);
                                         to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     }
                                     k2 += 1;
@@ -572,7 +518,7 @@ pub fn greedy_meshing(
                         {
                             // meshing along k
                             let mut k2 = k + 1;
-                            let mut pos = ijk_to_pos(i, j, k2);
+                            let mut pos = ijk_to_pos(s, i, j, k2);
                             while k2 < CHUNK_SIZE as i32
                                 && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
                             {
@@ -585,7 +531,7 @@ pub fn greedy_meshing(
                                 {
                                     to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
                                     k2 += 1;
-                                    pos = ijk_to_pos(i, j, k2);
+                                    pos = ijk_to_pos(s, i, j, k2);
                                 } else {
                                     break;
                                 }
@@ -593,9 +539,9 @@ pub fn greedy_meshing(
                             k_end = k2;
                         }
 
-                        let (px2, py2, pz2) = ijk_to_pos(i, j, k_end);
-                        let (px3, py3, pz3) = ijk_to_pos(i, j_end, k);
-                        let (px4, py4, pz4) = ijk_to_pos(i, j_end, k_end);
+                        let (px2, py2, pz2) = ijk_to_pos(s, i, j, k_end);
+                        let (px3, py3, pz3) = ijk_to_pos(s, i, j_end, k);
+                        let (px4, py4, pz4) = ijk_to_pos(s, i, j_end, k_end);
 
                         let mut px_ = [px as f32, px2 as f32, px3 as f32, px4 as f32];
                         let mut py_ = [py as f32, py2 as f32, py3 as f32, py4 as f32];
