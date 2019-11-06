@@ -35,7 +35,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let game_data = load_data("data".into())?;
 
     let mut world_generator =
-        WorldGenerationWorker::new(Box::new(DefaultWorldGenerator), game_data.blocks.clone());
+        WorldGenerationWorker::new(Box::new(DefaultWorldGenerator::new()), game_data.blocks.clone());
 
     let mut world = World::new();
     let mut players = HashMap::new();

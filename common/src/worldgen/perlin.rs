@@ -142,6 +142,13 @@ fn rand_pos(x: i32, y: i32, z: i32, seed: i32) -> f32 {
 }
 
 #[inline(always)]
+pub fn rand_pos_int(x: i32, y: i32, z: i32, seed: i32) -> i32 {
+    let a = hash(x + seed);
+    let b = hash(y + a);
+    return  hash(z + b);;
+}
+
+#[inline(always)]
 pub fn hash(b: i32) -> i32 {
     let mut a = b;
     a = a.wrapping_sub(a << 6);
