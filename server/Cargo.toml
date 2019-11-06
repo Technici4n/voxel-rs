@@ -1,0 +1,14 @@
+[package]
+name = "voxel-rs-server"
+version = "0.1.0"
+authors = ["Technici4n", "Azercoco"]
+edition = "2018"
+
+[dependencies]
+# Voxel-rs
+voxel-rs-common = { path = "../common" }
+
+# Utilities
+anyhow = "1.0"
+env_logger = "0.7"
+log = "0.4"

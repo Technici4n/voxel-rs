@@ -1,20 +1,25 @@
 use crate::{
-    block::{mesh::BlockMesh, Block, BlockData, BlockMeshData, BlockType},
+    block::{Block, BlockMesh, BlockType},
     registry::Registry,
 };
+
 use anyhow::{Context, Result};
+use image::{ImageBuffer, Rgba};
 use log::info;
 use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
+use texture_packer::{TexturePacker, TexturePackerConfig};
 
+#[derive(Debug, Clone)]
 pub struct Data {
     pub blocks: Registry<Block>,
     pub meshes: Vec<BlockMesh>,
-    pub texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
+    pub texture_atlas: ImageBuffer<Rgba<u8>, Vec<u8>>,
 }
 
-pub fn load_data(factory: &mut gfx_device_gl::Factory, data_directory: PathBuf) -> Result<Data> {
+// TODO: decent error handling
+pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     info!("Loading data from directory {}", data_directory.display());
 
     // Load textures
@@ -47,10 +52,10 @@ pub fn load_data(factory: &mut gfx_device_gl::Factory, data_directory: PathBuf) 
         }
     }
 
-    let (texture_atlas, texture_rects) = crate::texture::load_textures(factory, textures)?;
+    let (texture_atlas, texture_rects) = load_textures(textures)?;
 
     // Load blocks
-    let mut block_datas: Vec<(String, BlockData)> = Vec::new();
+    let mut block_datas: Vec<(String, BlockType)> = Vec::new();
     let blocks_directory = data_directory.join("blocks");
     info!(
         "Loading blocks from directory {}",
@@ -104,15 +109,18 @@ pub fn load_data(factory: &mut gfx_device_gl::Factory, data_directory: PathBuf) 
     )?;
     meshes.push(BlockMesh::Empty);
 
-    for (name, block_data) in block_datas.into_iter() {
+    for (name, block_type) in block_datas.into_iter() {
         let block = Block {
             name: name.clone(),
-            block_type: block_data.block_type,
+            block_type: block_type.clone(),
         };
         blocks.register(name, block)?;
-        let mesh = match block_data.mesh_data {
-            BlockMeshData::NoMesh => BlockMesh::Empty,
-            BlockMeshData::NormalCube(names) => BlockMesh::FullCube {
+        let mesh = match block_type {
+            BlockType::Air => BlockMesh::Empty,
+            // TODO: make sure there are exactly 6 face textures
+            BlockType::NormalCube {
+                face_textures: names,
+            } => BlockMesh::FullCube {
                 textures: [
                     texture_rects[texture_registry.get_id_by_name(&names[0]).unwrap() as usize],
                     texture_rects[texture_registry.get_id_by_name(&names[1]).unwrap() as usize],
@@ -132,4 +140,65 @@ pub fn load_data(factory: &mut gfx_device_gl::Factory, data_directory: PathBuf) 
         meshes,
         texture_atlas,
     })
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct TextureRect {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+const MAX_TEXTURE_SIZE: u32 = 2048;
+
+const TEXTURE_PACKER_CONFIG: TexturePackerConfig = TexturePackerConfig {
+    max_width: MAX_TEXTURE_SIZE,
+    max_height: MAX_TEXTURE_SIZE,
+    allow_rotation: false,
+    border_padding: 0,
+    texture_padding: 0,
+    trim: false,
+    texture_outlines: false,
+};
+
+/// Load given textures to a unique texture atlas
+fn load_textures(
+    textures: Vec<PathBuf>,
+) -> Result<(ImageBuffer<Rgba<u8>, Vec<u8>>, Vec<TextureRect>)> {
+    use image::GenericImage;
+    use texture_packer::{exporter::ImageExporter, importer::ImageImporter};
+
+    let mut packer = TexturePacker::new_skyline(TEXTURE_PACKER_CONFIG);
+    for (i, path) in textures.iter().enumerate() {
+        packer.pack_own(
+            format!("{}", i),
+            ImageImporter::import_from_file(path).expect("Failed to read texture to pack"),
+        );
+    }
+
+    let mut texture_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
+        ImageBuffer::new(MAX_TEXTURE_SIZE, MAX_TEXTURE_SIZE);
+    texture_buffer.copy_from(
+        &ImageExporter::export(&packer).expect("Failed to export texture from packer"),
+        0,
+        0,
+    );
+    Ok((
+        texture_buffer,
+        (0..textures.len())
+            .map(|i| {
+                let frame = packer
+                    .get_frame(&format!("{}", i))
+                    .expect("Texture packer frame key doesn't exist")
+                    .frame;
+                TextureRect {
+                    x: frame.x as f32 / MAX_TEXTURE_SIZE as f32,
+                    y: frame.y as f32 / MAX_TEXTURE_SIZE as f32,
+                    width: frame.w as f32 / MAX_TEXTURE_SIZE as f32,
+                    height: frame.h as f32 / MAX_TEXTURE_SIZE as f32,
+                }
+            })
+            .collect(),
+    ))
 }

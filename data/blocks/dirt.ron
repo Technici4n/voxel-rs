@@ -1,4 +1,3 @@
-BlockData(
-    type: NormalCube,
-    mesh_data: NormalCube(["dirt", "dirt", "dirt", "dirt", "dirt", "dirt"]),
+NormalCube(
+    face_textures: ["dirt", "dirt", "dirt", "dirt", "dirt", "dirt"],
 )

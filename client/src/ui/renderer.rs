@@ -183,7 +183,12 @@ impl UiRenderer {
         })
     }
 
-    pub fn render<Message>(&mut self, gfx: &mut Gfx, data: &WindowData, ui: &quint::Ui<PrimitiveBuffer, Message>) -> Result<()> {
+    pub fn render<Message>(
+        &mut self,
+        gfx: &mut Gfx,
+        data: &WindowData,
+        ui: &quint::Ui<PrimitiveBuffer, Message>,
+    ) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref mut factory,

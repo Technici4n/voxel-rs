@@ -1,6 +1,8 @@
-use super::chunk::{Chunk, CHUNK_SIZE};
 use super::renderer::Vertex;
-use crate::block::mesh::BlockMesh;
+use voxel_rs_common::{
+    block::BlockMesh,
+    world::chunk::{Chunk, CHUNK_SIZE},
+};
 
 // The constant associated to the normal direction
 /*
@@ -105,59 +107,6 @@ impl AdjChunkOccl {
     }
 }
 
-const MESH_EAST: [[f32; 3]; 4] = [
-    [1.0, 0.0, 0.0],
-    [1.0, 1.0, 0.0],
-    [1.0, 0.0, 1.0],
-    [1.0, 1.0, 1.0],
-];
-
-const MESH_EAST_INDEX: [usize; 6] = [0, 1, 2, 2, 1, 3];
-
-const MESH_WEST: [[f32; 3]; 4] = [
-    [0.0, 0.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [0.0, 0.0, 1.0],
-    [0.0, 1.0, 1.0],
-];
-
-const MESH_WEST_INDEX: [usize; 6] = [0, 2, 1, 2, 3, 1];
-
-const MESH_UP: [[f32; 3]; 4] = [
-    [0.0, 1.0, 0.0],
-    [1.0, 1.0, 0.0],
-    [0.0, 1.0, 1.0],
-    [1.0, 1.0, 1.0],
-];
-
-const MESH_UP_INDEX: [usize; 6] = [0, 2, 1, 2, 3, 1];
-
-const MESH_DOWN: [[f32; 3]; 4] = [
-    [0.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [0.0, 0.0, 1.0],
-    [1.0, 0.0, 1.0],
-];
-
-const MESH_DOWN_INDEX: [usize; 6] = [0, 1, 2, 2, 1, 3];
-
-const MESH_NORTH: [[f32; 3]; 4] = [
-    [0.0, 0.0, 0.0],
-    [1.0, 0.0, 0.0],
-    [0.0, 1.0, 0.0],
-    [1.0, 1.0, 0.0],
-];
-
-const MESH_NORTH_INDEX: [usize; 6] = [0, 2, 1, 2, 3, 1];
-
-const MESH_SOUTH: [[f32; 3]; 4] = [
-    [0.0, 0.0, 1.0],
-    [1.0, 0.0, 1.0],
-    [0.0, 1.0, 1.0],
-    [1.0, 1.0, 1.0],
-];
-const MESH_SOUTH_INDEX: [usize; 6] = [0, 1, 2, 2, 1, 3];
-
 const D: [[i32; 3]; 6] = [
     [1, 0, 0],
     [-1, 0, 0],
@@ -165,57 +114,6 @@ const D: [[i32; 3]; 6] = [
     [0, -1, 0],
     [0, 0, 1],
     [0, 0, -1],
-];
-const MESH_DIR: [[[f32; 3]; 4]; 6] = [
-    MESH_EAST, MESH_WEST, MESH_UP, MESH_DOWN, MESH_SOUTH, MESH_NORTH,
-];
-const MESH_INDEX: [[usize; 6]; 6] = [
-    MESH_EAST_INDEX,
-    MESH_WEST_INDEX,
-    MESH_UP_INDEX,
-    MESH_DOWN_INDEX,
-    MESH_SOUTH_INDEX,
-    MESH_NORTH_INDEX,
-];
-
-// good luck understanding this, future me !
-const OCC_POS_CHECK: [[[(i32, i32, i32, bool); 3]; 4]; 6] = [
-    [
-        [(1, -1, -1, false), (1, -1, 0, true), (1, 0, -1, true)],
-        [(1, 0, -1, true), (1, 1, -1, false), (1, 1, 0, true)],
-        [(1, -1, 0, true), (1, -1, 1, false), (1, 0, 1, true)],
-        [(1, 0, 1, true), (1, 1, 0, true), (1, 1, 1, false)],
-    ],
-    [
-        [(-1, -1, -1, false), (-1, -1, 0, true), (-1, 0, -1, true)],
-        [(-1, 0, -1, true), (-1, 1, -1, false), (-1, 1, 0, true)],
-        [(-1, -1, 0, true), (-1, -1, 1, false), (-1, 0, 1, true)],
-        [(-1, 0, 1, true), (-1, 1, 0, true), (-1, 1, 1, false)],
-    ],
-    [
-        [(-1, 1, -1, false), (-1, 1, 0, true), (0, 1, -1, true)],
-        [(0, 1, -1, true), (1, 1, -1, false), (1, 1, 0, true)],
-        [(-1, 1, 0, true), (-1, 1, 1, false), (0, 1, 1, true)],
-        [(0, 1, 1, true), (1, 1, 0, true), (1, 1, 1, false)],
-    ],
-    [
-        [(-1, -1, -1, false), (-1, -1, 0, true), (0, -1, -1, true)],
-        [(0, -1, -1, true), (1, -1, -1, false), (1, -1, 0, true)],
-        [(-1, -1, 0, true), (-1, -1, 1, false), (0, -1, 1, true)],
-        [(0, -1, 1, true), (1, -1, 0, true), (1, -1, 1, false)],
-    ],
-    [
-        [(-1, -1, 1, false), (-1, 0, 1, true), (0, -1, 1, true)],
-        [(0, -1, 1, true), (1, -1, 1, false), (1, 0, 1, true)],
-        [(-1, 0, 1, true), (-1, 1, 1, false), (0, 1, 1, true)],
-        [(0, 1, 1, true), (1, 0, 1, true), (1, 1, 1, false)],
-    ],
-    [
-        [(-1, -1, -1, false), (-1, 0, -1, true), (0, -1, -1, true)],
-        [(0, -1, -1, true), (1, -1, -1, false), (1, 0, -1, true)],
-        [(-1, 0, -1, true), (-1, 1, -1, false), (0, 1, -1, true)],
-        [(0, 1, -1, true), (1, 0, -1, true), (1, 1, -1, false)],
-    ],
 ];
 
 /// Return True if full block (taking into account adjacent chunks)
@@ -227,7 +125,7 @@ fn is_full(
 ) -> bool {
     let size = CHUNK_SIZE as i32;
     if i >= 0 && j >= 0 && k >= 0 && i < size && j < size && k < size {
-        return meshes[chunk.get_data(i as u32, j as u32, k as u32) as usize].is_opaque();
+        return meshes[chunk.get_block_at((i as u32, j as u32, k as u32)) as usize].is_opaque();
     } else {
         match adj {
             Some(_adj) => _adj.is_full(i, j, k),
@@ -453,49 +351,11 @@ pub fn greedy_meshing(
         }
     }
 
-    const UCHUNK_LEN: usize = super::chunk::CHUNK_LEN as usize;
-    const UN_SIZE: usize = N_SIZE as usize;
-    for i in 0..UCHUNK_LEN {
-        for j in 0..UCHUNK_LEN {
-            for k in 0..UCHUNK_LEN {
-                let index = (i * UCHUNK_LEN + j) * UCHUNK_LEN + k;
-                let world_index = ((2 * i + 1) * UN_SIZE + 2 * j + 1) * UN_SIZE + 2 * k + 1;
-                use super::chunk::BlockGroup;
-                match &chunk.data[index] {
-                    BlockGroup::Compressed(bxz, bxzz, bxxz, bxxzz) => {
-                        let obs = [
-                            meshes[*bxz as usize].is_opaque(),
-                            meshes[*bxzz as usize].is_opaque(),
-                            meshes[*bxxz as usize].is_opaque(),
-                            meshes[*bxxzz as usize].is_opaque(),
-                        ];
-                        for i2 in 0..2 {
-                            for k2 in 0..2 {
-                                if obs[i2 * 2 + k2] {
-                                    for j2 in 0..2 {
-                                        chunk_mask[world_index
-                                            + UN_SIZE * UN_SIZE * i2
-                                            + UN_SIZE * j2
-                                            + k2] = true;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    BlockGroup::Uncompressed(data) => {
-                        for i2 in 0..2 {
-                            for j2 in 0..2 {
-                                for k2 in 0..2 {
-                                    chunk_mask[world_index
-                                        + UN_SIZE * UN_SIZE * i2
-                                        + UN_SIZE * j2
-                                        + k2] =
-                                        meshes[data[i2 * 4 + j2 * 2 + k2] as usize].is_opaque();
-                                }
-                            }
-                        }
-                    }
-                }
+    for i in 0..CHUNK_SIZE {
+        for j in 0..CHUNK_SIZE {
+            for k in 0..CHUNK_SIZE {
+                chunk_mask[ind(i as i32 + 1, j as i32 + 1, k as i32 + 1)] =
+                    meshes[chunk.get_block_at((i, j, k)) as usize].is_opaque();
             }
         }
     }
@@ -604,7 +464,7 @@ pub fn greedy_meshing(
                                 v2: (s as u32) + (ambiant_occl(coins[1], edge[1]) << 3),
                                 v3: (s as u32) + (ambiant_occl(coins[2], edge[2]) << 3),
                                 v4: (s as u32) + (ambiant_occl(coins[3], edge[3]) << 3),
-                                block_id: chunk.get_data(i as u32, j as u32, k as u32),
+                                block_id: chunk.get_block_at((i as u32, j as u32, k as u32)),
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
                             to_mesh[ind_mesh(s, i, j, k)] = true;
@@ -633,14 +493,7 @@ pub fn greedy_meshing(
         [[0.0, 1.0], [0.0, 0.0], [1.0, 1.0], [1.0, 0.0]],
         [[1.0, 1.0], [1.0, 0.0], [0.0, 1.0], [0.0, 0.0]],
     ];
-    let uv_directions = [
-        [1, 0],
-        [1, 0],
-        [0, 1],
-        [0, 1],
-        [0, 1],
-        [0, 1],
-    ];
+    let uv_directions = [[1, 0], [1, 0], [0, 1], [0, 1], [0, 1], [0, 1]];
 
     for s in 0..6 {
         // each direction
@@ -779,12 +632,27 @@ pub fn greedy_meshing(
                         let uv_pos = [uv.x, uv.y];
                         let uv_size = [uv.width, uv.height];
                         let uv_factors = [(j_end - j) as f32, (k_end - k) as f32];
-                        let uv_factors = [uv_factors[uv_directions[s][0]], uv_factors[uv_directions[s][1]]];
+                        let uv_factors = [
+                            uv_factors[uv_directions[s][0]],
+                            uv_factors[uv_directions[s][1]],
+                        ];
                         let uvs = [
-                            [uvs[s][0][0] * uv.width * uv_factors[0], uvs[s][0][1] * uv.height * uv_factors[1]],
-                            [uvs[s][1][0] * uv.width * uv_factors[0], uvs[s][1][1] * uv.height * uv_factors[1]],
-                            [uvs[s][2][0] * uv.width * uv_factors[0], uvs[s][2][1] * uv.height * uv_factors[1]],
-                            [uvs[s][3][0] * uv.width * uv_factors[0], uvs[s][3][1] * uv.height * uv_factors[1]],
+                            [
+                                uvs[s][0][0] * uv.width * uv_factors[0],
+                                uvs[s][0][1] * uv.height * uv_factors[1],
+                            ],
+                            [
+                                uvs[s][1][0] * uv.width * uv_factors[0],
+                                uvs[s][1][1] * uv.height * uv_factors[1],
+                            ],
+                            [
+                                uvs[s][2][0] * uv.width * uv_factors[0],
+                                uvs[s][2][1] * uv.height * uv_factors[1],
+                            ],
+                            [
+                                uvs[s][3][0] * uv.width * uv_factors[0],
+                                uvs[s][3][1] * uv.height * uv_factors[1],
+                            ],
                         ];
 
                         for kk in 0..4 {

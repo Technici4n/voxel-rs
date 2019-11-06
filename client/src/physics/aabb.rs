@@ -1,5 +1,5 @@
-use crate::world::World;
 use nalgebra::Vector3;
+use voxel_rs_common::world::World;
 
 pub struct AABB {
     pub pos: Vector3<f64>,
@@ -71,7 +71,7 @@ impl AABB {
         for i in min_x..max_x {
             for j in min_y..max_y {
                 for k in min_z..max_z {
-                    if world.get_data(i, j, k) != 0 {
+                    if world.get_block((i, j, k).into()) != 0 {
                         return true;
                     }
                 }
