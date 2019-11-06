@@ -7,7 +7,7 @@ use voxel_rs_common::{
     block::Block,
     network::{messages::ToClient, messages::ToServer, Client, ClientEvent},
     registry::Registry,
-    world::{chunk::CHUNK_SIZE, World},
+    world::{BlockPos, chunk::CHUNK_SIZE, World},
 };
 
 use crate::world::camera::Camera;
@@ -20,12 +20,11 @@ use crate::{
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
     world::{
-        meshing::{greedy_meshing as meshing, AdjChunkOccl},
+        meshing::AdjChunkOccl,
         renderer::WorldRenderer,
     },
 };
 use std::collections::HashSet;
-use std::time::Instant;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -128,33 +127,54 @@ impl State for SinglePlayer {
             let p = self.camera.position;
             self.client.send(ToServer::SetPos((p[0], p[1], p[2])));
         }
+        let p = self.camera.position;
+        let player_chunk = BlockPos::from((p[0], p[1], p[2])).containing_chunk_pos();
+
+        // Remove chunks that are too far
+        // TODO: render distance!
+        // damned borrow checker :(
+        let Self { ref mut world, ref mut world_renderer, .. } = self;
+        world.chunks.retain(|chunk_pos, _| {
+            if (chunk_pos.px - player_chunk.px)
+                .abs()
+                .max((chunk_pos.py - player_chunk.py).abs())
+                .max((chunk_pos.pz - player_chunk.pz).abs())
+                <= 1 {
+                true
+            } else {
+                world_renderer.chunk_meshes.remove(chunk_pos);
+                world_renderer.meshing_worker.dequeue_chunk(*chunk_pos);
+                false
+            }
+        });
 
         // Update meshing
-        let mut quad_buffer = Vec::new();
+        // TODO: put this in the renderer ?
+        let mut chunk_updates: Vec<_> = chunk_updates.into_iter().collect();
+        chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
         for chunk_pos in chunk_updates.into_iter() {
             if let Some(chunk) = self.world.get_chunk(chunk_pos) {
-                let t1 = Instant::now();
-                let (vertices, indices, _, _) = meshing(
-                    chunk,
-                    Some(AdjChunkOccl::create_from_world(&self.world, chunk_pos, &self.world_renderer.block_meshes)),
-                    &self.world_renderer.block_meshes,
-                    &mut quad_buffer,
+                self.world_renderer.meshing_worker.enqueue_chunk(
+                    chunk.clone(),
+                    AdjChunkOccl::create_from_world(&self.world, chunk_pos, &self.world_renderer.block_meshes),
                 );
-                let t2 = Instant::now();
-                let pos = (
-                    (chunk.pos.px * CHUNK_SIZE as i64) as f32,
-                    (chunk.pos.py * CHUNK_SIZE as i64) as f32,
-                    (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
-                );
-                // TODO: reuse existing meshes when possible if that bottlenecks
-                let chunk_mesh = Mesh::new(pos, vertices, indices, &mut gfx.factory);
-                let t3 = Instant::now();
-                info!("Meshing took {} ms\nUpdating the mesh took {} ms", (t2 - t1).as_millis(), (t3 - t2).as_millis());
-                self.world_renderer.update_chunk_mesh(chunk.pos, chunk_mesh);
             }
         }
 
-        // TODO: drop chunks that are too far away
+        // Send new chunks to the GPU
+        for (chunk_pos, vertices, indices) in self.world_renderer.meshing_worker.get_processed_chunks().into_iter() {
+            // Add the mesh if the chunk is still loaded
+            if self.world.has_chunk(chunk_pos) {
+                let world_pos = (
+                    (chunk_pos.px * CHUNK_SIZE as i64) as f32,
+                    (chunk_pos.py * CHUNK_SIZE as i64) as f32,
+                    (chunk_pos.pz * CHUNK_SIZE as i64) as f32,
+                );
+                // TODO: reuse existing meshes when possible if that bottlenecks
+                let chunk_mesh = Mesh::new(world_pos, vertices, indices, &mut gfx.factory);
+                self.world_renderer.update_chunk_mesh(chunk_pos, chunk_mesh);
+            }
+        }
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 

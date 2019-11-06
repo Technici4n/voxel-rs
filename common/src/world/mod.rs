@@ -39,6 +39,16 @@ impl From<(i64, i64, i64)> for BlockPos {
     }
 }
 
+impl From<(f64, f64, f64)> for BlockPos {
+    fn from((px, py, pz): (f64, f64, f64)) -> Self {
+        Self {
+            px: px.floor() as i64,
+            py: py.floor() as i64,
+            pz: pz.floor() as i64,
+        }
+    }
+}
+
 /// A game world
 pub struct World {
     pub chunks: HashMap<ChunkPos, Chunk>,

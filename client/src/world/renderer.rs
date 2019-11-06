@@ -1,7 +1,10 @@
 use crate::{
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
-    world::{camera::Camera, skybox::Skybox},
+    world::{
+        camera::Camera, skybox::Skybox,
+        meshing_worker::MeshingWorker,
+    },
 };
 use anyhow::Result;
 use gfx;
@@ -62,6 +65,7 @@ pub struct WorldRenderer {
     pub texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
     pub texture_sampler: gfx::handle::Sampler<gfx_device_gl::Resources>,
     pub skybox: Skybox,
+    pub meshing_worker: MeshingWorker,
 }
 
 impl WorldRenderer {
@@ -131,10 +135,11 @@ impl WorldRenderer {
             pso_skybox,
             chunk_meshes: HashMap::new(),
             transform: factory.create_constant_buffer(1),
-            block_meshes,
+            block_meshes: block_meshes.clone(),
             texture_atlas,
             texture_sampler,
             skybox,
+            meshing_worker: MeshingWorker::new(block_meshes),
         })
     }
 

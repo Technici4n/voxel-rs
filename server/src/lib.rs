@@ -71,11 +71,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         // Send chunks to players
         let mut player_positions = Vec::new();
         for (player, data) in players.iter_mut() {
-            let position = BlockPos {
-                px: data.position.0 as i64,
-                py: data.position.1 as i64,
-                pz: data.position.2 as i64,
-            };
+            let position = BlockPos::from(data.position);
             let position = position.containing_chunk_pos();
             player_positions.push(position);
             // TODO: render distance check

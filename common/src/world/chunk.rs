@@ -25,6 +25,14 @@ impl ChunkPos {
     pub fn offset_by_pos(self, other: ChunkPos) -> Self {
         self.offset(other.px, other.py, other.pz)
     }
+
+    /// Squared euclidian distance to other chunk
+    pub fn squared_euclidian_distance(self, other: ChunkPos) -> u64 {
+        fn square(x: i64) -> u64 {
+            (x * x) as u64
+        }
+        square(self.px - other.px) + square(self.py - other.py) + square(self.pz - other.pz)
+    }
 }
 
 impl From<(i64, i64, i64)> for ChunkPos {
