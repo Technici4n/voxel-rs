@@ -146,6 +146,7 @@ impl State for SinglePlayer {
                     (chunk.pos.py * CHUNK_SIZE as i64) as f32,
                     (chunk.pos.pz * CHUNK_SIZE as i64) as f32,
                 );
+                // TODO: reuse existing meshes when possible if that bottlenecks
                 let chunk_mesh = Mesh::new(pos, vertices, indices, &mut gfx.factory);
                 let t3 = Instant::now();
                 info!("Meshing took {} ms\nUpdating the mesh took {} ms", (t2 - t1).as_millis(), (t3 - t2).as_millis());
