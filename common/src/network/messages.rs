@@ -1,10 +1,16 @@
-use crate::{data::Data, world::chunk::CompressedChunk};
+use crate::{
+    world::chunk::CompressedChunk,
+    data::Data,
+    player::RenderDistance
+};
 
 /// A message sent to the server by the client
 #[derive(Debug, Clone)]
 pub enum ToServer {
     /// Update player position TODO: remove this
     SetPos((f64, f64, f64)),
+    /// Update player render distance
+    SetRenderDistance(RenderDistance),
     /*/// Update the current player's input
     UpdateInput,*/
 }

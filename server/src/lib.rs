@@ -2,8 +2,8 @@ use crate::worldgen::WorldGenerationWorker;
 use anyhow::Result;
 use log::info;
 use std::collections::{HashMap, HashSet};
-use voxel_rs_common::worldgen::DefaultWorldGenerator;
 use voxel_rs_common::{
+    worldgen::DefaultWorldGenerator,
     data::load_data,
     network::{
         messages::{ToClient, ToServer},
@@ -11,8 +11,9 @@ use voxel_rs_common::{
     },
     world::{
         chunk::{ChunkPos, CompressedChunk},
-        BlockPos, World,
+        World,
     },
+    player::RenderDistance
 };
 
 mod worldgen;
@@ -22,6 +23,7 @@ mod worldgen;
 struct PlayerData {
     position: (f64, f64, f64),
     loaded_chunks: HashSet<ChunkPos>,
+    render_distance: RenderDistance,
 }
 
 /// Start a new server instance.
@@ -54,6 +56,9 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                     ToServer::SetPos(pos) => {
                         players.entry(id).or_insert(PlayerData::default()).position = pos;
                     }
+                    ToServer::SetRenderDistance(render_distance) => {
+                        players.entry(id).or_insert(PlayerData::default()).render_distance = render_distance;
+                    }
                 },
             }
         }
@@ -71,82 +76,54 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         // Send chunks to players
         let mut player_positions = Vec::new();
         for (player, data) in players.iter_mut() {
-            let position = BlockPos::from(data.position);
-            let position = position.containing_chunk_pos();
-            player_positions.push(position);
-            // TODO: render distance check
+            player_positions.push((data.position, data.render_distance));
             // Send new chunks
-            for i in -1..=1 {
-                for j in -1..=1 {
-                    for k in -1..=1 {
-                        let position = ChunkPos {
-                            px: position.px + i,
-                            py: position.py + j,
-                            pz: position.pz + k,
-                        };
-                        // The player hasn't received the chunk yet
-                        if !data.loaded_chunks.contains(&position) {
-                            // Generate it if it's not in the world
-                            if !world.has_chunk(position) {
-                                // Generate the chunk if it's not already generating
-                                let actually_inserted = generating_chunks.insert(position);
-                                if actually_inserted {
-                                    world_generator.enqueue_chunk(position);
-                                }
-                            } else {
-                                // Send it to the player
-                                server.send(
-                                    *player,
-                                    ToClient::Chunk(CompressedChunk::from_chunk(
-                                        world.get_chunk(position).unwrap(),
-                                    )),
-                                );
-                                data.loaded_chunks.insert(position);
-                            }
+            for chunk_pos in data.render_distance.iterate_around_player(data.position) {
+                // The player hasn't received the chunk yet
+                if !data.loaded_chunks.contains(&chunk_pos) {
+                    if let Some(chunk) = world.get_chunk(chunk_pos) {
+                        // Send it to the player if it's in the world
+                        server.send(
+                            *player,
+                            ToClient::Chunk(CompressedChunk::from_chunk(chunk)),
+                        );
+                        data.loaded_chunks.insert(chunk_pos);
+                    }
+                    else {
+                        // Generate the chunk if it's not already generating
+                        let actually_inserted = generating_chunks.insert(chunk_pos);
+                        if actually_inserted {
+                            world_generator.enqueue_chunk(chunk_pos);
                         }
                     }
                 }
             }
-            // TODO: render distance check
             // Drop chunks that are too far away
+            let render_distance = data.render_distance;
+            let position = data.position;
             data.loaded_chunks.retain(|chunk_pos| {
-                (chunk_pos.px - position.px)
-                    .abs()
-                    .max((chunk_pos.py - position.py).abs())
-                    .max((chunk_pos.pz - position.pz).abs())
-                    <= 1
-            })
+                render_distance.is_chunk_visible(position, *chunk_pos)
+            });
         }
 
         // Drop chunks that are far from all players
-        // TODO: render distance check
-        world.chunks.retain(|&chunk_pos, _| {
-            for player_position in player_positions.iter() {
-                if (chunk_pos.px - player_position.px)
-                    .abs()
-                    .max((chunk_pos.py - player_position.py).abs())
-                    .max((chunk_pos.pz - player_position.pz).abs())
-                    <= 1
-                {
+        let is_chunk_visible = |&chunk_pos: &ChunkPos| {
+            for (player_position, render_distance) in player_positions.iter() {
+                if render_distance.is_chunk_visible(*player_position, chunk_pos) {
                     return true;
                 }
             }
             false
+        };
+        world.chunks.retain(|chunk_pos, _| is_chunk_visible(chunk_pos));
+        generating_chunks.retain(|chunk_pos| {
+            if is_chunk_visible(chunk_pos) {
+                true
+            } else {
+                world_generator.dequeue_chunk(*chunk_pos);
+                false
+            }
         });
-        generating_chunks.retain(|&chunk_pos| {
-            for player_position in player_positions.iter() {
-                if (chunk_pos.px - player_position.px)
-                    .abs()
-                    .max((chunk_pos.py - player_position.py).abs())
-                    .max((chunk_pos.pz - player_position.pz).abs())
-                    <= 1
-                {
-                    return true;
-                }
-            }
-            world_generator.dequeue_chunk(chunk_pos);
-            false
-        })
 
         // Nothing else to do for now :-)
     }

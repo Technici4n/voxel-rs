@@ -8,10 +8,15 @@ use voxel_rs_common::{
     network::{messages::ToClient, messages::ToServer, Client, ClientEvent},
     registry::Registry,
     world::{BlockPos, chunk::CHUNK_SIZE, World},
+    player::RenderDistance,
 };
 
-use crate::world::camera::Camera;
 use crate::{
+    world::{
+        camera::Camera,
+        meshing::AdjChunkOccl,
+        renderer::WorldRenderer,
+    },
     fps::FpsCounter,
     input::InputState,
     mesh::Mesh,
@@ -19,10 +24,6 @@ use crate::{
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{
-        meshing::AdjChunkOccl,
-        renderer::WorldRenderer,
-    },
 };
 use std::collections::HashSet;
 
@@ -38,6 +39,7 @@ pub struct SinglePlayer {
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     client: Box<dyn Client>,
+    render_distance: RenderDistance, // TODO: put this in the settigs
 }
 
 impl SinglePlayer {
@@ -59,6 +61,11 @@ impl SinglePlayer {
             }
         };
         info!("Received game data from the server");
+
+        // Set render distance
+        let render_distance = RenderDistance { x_max: 10, x_min: 10, y_max: 3, y_min: 3, z_max: 10, z_min: 10 };
+        client.send(ToServer::SetRenderDistance(render_distance));
+
         // Load texture atlas
         let texture_atlas = crate::texture::load_image(&mut gfx.factory, data.texture_atlas)?;
 
@@ -78,6 +85,7 @@ impl SinglePlayer {
             player: AABB::new(Vector3::new(0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
             block_registry: data.blocks,
             client,
+            render_distance,
         }))
     }
 }
@@ -128,18 +136,14 @@ impl State for SinglePlayer {
             self.client.send(ToServer::SetPos((p[0], p[1], p[2])));
         }
         let p = self.camera.position;
-        let player_chunk = BlockPos::from((p[0], p[1], p[2])).containing_chunk_pos();
+        let p = (p[0], p[1], p[2]);
+        let player_chunk = BlockPos::from(p).containing_chunk_pos();
 
         // Remove chunks that are too far
-        // TODO: render distance!
         // damned borrow checker :(
-        let Self { ref mut world, ref mut world_renderer, .. } = self;
+        let Self { ref mut world, ref mut world_renderer, ref render_distance, .. } = self;
         world.chunks.retain(|chunk_pos, _| {
-            if (chunk_pos.px - player_chunk.px)
-                .abs()
-                .max((chunk_pos.py - player_chunk.py).abs())
-                .max((chunk_pos.pz - player_chunk.pz).abs())
-                <= 1 {
+            if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
                 world_renderer.chunk_meshes.remove(chunk_pos);
@@ -151,6 +155,7 @@ impl State for SinglePlayer {
         // Update meshing
         // TODO: put this in the renderer ?
         let mut chunk_updates: Vec<_> = chunk_updates.into_iter().collect();
+        // Sort the chunks so that the nearest ones are meshed first
         chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
         for chunk_pos in chunk_updates.into_iter() {
             if let Some(chunk) = self.world.get_chunk(chunk_pos) {
