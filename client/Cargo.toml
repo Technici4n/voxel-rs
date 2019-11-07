@@ -35,6 +35,3 @@ quint = { path = "../quint" }
 
 # Math
 nalgebra = "0.18"
-
-[profile.release]
-debug = true
