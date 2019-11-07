@@ -21,15 +21,12 @@ pub fn perlin(
     let mut factor_z = scale_z;
 
     for _i in 0..octave {
-        let noise = value_noise(
+        value_noise(
             (x, y, z),
             (size, size, size),
-            (factor_x, factor_y, factor_z),
+            (factor_x, factor_y, factor_z), p, &mut result,
             seed,
         );
-        for _j in 0..(size * size * size) {
-            result[_j] = result[_j] + p * noise[_j];
-        }
         factor_x *= 2.0;
         factor_y *= 2.0;
         factor_z *= 2.0;
@@ -48,8 +45,10 @@ pub fn value_noise(
     (x, y, z): (f32, f32, f32),
     (size_x, size_y, size_z): (usize, usize, usize),
     (scale_x, scale_y, scale_z): (f32, f32, f32),
+    p: f32,
+    to_add: &mut Vec<f32>,
     seed: i32,
-) -> Vec<f32> {
+) {
     let min_x = (x * scale_x).floor() as i32;
     let max_x = ((x + size_x as f32 - 1.0) * scale_x).ceil() as i32;
     let min_y = (y * scale_y).floor() as i32;
@@ -62,7 +61,7 @@ pub fn value_noise(
     let nz = (max_z - min_z + 2) as usize;
 
     let mut values = vec![0.0; nx * ny * nz];
-    let mut res = vec![0.0; size_x * size_y * size_z];
+    //let mut res = vec![0.0; size_x * size_y * size_z];
 
     for i in 0..nx {
         for j in 0..ny {
@@ -75,54 +74,66 @@ pub fn value_noise(
         }
     }
 
+    let mut fx = vec![0.0; size_x];
+    let mut fy = vec![0.0; size_y];
+    let mut fz = vec![0.0; size_z];
+
+    let mut x_c = vec![0; size_x];
+    let mut y_c = vec![0; size_y];
+    let mut z_c = vec![0; size_z];
+
+    for i in 0..size_x {
+        let xx = (x + i as f32) * scale_x;
+        let u_x = xx.floor();
+        fx[i] = smoothstep(xx - u_x);
+        x_c[i] = ((u_x as i32) - min_x) as usize;
+    }
+
+
+    for j in 0..size_y {
+        let yy = (y + j as f32) * scale_y;
+        let u_y = yy.floor();
+        fy[j] = smoothstep(yy - u_y);
+        y_c[j] = ((u_y as i32) - min_y) as usize;
+    }
+
+    for k in 0..size_z {
+        let zz = (z + k as f32) * scale_z;
+        let u_z = zz.floor();
+        fz[k] = smoothstep(zz - u_z);
+        z_c[k] = ((u_z as i32) - min_z) as usize;
+    }
+
     for i in 0..size_x {
         for j in 0..size_y {
             for k in 0..size_z {
                 // plz vectorize this for me
-                let xx = (x + i as f32) * scale_x;
-                let yy = (y + j as f32) * scale_y;
-                let zz = (z + k as f32) * scale_z;
+                let a_a_a = values[(x_c[i] * ny + y_c[j]) * nz + z_c[k]];
+                let a_a_b = values[(x_c[i] * ny + y_c[j]) * nz + z_c[k] + 1];
 
-                let u_x = xx.floor();
-                let u_y = yy.floor();
-                let u_z = zz.floor();
+                let a_a = a_a_a + (a_a_b - a_a_a) * fz[k];
 
-                let fx = smoothstep(xx - u_x);
-                let fy = smoothstep(yy - u_y);
-                let fz = smoothstep(zz - u_z);
+                let a_b_a = values[(x_c[i] * ny + y_c[j] + 1) * nz + z_c[k]];
+                let a_b_b = values[(x_c[i] * ny + y_c[j] + 1) * nz + z_c[k] + 1];
 
-                let x_c = ((u_x as i32) - min_x) as usize;
-                let y_c = ((u_y as i32) - min_y) as usize;
-                let z_c = ((u_z as i32) - min_z) as usize;
+                let a_b = a_b_a + (a_b_b - a_b_a) * fz[k];
 
-                let a_a_a = values[(x_c * ny + y_c) * nz + z_c];
-                let a_a_b = values[(x_c * ny + y_c) * nz + z_c + 1];
+                let b_a_a = values[(x_c[i] * ny + y_c[j] + ny) * nz + z_c[k]];
+                let b_a_b = values[(x_c[i] * ny + y_c[j] + ny) * nz + z_c[k] + 1];
 
-                let a_a = a_a_a + (a_a_b - a_a_a) * fz;
+                let b_a = b_a_a + (b_a_b - b_a_a) * fz[k];
 
-                let a_b_a = values[(x_c * ny + y_c + 1) * nz + z_c];
-                let a_b_b = values[(x_c * ny + y_c + 1) * nz + z_c + 1];
+                let b_b_a = values[(x_c[i] * ny + y_c[j] + 1 + ny) * nz + z_c[k]];
+                let b_b_b = values[(x_c[i] * ny + y_c[j] + 1 + ny) * nz + z_c[k] + 1];
 
-                let a_b = a_b_a + (a_b_b - a_b_a) * fz;
+                let b_b = b_b_a + (b_b_b - b_b_a) * fz[k];
 
-                let b_a_a = values[(x_c * ny + y_c + ny) * nz + z_c];
-                let b_a_b = values[(x_c * ny + y_c + ny) * nz + z_c + 1];
-
-                let b_a = b_a_a + (b_a_b - b_a_a) * fz;
-
-                let b_b_a = values[(x_c * ny + y_c + 1 + ny) * nz + z_c];
-                let b_b_b = values[(x_c * ny + y_c + 1 + ny) * nz + z_c + 1];
-
-                let b_b = b_b_a + (b_b_b - b_b_a) * fz;
-
-                let a = (a_a) + (a_b - a_a) * fy;
-                let b = (b_a) + (b_b - b_a) * fy;
-
-                res[(i * size_y + j) * size_z + k] = a + (b - a) * fx;
+                let a = (a_a) + (a_b - a_a) * fy[j];
+                let b = (b_a) + (b_b - b_a) * fy[j];
+                to_add[(i * size_y + j) * size_z + k] += p*(a + (b - a) * fx[i]);
             }
         }
     }
-    res
 }
 
 #[inline(always)]

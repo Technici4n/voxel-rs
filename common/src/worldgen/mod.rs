@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use crate::{
     block::Block,
@@ -34,6 +35,7 @@ impl DefaultWorldGenerator {
     }
 
     fn pregenerate_chunk(chunk: &mut Chunk, block_registry: &Registry<Block>) {
+        let t1 = Instant::now();
         let stone_block = block_registry.get_id_by_name(&"stone".to_owned()).unwrap() as u16;
         let grass_block = block_registry.get_id_by_name(&"grass".to_owned()).unwrap() as u16;
         let dirt_block = block_registry.get_id_by_name(&"dirt".to_owned()).unwrap() as u16;
@@ -42,10 +44,21 @@ impl DefaultWorldGenerator {
         let pz = (chunk.pos.pz * CHUNK_SIZE as i64) as f32;
         let freq = 1.0 / 64.0;
 
+        if py > 100.0 {
+            return;
+        } else if py + CHUNK_SIZE as f32 + 13.0 < 0.0 {
+            for i in 0..32 {
+                for j in 0..32 {
+                    for k in 0..32 {
+                        chunk.set_block_at((i as u32, j as u32, k as u32), stone_block);
+                    }
+                }
+            }
+            return;
+        }
+
         let s = (CHUNK_SIZE + 3) as usize;
-
         let noise = perlin::perlin(px, py, pz, s, freq, freq * 2.0, freq, 5, 0.4, 42);
-
 
         for i in 0..32 {
             for j in 0..32 {
@@ -71,12 +84,33 @@ impl DefaultWorldGenerator {
                 }
             }
         }
+        let t2 = Instant::now();
+        println!("Time to generate chunk : {} ms", (t2 - t1).subsec_millis());
     }
 }
 
 impl WorldGenerator for DefaultWorldGenerator {
     fn generate_chunk(&mut self, pos: ChunkPos, block_registry: &Registry<Block>) -> Chunk {
+
         let mut chunks_vec = Vec::new();
+
+        let mut vec_to_drop : Vec<ChunkPos> = Vec::new();
+
+        for pos_to_drop in self.pregenerated_chunks.keys(){
+            let dx = (pos.px - pos_to_drop.px).abs();
+            let dy = (pos.py - pos_to_drop.py).abs();
+            let dz = (pos.pz - pos_to_drop.pz).abs();
+            if dx >= 16 || dy >= 8 || dz >= 16{ // TODO : use render distance value
+                vec_to_drop.push(pos_to_drop.clone());
+                println!("Dropping pregenerate chunks ...");
+            }
+        }
+
+        for pos_to_drop in vec_to_drop.drain(..) {
+            self.pregenerated_chunks.remove(&pos_to_drop);
+        }
+
+
 
         for i in -1..=1 {
             for j in -1..=1 {
@@ -111,12 +145,12 @@ impl WorldGenerator for DefaultWorldGenerator {
 
         let mut blocks_to_place: Vec<BlockToPlace> = Vec::new();
         {
-            let minX = chunks[0].pos.px * CHUNK_SIZE as i64;
-            let maxX = (chunks[0].pos.px + 3) * CHUNK_SIZE as i64;
-            let minY = chunks[0].pos.py * CHUNK_SIZE as i64;
-            let maxY = (chunks[0].pos.py + 3) * CHUNK_SIZE as i64;
-            let minZ = chunks[0].pos.pz * CHUNK_SIZE as i64;
-            let maxZ = (chunks[0].pos.pz + 3) * CHUNK_SIZE as i64;
+            let min_x = chunks[0].pos.px * CHUNK_SIZE as i64;
+            let max_x = (chunks[0].pos.px + 3) * CHUNK_SIZE as i64;
+            let min_y = chunks[0].pos.py * CHUNK_SIZE as i64;
+            let max_y = (chunks[0].pos.py + 3) * CHUNK_SIZE as i64;
+            let min_z = chunks[0].pos.pz * CHUNK_SIZE as i64;
+            let max_z = (chunks[0].pos.pz + 3) * CHUNK_SIZE as i64;
 
             let chunk_size_64 = CHUNK_SIZE as i64;
 
@@ -178,7 +212,7 @@ impl WorldGenerator for DefaultWorldGenerator {
                                 let mut place = true;
 
                                 for blocks in blocks_to_place_one.iter() {
-                                    if blocks.pos.px >= minX && blocks.pos.px < maxX && blocks.pos.py >= minY && blocks.pos.py < maxY && blocks.pos.pz >= minZ && blocks.pos.pz < maxZ {
+                                    if blocks.pos.px >= min_x && blocks.pos.px < max_x && blocks.pos.py >= min_y && blocks.pos.py < max_y && blocks.pos.pz >= min_z && blocks.pos.pz < max_z {
                                         let cblock_pos = blocks.pos.containing_chunk_pos();
                                         let (x, y, z) = (cblock_pos.px - chunks[0].pos.px, cblock_pos.py - chunks[0].pos.py, cblock_pos.pz - chunks[0].pos.pz);
                                         let chunk = &chunks[(x * 9 + y * 3 + z) as usize];
@@ -205,13 +239,13 @@ impl WorldGenerator for DefaultWorldGenerator {
         }
 
         for blocks in blocks_to_place.drain(..) {
-            let minX = (chunks[0].pos.px + 1) * CHUNK_SIZE as i64;
-            let maxX = (chunks[0].pos.px + 2) * CHUNK_SIZE as i64;
-            let minY = (chunks[0].pos.py + 1) * CHUNK_SIZE as i64;
-            let maxY = (chunks[0].pos.py + 2) * CHUNK_SIZE as i64;
-            let minZ = (chunks[0].pos.pz + 1) * CHUNK_SIZE as i64;
-            let maxZ = (chunks[0].pos.pz + 2) * CHUNK_SIZE as i64;
-            if blocks.pos.px >= minX && blocks.pos.px < maxX && blocks.pos.py >= minY && blocks.pos.py < maxY && blocks.pos.pz >= minZ && blocks.pos.pz < maxZ {
+            let min_x = (chunks[0].pos.px + 1) * CHUNK_SIZE as i64;
+            let max_x = (chunks[0].pos.px + 2) * CHUNK_SIZE as i64;
+            let min_y = (chunks[0].pos.py + 1) * CHUNK_SIZE as i64;
+            let max_y = (chunks[0].pos.py + 2) * CHUNK_SIZE as i64;
+            let min_z = (chunks[0].pos.pz + 1) * CHUNK_SIZE as i64;
+            let max_z = (chunks[0].pos.pz + 2) * CHUNK_SIZE as i64;
+            if blocks.pos.px >= min_x && blocks.pos.px < max_x && blocks.pos.py >= min_y && blocks.pos.py < max_y && blocks.pos.pz >= min_z && blocks.pos.pz < max_z {
                 let pos = blocks.pos.pos_in_containing_chunk();
                 chunks[13].set_block_at(pos, blocks.id);
             }
