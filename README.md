@@ -7,7 +7,7 @@ We are still looking for a better name...
 - [x] Voxel world rendering
 - [x] Procedural world generation
 - [x] Client-server architecture
-- [ ] Networked physics (@Technici4n)
+- [x] Networked physics
 - [ ] Player physics (@Technici4n)
 - [ ] Procedural generation blueprints (@Azercoco)
 - [ ] Frustum culling for chunks (@Azercoco)
