@@ -14,3 +14,6 @@ serde = "1.0"
 # Image loading
 image = "0.22"
 texture_packer = "0.17"
+
+# Math
+nalgebra = "0.18"

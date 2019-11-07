@@ -1,9 +1,9 @@
-use std::collections::{HashSet, BTreeMap};
+use std::collections::{BTreeMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::{
-    world::chunk::{Chunk, ChunkPos},
-    registry::Registry,
     block::Block,
+    registry::Registry,
+    world::chunk::{Chunk, ChunkPos},
     world::WorldGenerator,
 };
 
@@ -54,7 +54,9 @@ impl WorldGenerationWorker {
     /// Set the priority of a chunk.
     /// Has no effect if the chunk is not queued
     pub fn set_chunk_priority(&mut self, pos: ChunkPos, priority: u64) {
-        self.sender.send(ToOtherThread::SetPriority(pos, priority)).unwrap();
+        self.sender
+            .send(ToOtherThread::SetPriority(pos, priority))
+            .unwrap();
     }
 
     /// Get the processed chunks
@@ -91,13 +93,19 @@ fn launch_worker(
             match message {
                 ToOtherThread::Enqueue(pos) => {
                     queued_chunks.insert(pos);
-                    priorities.entry(u64::max_value()).or_insert_with(Vec::new).push(pos);
+                    priorities
+                        .entry(u64::max_value())
+                        .or_insert_with(Vec::new)
+                        .push(pos);
                 }
                 ToOtherThread::Dequeue(pos) => {
                     queued_chunks.remove(&pos);
                 }
                 ToOtherThread::SetPriority(pos, priority) => {
-                    priorities.entry(priority).or_insert_with(Vec::new).push(pos);
+                    priorities
+                        .entry(priority)
+                        .or_insert_with(Vec::new)
+                        .push(pos);
                 }
             }
         }
@@ -109,7 +117,7 @@ fn launch_worker(
                     // Generate the chunk it if it is still queued
                     let chunk = world_generator.generate_chunk(pos, &block_registry);
                     sender.send(chunk).unwrap();
-                    break 'outer
+                    break 'outer;
                 }
             }
 

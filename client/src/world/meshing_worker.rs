@@ -1,9 +1,9 @@
+use crate::world::meshing::{greedy_meshing, AdjChunkOccl};
+use crate::world::renderer::Vertex;
 use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
-use voxel_rs_common::world::chunk::{ChunkPos, Chunk};
-use crate::world::meshing::{AdjChunkOccl, greedy_meshing};
-use crate::world::renderer::Vertex;
+use voxel_rs_common::world::chunk::{Chunk, ChunkPos};
 
 pub type ChunkMesh = (ChunkPos, Vec<Vertex>, Vec<u32>);
 
@@ -21,9 +21,7 @@ enum ToOtherThread {
 
 impl MeshingWorker {
     /// Create a new `MeshingWorker`, using the given block meshes.
-    pub fn new(
-        block_meshes: Vec<BlockMesh>,
-    ) -> Self {
+    pub fn new(block_meshes: Vec<BlockMesh>) -> Self {
         let (sender1, receiver1) = channel();
         let (sender2, receiver2) = channel();
 
@@ -39,7 +37,9 @@ impl MeshingWorker {
 
     /// Enqueue a chunk
     pub fn enqueue_chunk(&mut self, chunk: Chunk, adj: AdjChunkOccl) {
-        self.sender.send(ToOtherThread::Enqueue(chunk, adj)).unwrap();
+        self.sender
+            .send(ToOtherThread::Enqueue(chunk, adj))
+            .unwrap();
     }
 
     /// Dequeue a chunk from processing if it's still in the queue.
@@ -94,9 +94,10 @@ fn launch_worker(
         // Mesh the first chunk that is in the queue
         while let Some(chunk_pos) = ordered_positions.pop_front() {
             if let Some((chunk, adj)) = queued_chunks.remove(&chunk_pos) {
-                let (vertices, indices, _, _) = greedy_meshing(&chunk, Some(adj), &block_meshes, &mut quads);
+                let (vertices, indices, _, _) =
+                    greedy_meshing(&chunk, Some(adj), &block_meshes, &mut quads);
                 sender.send((chunk_pos, vertices, indices)).unwrap();
-                break
+                break;
             }
         }
     }

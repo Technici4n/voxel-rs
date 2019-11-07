@@ -24,7 +24,9 @@ pub fn perlin(
         value_noise(
             (x, y, z),
             (size, size, size),
-            (factor_x, factor_y, factor_z), p, &mut result,
+            (factor_x, factor_y, factor_z),
+            p,
+            &mut result,
             seed,
         );
         factor_x *= 2.0;
@@ -89,7 +91,6 @@ pub fn value_noise(
         x_c[i] = ((u_x as i32) - min_x) as usize;
     }
 
-
     for j in 0..size_y {
         let yy = (y + j as f32) * scale_y;
         let u_y = yy.floor();
@@ -130,7 +131,7 @@ pub fn value_noise(
 
                 let a = (a_a) + (a_b - a_a) * fy[j];
                 let b = (b_a) + (b_b - b_a) * fy[j];
-                to_add[(i * size_y + j) * size_z + k] += p*(a + (b - a) * fx[i]);
+                to_add[(i * size_y + j) * size_z + k] += p * (a + (b - a) * fx[i]);
             }
         }
     }
@@ -156,7 +157,7 @@ fn rand_pos(x: i32, y: i32, z: i32, seed: i32) -> f32 {
 pub fn rand_pos_int(x: i32, y: i32, z: i32, seed: i32) -> i32 {
     let a = hash(x + seed);
     let b = hash(y + a);
-    return  hash(z + b);;
+    return hash(z + b);
 }
 
 #[inline(always)]

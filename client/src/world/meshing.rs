@@ -2,8 +2,8 @@ use super::renderer::Vertex;
 use voxel_rs_common::{
     block::BlockMesh,
     collections::zero_initialized_vec,
-    world::World,
     world::chunk::{Chunk, ChunkPos, CHUNK_SIZE},
+    world::World,
 };
 
 /// Structure containing information about adjacent chunks for the meshing
@@ -40,13 +40,21 @@ impl Quad {
 impl AdjChunkOccl {
     /// Generate the AdjChunkOccl struct used in the meshing containing the
     /// informations about adjacent chunks
-    pub fn create_from_world(world: &World, pos: ChunkPos, meshes: &Vec<BlockMesh>) -> AdjChunkOccl {
+    pub fn create_from_world(
+        world: &World,
+        pos: ChunkPos,
+        meshes: &Vec<BlockMesh>,
+    ) -> AdjChunkOccl {
         const ICHUNK_SIZE: i64 = CHUNK_SIZE as i64;
         // Transform every number to 0 except -1.
         // This allows us to transform chunk deltas into block deltas.
         #[inline(always)]
         fn f(x: i64) -> i64 {
-            if x == -1 { -1 } else { 0 }
+            if x == -1 {
+                -1
+            } else {
+                0
+            }
         }
         // faces
         let da = [
@@ -78,7 +86,8 @@ impl AdjChunkOccl {
                                 uy = k;
                                 uz = (ICHUNK_SIZE + f(da[i][2])) as u32 % CHUNK_SIZE;
                             }
-                            res[j as usize][k as usize] = meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
+                            res[j as usize][k as usize] =
+                                meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
                         }
                     }
                     res
@@ -121,7 +130,8 @@ impl AdjChunkOccl {
                             uy = (ICHUNK_SIZE + f(de[i][1])) as u32 % CHUNK_SIZE;
                             uz = j;
                         }
-                        res[j as usize] = meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
+                        res[j as usize] =
+                            meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
                     }
                     res
                 }
@@ -339,8 +349,12 @@ pub fn greedy_meshing(
         [0, 1, 0],
     ];
 
-    quads.resize(6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize, Quad::default());
-    let mut to_mesh = unsafe { zero_initialized_vec(6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize) };
+    quads.resize(
+        6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize,
+        Quad::default(),
+    );
+    let mut to_mesh =
+        unsafe { zero_initialized_vec(6 * (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize) };
 
     #[inline(always)]
     fn ind_mesh(s: usize, x: i32, y: i32, z: i32) -> usize {

@@ -3,6 +3,7 @@ use crate::{
     block::{Block, BlockId},
     registry::Registry,
 };
+use nalgebra::Vector3;
 use std::collections::HashMap;
 
 pub mod chunk;
@@ -45,6 +46,16 @@ impl From<(f64, f64, f64)> for BlockPos {
             px: px.floor() as i64,
             py: py.floor() as i64,
             pz: pz.floor() as i64,
+        }
+    }
+}
+
+impl From<Vector3<f64>> for BlockPos {
+    fn from(vec: Vector3<f64>) -> Self {
+        Self {
+            px: vec[0].floor() as i64,
+            py: vec[1].floor() as i64,
+            pz: vec[2].floor() as i64,
         }
     }
 }
@@ -118,5 +129,4 @@ pub trait WorldGenerator {
     /// Decorate the chunk based on the adjacent chunks (that have been generated but not decorated)
     /// chunks contains a 3x3x3 (27) group of adjacent chunks (the chunk to be decorated is in the center)
     fn decorate_chunk(&mut self, chunks: &mut Vec<Chunk>, block_registry: &Registry<Block>);
-
 }

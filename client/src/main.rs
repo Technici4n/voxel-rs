@@ -11,7 +11,6 @@ mod fps;
 mod input;
 //mod mainmenu; TODO: fix this
 mod mesh;
-mod physics;
 mod settings;
 mod singleplayer;
 mod texture;

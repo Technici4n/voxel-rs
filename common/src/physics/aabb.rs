@@ -1,5 +1,5 @@
+use crate::world::World;
 use nalgebra::Vector3;
-use voxel_rs_common::world::World;
 
 pub struct AABB {
     pub pos: Vector3<f64>,

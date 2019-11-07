@@ -1,5 +1,8 @@
 use super::messages::{ToClient, ToServer};
-use crate::network::{ClientEvent, ClientId, ServerEvent};
+use crate::{
+    network::{ClientEvent, ServerEvent},
+    player::PlayerId,
+};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 
 pub struct DummyClient {
@@ -35,16 +38,16 @@ impl super::Server for DummyServer {
     fn receive_event(&mut self) -> ServerEvent {
         if self.first_queried {
             self.first_queried = false;
-            return ServerEvent::ClientConnected(ClientId(0));
+            return ServerEvent::ClientConnected(PlayerId(0));
         }
         match self.to_server.try_recv() {
-            Ok(m) => ServerEvent::ClientMessage(ClientId(0), m),
+            Ok(m) => ServerEvent::ClientMessage(PlayerId(0), m),
             Err(TryRecvError::Empty) => ServerEvent::NoEvent,
             Err(TryRecvError::Disconnected) => panic!("Got to somehow terminate the server :)"),
         }
     }
 
-    fn send(&mut self, _: ClientId, message: ToClient) {
+    fn send(&mut self, _: PlayerId, message: ToClient) {
         self.to_client.send(message).unwrap();
     }
 }

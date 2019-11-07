@@ -1,18 +1,18 @@
+use crate::player::PlayerId;
 use crate::{
-    world::chunk::CompressedChunk,
     data::Data,
-    player::RenderDistance
+    physics::simulation::ServerState,
+    player::{PlayerInput, RenderDistance},
+    world::chunk::CompressedChunk,
 };
 
 /// A message sent to the server by the client
 #[derive(Debug, Clone)]
 pub enum ToServer {
-    /// Update player position TODO: remove this
-    SetPos((f64, f64, f64)),
     /// Update player render distance
     SetRenderDistance(RenderDistance),
-    /*/// Update the current player's input
-    UpdateInput,*/
+    /// Update the player's input
+    UpdateInput(PlayerInput),
 }
 
 /// A message sent to the client by the server
@@ -22,6 +22,9 @@ pub enum ToClient {
     GameData(Data),
     /// Send the chunk at some position
     Chunk(CompressedChunk),
-    /*/// Update part of the physics simulation
-    UpdatePhysics,*/
+    /// Update the whole of the physics simulation
+    // TODO: only send part of the physics simulation
+    UpdatePhysics(ServerState),
+    /// Set the id of a player
+    CurrentId(PlayerId),
 }

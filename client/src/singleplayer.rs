@@ -1,31 +1,28 @@
 use anyhow::Result;
 use gfx::Device;
 use log::info;
-use nalgebra::Vector3;
 
 use voxel_rs_common::{
     block::Block,
     network::{messages::ToClient, messages::ToServer, Client, ClientEvent},
-    registry::Registry,
-    world::{BlockPos, chunk::CHUNK_SIZE, World},
     player::RenderDistance,
+    registry::Registry,
+    world::{chunk::CHUNK_SIZE, BlockPos, World},
 };
 
+use crate::input::YawPitch;
 use crate::{
-    world::{
-        camera::Camera,
-        meshing::AdjChunkOccl,
-        renderer::WorldRenderer,
-    },
     fps::FpsCounter,
     input::InputState,
     mesh::Mesh,
-    physics::aabb::AABB,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
+    world::{frustum::Frustum, meshing::AdjChunkOccl, renderer::WorldRenderer},
 };
 use std::collections::HashSet;
+use std::time::Instant;
+use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -34,12 +31,12 @@ pub struct SinglePlayer {
     ui_renderer: UiRenderer,
     world: World,
     world_renderer: WorldRenderer,
-    camera: Camera,
-    player: AABB,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     client: Box<dyn Client>,
     render_distance: RenderDistance, // TODO: put this in the settigs
+    physics_simulation: ClientPhysicsSimulation,
+    yaw_pitch: YawPitch,
 }
 
 impl SinglePlayer {
@@ -53,17 +50,34 @@ impl SinglePlayer {
         mut client: Box<dyn Client>,
     ) -> Result<Box<dyn State>> {
         info!("Launching singleplayer");
-        // Wait for data from the server
-        let data = loop {
-            match client.receive_event() {
-                ClientEvent::ServerMessage(ToClient::GameData(data)) => break data,
-                _ => (),
+        // Wait for data and player_id from the server
+        let (data, player_id) = {
+            let mut data = None;
+            let mut player_id = None;
+            loop {
+                if data.is_some() && player_id.is_some() {
+                    break (data.unwrap(), player_id.unwrap());
+                }
+                match client.receive_event() {
+                    ClientEvent::ServerMessage(ToClient::GameData(game_data)) => {
+                        data = Some(game_data)
+                    }
+                    ClientEvent::ServerMessage(ToClient::CurrentId(id)) => player_id = Some(id),
+                    _ => (),
+                }
             }
         };
         info!("Received game data from the server");
 
         // Set render distance
-        let render_distance = RenderDistance { x_max: 10, x_min: 10, y_max: 3, y_min: 3, z_max: 10, z_min: 10 };
+        let render_distance = RenderDistance {
+            x_max: 10,
+            x_min: 10,
+            y_max: 3,
+            y_min: 3,
+            z_max: 10,
+            z_min: 10,
+        };
         client.send(ToServer::SetRenderDistance(render_distance));
 
         // Load texture atlas
@@ -77,15 +91,18 @@ impl SinglePlayer {
             ui_renderer: UiRenderer::new(gfx)?,
             world: World::new(),
             world_renderer: world_renderer?,
-            camera: {
-                let mut cam = Camera::new();
-                cam.position = Vector3::new(0.4, 1.6, 0.4);
-                cam
-            },
-            player: AABB::new(Vector3::new(0.0, 0.0, 0.0), (0.8, 1.8, 0.8)),
             block_registry: data.blocks,
             client,
             render_distance,
+            physics_simulation: ClientPhysicsSimulation::new(
+                ServerState {
+                    physics_state: PhysicsState::default(),
+                    server_time: Instant::now(),
+                    input: Default::default(),
+                },
+                player_id,
+            ),
+            yaw_pitch: Default::default(),
         }))
     }
 }
@@ -94,10 +111,10 @@ impl State for SinglePlayer {
     fn update(
         &mut self,
         _settings: &mut Settings,
-        keyboard_state: &InputState,
+        input_state: &InputState,
         _data: &WindowData,
         flags: &mut WindowFlags,
-        seconds_delta: f64,
+        _seconds_delta: f64,
         gfx: &mut Gfx,
     ) -> Result<StateTransition> {
         let mut chunk_updates = HashSet::new();
@@ -118,30 +135,37 @@ impl State for SinglePlayer {
                             }
                         }
                     }
+                    ToClient::UpdatePhysics(server_state) => {
+                        self.physics_simulation.receive_server_update(server_state);
+                    }
                     ToClient::GameData(_) => {}
+                    ToClient::CurrentId(_) => {}
                 },
                 ClientEvent::Disconnected => unimplemented!("server disconnected"),
                 ClientEvent::Connected => {}
             }
         }
 
-        if self.ui.should_update_camera() {
-            let delta_move = self.camera.get_movement(seconds_delta, keyboard_state);
-            let delta_move = self.player.move_check_collision(&self.world, delta_move);
+        // Collect input
+        let frame_input =
+            input_state.get_physics_input(self.yaw_pitch, self.ui.should_update_camera());
+        // Send input to server
+        self.client.send(ToServer::UpdateInput(frame_input));
+        // Update physics
+        self.physics_simulation
+            .step_simulation(frame_input, Instant::now(), &self.world);
 
-            self.camera.position += delta_move;
-
-            // TODO: real physics handling
-            let p = self.camera.position;
-            self.client.send(ToServer::SetPos((p[0], p[1], p[2])));
-        }
-        let p = self.camera.position;
-        let p = (p[0], p[1], p[2]);
+        let p = self.physics_simulation.get_current_position();
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
 
         // Remove chunks that are too far
         // damned borrow checker :(
-        let Self { ref mut world, ref mut world_renderer, ref render_distance, .. } = self;
+        let Self {
+            ref mut world,
+            ref mut world_renderer,
+            ref render_distance,
+            ..
+        } = self;
         world.chunks.retain(|chunk_pos, _| {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
@@ -161,13 +185,22 @@ impl State for SinglePlayer {
             if let Some(chunk) = self.world.get_chunk(chunk_pos) {
                 self.world_renderer.meshing_worker.enqueue_chunk(
                     chunk.clone(),
-                    AdjChunkOccl::create_from_world(&self.world, chunk_pos, &self.world_renderer.block_meshes),
+                    AdjChunkOccl::create_from_world(
+                        &self.world,
+                        chunk_pos,
+                        &self.world_renderer.block_meshes,
+                    ),
                 );
             }
         }
 
         // Send new chunks to the GPU
-        for (chunk_pos, vertices, indices) in self.world_renderer.meshing_worker.get_processed_chunks().into_iter() {
+        for (chunk_pos, vertices, indices) in self
+            .world_renderer
+            .meshing_worker
+            .get_processed_chunks()
+            .into_iter()
+        {
             // Add the mesh if the chunk is still loaded
             if self.world.has_chunk(chunk_pos) {
                 let world_pos = (
@@ -200,19 +233,23 @@ impl State for SinglePlayer {
         // Count fps
         self.fps_counter.add_frame();
 
+        let frustum = Frustum::new(
+            self.physics_simulation.get_current_position(),
+            self.yaw_pitch,
+        );
+
         // Clear buffers
         gfx.encoder
             .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
-        self.world_renderer.render(gfx, data, &self.camera)?;
+        self.world_renderer.render(gfx, data, &frustum)?;
         // Clear depth
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
-        self.ui
-            .rebuild(&self.camera, self.fps_counter.fps(), data)?;
+        self.ui.rebuild(&frustum, self.fps_counter.fps(), data)?;
         self.ui_renderer.render(gfx, &data, &self.ui.ui)?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);
@@ -224,7 +261,7 @@ impl State for SinglePlayer {
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
         if self.ui.should_update_camera() {
-            self.camera.update_cursor(delta.0, delta.1);
+            self.yaw_pitch.update_cursor(delta.0, delta.1);
         }
     }
 

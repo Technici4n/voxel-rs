@@ -1,7 +1,7 @@
 use self::widgets::{Text, WithStyle};
 use crate::ui::widgets::Button;
 use crate::window::WindowData;
-use crate::world::camera::Camera;
+use crate::world::frustum::Frustum;
 use anyhow::Result;
 use gfx_glyph::Scale;
 use glutin::dpi::LogicalPosition;
@@ -45,14 +45,14 @@ impl Ui {
     }
 
     /// Rebuild the Ui if it changed
-    pub fn rebuild(&mut self, camera: &Camera, fps: usize, data: &WindowData) -> Result<()> {
+    pub fn rebuild(&mut self, frustum: &Frustum, fps: usize, data: &WindowData) -> Result<()> {
         self.update();
 
         let mut layers = Vec::new();
 
         // Always draw debug info
         {
-            layers.push(self.draw_debug_info(camera, fps));
+            layers.push(self.draw_debug_info(frustum, fps));
         }
 
         // Draw menu
@@ -77,7 +77,7 @@ impl Ui {
 
     fn draw_debug_info(
         &self,
-        camera: &Camera,
+        camera: &Frustum,
         fps: usize,
     ) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
         let text = format!(

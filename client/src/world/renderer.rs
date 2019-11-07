@@ -1,10 +1,7 @@
 use crate::{
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
-    world::{
-        camera::Camera, skybox::Skybox,
-        meshing_worker::MeshingWorker,
-    },
+    world::{frustum::Frustum, meshing_worker::MeshingWorker, skybox::Skybox},
 };
 use anyhow::Result;
 use gfx;
@@ -143,7 +140,7 @@ impl WorldRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, camera: &Camera) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref color_buffer,
@@ -160,7 +157,7 @@ impl WorldRenderer {
         };
 
         let view_proj =
-            convert::<Matrix4<f64>, Matrix4<f32>>(camera.get_view_projection(aspect_ratio)).into();
+            convert::<Matrix4<f64>, Matrix4<f32>>(frustum.get_view_projection(aspect_ratio)).into();
 
         // drawing all the mesh
         for mesh in self.chunk_meshes.values() {
@@ -198,9 +195,9 @@ impl WorldRenderer {
                 [0.0, 1.0, 0.0, 0.0],
                 [0.0, 0.0, 1.0, 0.0],
                 [
-                    camera.position.x as f32,
-                    camera.position.y as f32,
-                    camera.position.z as f32,
+                    frustum.position.x as f32,
+                    frustum.position.y as f32,
+                    frustum.position.z as f32,
                     1.0,
                 ], // set skybox center at camera
             ],
@@ -222,11 +219,5 @@ impl WorldRenderer {
     /// Add a new chunk mesh to the rendering or update one if already exists
     pub fn update_chunk_mesh(&mut self, pos: ChunkPos, mesh: Mesh) {
         self.chunk_meshes.insert(pos, mesh);
-    }
-
-    /// Drop the mesh of the chunk at the position given (if the chunk exists)
-    #[allow(dead_code)] // TODO: drop mesh
-    pub fn drop_mesh(&mut self, pos: &ChunkPos) {
-        self.chunk_meshes.remove(pos);
     }
 }
