@@ -1,7 +1,8 @@
-use crate::physics::camera::default_camera;
 use crate::{
     player::{PlayerId, PlayerInput},
     world::World,
+    physics::camera::default_camera,
+    physics::player::PhysicsPlayer,
 };
 use nalgebra::Vector3;
 use std::{
@@ -18,7 +19,7 @@ pub struct Input {
 /// Physics state of the whole simulation.
 #[derive(Debug, Clone, Default)]
 pub struct PhysicsState {
-    pub player_positions: HashMap<PlayerId, Vector3<f64>>,
+    pub players: HashMap<PlayerId, PhysicsPlayer>,
 }
 
 impl PhysicsState {
@@ -27,14 +28,14 @@ impl PhysicsState {
     pub fn step_simulation(&mut self, input: &Input, dt: Duration, world: &World) {
         let seconds_delta = dt.as_secs_f64();
         for (&id, input) in input.player_inputs.iter() {
-            let pos = self
-                .player_positions
+            let player = self
+                .players
                 .entry(id)
-                .or_insert(Vector3::new(0.0, 0.0, 0.0));
-            *pos = default_camera(*pos, *input, seconds_delta, world);
+                .or_insert(Default::default());
+            default_camera(player, *input, seconds_delta, world);
         }
         // Remove players that don't exist anymore
-        self.player_positions
+        self.players
             .retain(|id, _| input.player_inputs.contains_key(id));
     }
 }
@@ -85,13 +86,14 @@ impl ClientPhysicsSimulation {
         self.needs_recomputing = true;
     }
 
-    /// Get the current position of the client
-    pub fn get_current_position(&self) -> Vector3<f64> {
-        *self
+    /// Get the camera position of the client
+    pub fn get_camera_position(&self) -> Vector3<f64> {
+        self
             .current_state
-            .player_positions
+            .players
             .get(&self.player_id)
             .unwrap()
+            .get_camera_position()
     }
 
     /// Step the simulation according to the current input and time

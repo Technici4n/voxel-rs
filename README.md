@@ -8,7 +8,7 @@ We are still looking for a better name...
 - [x] Procedural world generation
 - [x] Client-server architecture
 - [x] Networked physics
-- [ ] Player physics (@Technici4n)
+- [x] Player physics
 - [ ] Procedural generation blueprints (@Azercoco)
 - [ ] Frustum culling for chunks (@Azercoco)
 - [ ] Geometry shaders to improve rendering performance (@Azercoco)

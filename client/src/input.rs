@@ -40,6 +40,7 @@ pub struct InputState {
     keys: HashMap<u32, ElementState>,
     mouse_buttons: HashMap<MouseButton, ElementState>,
     modifiers_state: ModifiersState,
+    flying: bool, // TODO: reset this on game start
 }
 
 impl InputState {
@@ -48,6 +49,7 @@ impl InputState {
             keys: HashMap::new(),
             mouse_buttons: HashMap::new(),
             modifiers_state: ModifiersState::default(),
+            flying: false,
         }
     }
 
@@ -56,6 +58,11 @@ impl InputState {
         self.modifiers_state = input.modifiers;
         let previous_state = self.keys.get(&input.scancode).cloned();
         self.keys.insert(input.scancode, input.state);
+        if input.scancode == TOGGLE_FLIGHT {
+            if let &Some(ElementState::Pressed) = &previous_state {
+                self.flying = !self.flying;
+            }
+        }
         previous_state != Some(input.state)
     }
 
@@ -107,6 +114,7 @@ impl InputState {
             key_move_down: allow_movement && self.is_key_pressed(MOVE_DOWN),
             yaw: yaw_pitch.yaw,
             pitch: yaw_pitch.pitch,
+            flying: self.flying,
         }
     }
 }
@@ -117,3 +125,4 @@ pub const MOVE_BACKWARD: u32 = 31;
 pub const MOVE_RIGHT: u32 = 32;
 pub const MOVE_UP: u32 = 57;
 pub const MOVE_DOWN: u32 = 42;
+pub const TOGGLE_FLIGHT: u32 = 33;

@@ -13,6 +13,7 @@ pub struct PlayerInput {
     pub key_move_down: bool,
     pub yaw: f64,
     pub pitch: f64,
+    pub flying: bool,
 }
 
 impl Default for PlayerInput {
@@ -26,6 +27,7 @@ impl Default for PlayerInput {
             key_move_down: false,
             yaw: 0.0,
             pitch: 0.0,
+            flying: false,
         }
     }
 }

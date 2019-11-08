@@ -97,12 +97,13 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         // Send chunks to players
         let mut player_positions = Vec::new();
         for (player, data) in players.iter_mut() {
-            let player_pos = *physics_simulation
+            let player_pos = physics_simulation
                 .get_state()
                 .physics_state
-                .player_positions
+                .players
                 .get(player)
-                .unwrap();
+                .unwrap()
+                .get_camera_position();
             player_positions.push((player_pos, data.render_distance));
             // Send new chunks
             for chunk_pos in data.render_distance.iterate_around_player(player_pos) {

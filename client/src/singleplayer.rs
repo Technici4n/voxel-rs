@@ -158,7 +158,7 @@ impl State for SinglePlayer {
         self.physics_simulation
             .step_simulation(frame_input, Instant::now(), &self.world);
 
-        let p = self.physics_simulation.get_current_position();
+        let p = self.physics_simulation.get_camera_position();
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
 
         // Debug current player position, yaw and pitch
@@ -242,7 +242,7 @@ impl State for SinglePlayer {
         send_debug_info("Player", "fps", format!("fps = {}", self.fps_counter.fps()));
 
         let frustum = Frustum::new(
-            self.physics_simulation.get_current_position(),
+            self.physics_simulation.get_camera_position(),
             self.yaw_pitch,
         );
 

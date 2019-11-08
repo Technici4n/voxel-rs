@@ -1,6 +1,7 @@
 use crate::world::World;
 use nalgebra::Vector3;
 
+#[derive(Debug, Clone)]
 pub struct AABB {
     pub pos: Vector3<f64>,
     pub size_x: f64,
@@ -107,7 +108,7 @@ impl AABB {
                 let mut min_d = 0.0;
                 let mut max_d = ddx.abs();
 
-                while max_d - min_d > 0.01 {
+                while max_d - min_d > 0.001 {
                     // binary search the max delta
                     let med = (min_d + max_d) / 2.0;
                     self.pos.x += med * ddx.signum();
@@ -134,7 +135,7 @@ impl AABB {
                 let mut min_d = 0.0;
                 let mut max_d = ddy.abs();
 
-                while max_d - min_d > 0.01 {
+                while max_d - min_d > 0.001 {
                     let med = (min_d + max_d) / 2.0;
                     self.pos.y += med * ddy.signum();
                     if self.intersect_world(world) {
@@ -161,7 +162,7 @@ impl AABB {
                 let mut min_d = 0.0;
                 let mut max_d = ddz.abs();
 
-                while max_d - min_d > 0.01 {
+                while max_d - min_d > 0.001 {
                     let med = (min_d + max_d) / 2.0;
                     self.pos.z += med * ddz.signum();
                     if self.intersect_world(world) {
@@ -179,5 +180,13 @@ impl AABB {
 
         res.z = self.pos.z - old_z;
         return res;
+    }
+
+    /// Check whether the bounding box is touching the ground
+    pub fn is_on_the_ground(&mut self, world: &World) -> bool {
+        self.pos.y -= 0.0021;
+        let would_intersect_down = self.intersect_world(world);
+        self.pos.y += 0.0021;
+        !self.intersect_world(world) && would_intersect_down
     }
 }
