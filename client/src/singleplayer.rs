@@ -23,6 +23,7 @@ use crate::{
 use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
+use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -37,6 +38,7 @@ pub struct SinglePlayer {
     render_distance: RenderDistance, // TODO: put this in the settigs
     physics_simulation: ClientPhysicsSimulation,
     yaw_pitch: YawPitch,
+    debug_info: DebugInfo,
 }
 
 impl SinglePlayer {
@@ -103,6 +105,7 @@ impl SinglePlayer {
                 player_id,
             ),
             yaw_pitch: Default::default(),
+            debug_info: DebugInfo::new_current(),
         }))
     }
 }
@@ -157,6 +160,10 @@ impl State for SinglePlayer {
 
         let p = self.physics_simulation.get_current_position();
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
+
+        // Debug current player position, yaw and pitch
+        send_debug_info("Player", "position", format!("x = {:.2}\ny = {:.2}\nz = {:.2}\nchunk x = {}\nchunk y={}\nchunk z = {}", p[0], p[1], p[2], player_chunk.px, player_chunk.py, player_chunk.pz));
+        send_debug_info("Player", "yawpitch", format!("yaw = {:.0}\npitch = {:.0}", self.yaw_pitch.yaw, self.yaw_pitch.pitch));
 
         // Remove chunks that are too far
         // damned borrow checker :(
@@ -232,6 +239,7 @@ impl State for SinglePlayer {
     ) -> Result<StateTransition> {
         // Count fps
         self.fps_counter.add_frame();
+        send_debug_info("Player", "fps", format!("fps = {}", self.fps_counter.fps()));
 
         let frustum = Frustum::new(
             self.physics_simulation.get_current_position(),
@@ -249,7 +257,7 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
-        self.ui.rebuild(&frustum, self.fps_counter.fps(), data)?;
+        self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer.render(gfx, &data, &self.ui.ui)?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);

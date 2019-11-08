@@ -1,11 +1,12 @@
 use self::widgets::{Text, WithStyle};
 use crate::ui::widgets::Button;
 use crate::window::WindowData;
-use crate::world::frustum::Frustum;
 use anyhow::Result;
 use gfx_glyph::Scale;
 use glutin::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
+use voxel_rs_common::debug::DebugInfo;
+use std::collections::HashMap;
 
 pub mod renderer;
 pub mod widgets;
@@ -45,14 +46,14 @@ impl Ui {
     }
 
     /// Rebuild the Ui if it changed
-    pub fn rebuild(&mut self, frustum: &Frustum, fps: usize, data: &WindowData) -> Result<()> {
+    pub fn rebuild(&mut self, debug_info: &mut DebugInfo, data: &WindowData) -> Result<()> {
         self.update();
 
         let mut layers = Vec::new();
 
         // Always draw debug info
         {
-            layers.push(self.draw_debug_info(frustum, fps));
+            layers.push(self.draw_debug_info(debug_info.get_debug_info()));
         }
 
         // Draw menu
@@ -77,24 +78,20 @@ impl Ui {
 
     fn draw_debug_info(
         &self,
-        camera: &Frustum,
-        fps: usize,
+        debug_info: HashMap<String, HashMap<String, String>>,
     ) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
-        let text = format!(
-            "\
-Welcome to voxel-rs
-
-FPS = {}
-
-yaw = {:4.0}
-pitch = {:4.0}
-
-x = {:.2}
-y = {:.2}
-z = {:.2}
-",
-            fps, camera.yaw, camera.pitch, camera.position.x, camera.position.y, camera.position.z
-        );
+        let text =
+            debug_info
+                .into_iter()
+                .map(|(section, messages)| {
+                    format!("{} DEBUG INFO\n{}\n\n",
+                        section,
+                        messages.into_iter().map(|(_id, m)| m).collect::<Vec<String>>().join("\n")
+                    )
+                })
+                .collect::<Vec<String>>()
+                .join("");
+        let text = format!("VOXEL-RS\n\n{}", text);
 
         wt! {
             WithStyle { style: Style::default().percent_size(1.0, 1.0) },
