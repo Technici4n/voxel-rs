@@ -10,7 +10,7 @@ We are still looking for a better name...
 - [x] Networked physics
 - [x] Player physics
 - [x] Procedural generation blueprints
-- [ ] Frustum culling for chunks (@Technici4n)
+- [x] Frustum culling for chunks
 - [x] Ambient occlusion using textures
 - [ ] Lighting (@Azercoco)
 - [ ] Entities and player mesh (@Azercoco)
