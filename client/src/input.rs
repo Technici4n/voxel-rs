@@ -1,6 +1,7 @@
 use glutin::{ElementState, KeyboardInput, ModifiersState, MouseButton};
 use std::collections::HashMap;
 use voxel_rs_common::player::PlayerInput;
+use voxel_rs_common::debug::send_debug_info;
 
 /// A helper struct to keep track of the yaw and pitch of a player
 #[derive(Debug, Clone, Copy, Default)]
@@ -41,6 +42,7 @@ pub struct InputState {
     mouse_buttons: HashMap<MouseButton, ElementState>,
     modifiers_state: ModifiersState,
     flying: bool, // TODO: reset this on game start
+    pub enable_culling: bool, // TODO: don't put this here
 }
 
 impl InputState {
@@ -50,6 +52,7 @@ impl InputState {
             mouse_buttons: HashMap::new(),
             modifiers_state: ModifiersState::default(),
             flying: false,
+            enable_culling: true,
         }
     }
 
@@ -58,9 +61,13 @@ impl InputState {
         self.modifiers_state = input.modifiers;
         let previous_state = self.keys.get(&input.scancode).cloned();
         self.keys.insert(input.scancode, input.state);
-        if input.scancode == TOGGLE_FLIGHT {
-            if let &Some(ElementState::Pressed) = &previous_state {
+        if let &Some(ElementState::Pressed) = &previous_state {
+            if input.scancode == TOGGLE_FLIGHT {
                 self.flying = !self.flying;
+            }
+            if input.scancode == TOGGLE_CULLING {
+                self.enable_culling = !self.enable_culling;
+                send_debug_info("Render", "chunkculling", format!("Chunk culling is {}enabled", if self.enable_culling { "" } else { "not "}));
             }
         }
         previous_state != Some(input.state)
@@ -126,3 +133,4 @@ pub const MOVE_RIGHT: u32 = 32;
 pub const MOVE_UP: u32 = 57;
 pub const MOVE_DOWN: u32 = 42;
 pub const TOGGLE_FLIGHT: u32 = 33;
+pub const TOGGLE_CULLING: u32 = 46;

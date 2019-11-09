@@ -12,6 +12,7 @@ use gfx_device_gl::Resources;
 use nalgebra::{convert, Matrix4};
 use std::collections::HashMap;
 use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
+use voxel_rs_common::debug::send_debug_info;
 
 gfx_defines! {
     vertex Vertex {
@@ -140,7 +141,7 @@ impl WorldRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum, enable_culling: bool) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref color_buffer,
@@ -156,35 +157,43 @@ impl WorldRenderer {
             win_w / win_h
         };
 
+        let view_mat = frustum.get_view_matrix();
+        let planes = frustum.get_planes(aspect_ratio);
+        let view_proj_mat = frustum.get_view_projection(aspect_ratio);
         let view_proj =
-            convert::<Matrix4<f64>, Matrix4<f32>>(frustum.get_view_projection(aspect_ratio)).into();
+            convert::<Matrix4<f64>, Matrix4<f32>>(view_proj_mat).into();
 
-        // drawing all the mesh
-        for mesh in self.chunk_meshes.values() {
-            let transform = Transform {
-                view_proj,
-                model: [
-                    // warning matrix is transposed
-                    [1.0, 0.0, 0.0, 0.0],
-                    [0.0, 1.0, 0.0, 0.0],
-                    [0.0, 0.0, 1.0, 0.0],
-                    [mesh.pos_x, mesh.pos_y, mesh.pos_z, 1.0], // model matrix to account mesh position
-                ],
-            };
+        // drawing all the meshes
+        let mut count = 0;
+        for (pos, mesh) in self.chunk_meshes.iter() {
+            if !enable_culling || Frustum::contains_chunk(&planes, &view_mat, *pos) {
+                count += 1;
+                let transform = Transform {
+                    view_proj,
+                    model: [
+                        // warning matrix is transposed
+                        [1.0, 0.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0, 0.0],
+                        [0.0, 0.0, 1.0, 0.0],
+                        [mesh.pos_x, mesh.pos_y, mesh.pos_z, 1.0], // model matrix to account mesh position
+                    ],
+                };
 
-            let data = pipe::Data {
-                // data object controlling the rendering
-                vbuf: mesh.v_buffer.clone(), // set the vertex buffer to be drawn
-                transform: self.transform.clone(),
-                texture_atlas: (self.texture_atlas.clone(), self.texture_sampler.clone()),
-                color_buffer: color_buffer.clone(),
-                depth_buffer: depth_buffer.clone(),
-            };
+                let data = pipe::Data {
+                    // data object controlling the rendering
+                    vbuf: mesh.v_buffer.clone(), // set the vertex buffer to be drawn
+                    transform: self.transform.clone(),
+                    texture_atlas: (self.texture_atlas.clone(), self.texture_sampler.clone()),
+                    color_buffer: color_buffer.clone(),
+                    depth_buffer: depth_buffer.clone(),
+                };
 
-            encoder.update_buffer(&data.transform, &[transform], 0)?;
-            // (index buffer, pso, full data with vertex buffer and uniform buffer inside)
-            encoder.draw(&mesh.indices, &self.pso_fill, &data);
+                encoder.update_buffer(&data.transform, &[transform], 0)?;
+                // (index buffer, pso, full data with vertex buffer and uniform buffer inside)
+                encoder.draw(&mesh.indices, &self.pso_fill, &data);
+            }
         }
+        send_debug_info("Render", "renderedchunks", format!("{} chunks were rendered", count));
 
         // drawing the Skybox
         let transform = Transform {

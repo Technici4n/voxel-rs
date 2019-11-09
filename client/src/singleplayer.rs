@@ -236,6 +236,7 @@ impl State for SinglePlayer {
         _settings: &Settings,
         gfx: &mut Gfx,
         data: &WindowData,
+        input_state: &InputState,
     ) -> Result<StateTransition> {
         // Count fps
         self.fps_counter.add_frame();
@@ -252,7 +253,7 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
-        self.world_renderer.render(gfx, data, &frustum)?;
+        self.world_renderer.render(gfx, data, &frustum, input_state.enable_culling)?;
         // Clear depth
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);

@@ -60,6 +60,7 @@ pub trait State {
         settings: &Settings,
         gfx: &mut Gfx,
         data: &WindowData,
+        input_state: &InputState,
     ) -> Result<StateTransition>;
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
@@ -276,7 +277,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
 
         // Render frame
         match state
-            .render(settings, &mut gfx, &window_data)
+            .render(settings, &mut gfx, &window_data, &input_state)
             .context("Failed to `render` the current window state")?
         {
             StateTransition::KeepCurrent => (),
