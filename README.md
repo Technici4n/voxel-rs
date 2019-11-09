@@ -11,8 +11,7 @@ We are still looking for a better name...
 - [x] Player physics
 - [x] Procedural generation blueprints
 - [ ] Frustum culling for chunks (@Technici4n)
-- [ ] Geometry shaders to improve rendering performance (@Azercoco)
-- [ ] Ambient occlusion using textures
+- [x] Ambient occlusion using textures
 - [ ] Lighting (@Azercoco)
 - [ ] Entities and player mesh (@Azercoco)
 - [ ] Block placing and breaking (@Azercoco)

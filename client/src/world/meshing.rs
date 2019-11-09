@@ -435,13 +435,22 @@ pub fn greedy_meshing(
         }
     }
 
-    let order = [
+    let order1 = [
         [0, 2, 1, 1, 2, 3],
         [0, 1, 2, 1, 3, 2],
         [0, 1, 2, 1, 3, 2],
         [0, 2, 1, 1, 2, 3],
         [3, 1, 2, 2, 1, 0],
         [3, 2, 1, 2, 0, 1],
+    ];
+
+    let order2 = [
+        [0, 2, 3, 0, 3, 1],
+        [0, 3, 2, 0, 1, 3],
+        [0, 3, 2, 0, 1, 3],
+        [0, 2, 3, 0, 3, 1],
+        [1, 0, 3, 2, 3, 0],
+        [1, 3, 0, 2, 0, 3],
     ];
 
     let uvs = [
@@ -625,8 +634,17 @@ pub fn greedy_meshing(
                             });
                         }
 
+                        let a00 = v[0] >> 3;
+                        let a11 = v[3] >> 3;
+                        let a01 = v[1] >> 3;
+                        let a10 = v[2] >> 3;
+
                         for kk in 0..6 {
-                            res_index.push(n_of_different_vertex + order[s][kk]);
+                            if a00 + a11 < a01 + a10{
+                                res_index.push(n_of_different_vertex + order1[s][kk]);
+                            }else{
+                                res_index.push(n_of_different_vertex + order2[s][kk]);
+                            }
                         }
                         n_of_different_vertex += 4;
                         act_quad += 1;

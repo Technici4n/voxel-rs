@@ -57,11 +57,11 @@ void main() {
     if(code_occl == 3u){
       occl = 1.0;
     }else if(code_occl == 2u){
-      occl = 0.75;
+      occl = 0.65;
     }else if(code_occl == 1u){
-      occl = 0.6;
+      occl = 0.4;
     }else{
-      occl = 0.45;
+      occl = 0.3;
     }
 
     v_UvPos = a_UvPos;
