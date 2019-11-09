@@ -125,8 +125,4 @@ pub trait WorldGenerator {
     /// Generate the chunk at position `pos`. The result must always be the same,
     /// independently of the previous calls to this function!
     fn generate_chunk(&mut self, pos: ChunkPos, block_registry: &Registry<Block>) -> Chunk;
-
-    /// Decorate the chunk based on the adjacent chunks (that have been generated but not decorated)
-    /// chunks contains a 3x3x3 (27) group of adjacent chunks (the chunk to be decorated is in the center)
-    fn decorate_chunk(&mut self, chunks: &mut Vec<Chunk>, block_registry: &Registry<Block>);
 }
