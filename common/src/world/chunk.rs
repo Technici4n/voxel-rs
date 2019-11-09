@@ -47,6 +47,40 @@ impl From<[i64; 3]> for ChunkPos {
     }
 }
 
+/// Chunk position but only along XZ axis, used for highest block position
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ChunkPosXZ {
+    pub px: i64,
+    pub pz: i64,
+}
+
+impl ChunkPosXZ {
+    /// Offset the current chunk position by some amount of chunks
+    pub fn offset(self, dx: i64, dz: i64) -> Self {
+        Self {
+            px: self.px + dx,
+            pz: self.pz + dz,
+        }
+    }
+
+    /// Offset the current chunk position by some amount of chunks
+    pub fn offset_by_pos(self, other: ChunkPosXZ) -> Self {
+        self.offset(other.px, other.pz)
+    }
+}
+
+impl From<(i64, i64)> for ChunkPosXZ {
+    fn from((px, pz): (i64, i64)) -> Self {
+        Self { px, pz }
+    }
+}
+
+impl From<[i64; 2]> for ChunkPosXZ {
+    fn from([px, pz]: [i64; 2]) -> Self {
+        Self { px, pz }
+    }
+}
+
 /// An RLE-compressed chunk
 #[derive(Debug, Clone)]
 pub struct CompressedChunk {

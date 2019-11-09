@@ -5,6 +5,7 @@ use crate::{
 };
 use nalgebra::Vector3;
 use std::collections::HashMap;
+use crate::world::chunk::ChunkPosXZ;
 
 pub mod chunk;
 
@@ -63,12 +64,31 @@ impl From<Vector3<f64>> for BlockPos {
 /// A game world
 pub struct World {
     pub chunks: HashMap<ChunkPos, Chunk>,
+    pub highest_opaque_block : HashMap<ChunkPosXZ, HighestOpaqueBlock>,
 }
+
+/// This data structure contains the y position of the highest opaque block
+pub struct HighestOpaqueBlock{
+    pub pos : ChunkPosXZ,
+    pub y : [i64; (CHUNK_SIZE*CHUNK_SIZE) as usize],
+}
+
+impl HighestOpaqueBlock{
+
+    pub fn new(pos: ChunkPosXZ) -> Self{
+        Self{
+            pos,
+            y :[0; (CHUNK_SIZE*CHUNK_SIZE) as usize],
+        }
+    }
+}
+
 
 impl World {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
+            highest_opaque_block : HashMap::new(),
         }
     }
 
