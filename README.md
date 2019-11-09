@@ -9,8 +9,8 @@ We are still looking for a better name...
 - [x] Client-server architecture
 - [x] Networked physics
 - [x] Player physics
-- [ ] Procedural generation blueprints (@Azercoco)
-- [ ] Frustum culling for chunks (@Azercoco)
+- [x] Procedural generation blueprints
+- [ ] Frustum culling for chunks (@Technici4n)
 - [ ] Geometry shaders to improve rendering performance (@Azercoco)
 - [ ] Ambient occlusion using textures
 - [ ] Lighting (@Azercoco)
