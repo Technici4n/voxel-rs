@@ -134,8 +134,8 @@ impl UiRenderer {
         } = gfx;
 
         // Create glyph renderer
-        let ubuntu: &'static [u8] = include_bytes!("../../assets/fonts/Ubuntu-R.ttf");
-        let glyph_brush = GlyphBrushBuilder::using_font_bytes(ubuntu).build(factory.clone());
+        let font: &'static [u8] = include_bytes!("../../assets/fonts/IBMPlexMono-Regular.ttf");
+        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font).build(factory.clone());
 
         // Create rectangle drawing pipeline
         let shader_set = factory.create_shader_set(
