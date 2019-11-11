@@ -8,3 +8,4 @@ pub mod player;
 pub mod registry;
 pub mod world;
 pub mod worldgen;
+pub mod ligth;
