@@ -81,6 +81,12 @@ impl From<[i64; 2]> for ChunkPosXZ {
     }
 }
 
+impl From<ChunkPos> for ChunkPosXZ {
+    fn from(chunk_pos: ChunkPos) -> Self {
+        Self { px: chunk_pos.px, pz :chunk_pos.pz }
+    }
+}
+
 /// An RLE-compressed chunk
 #[derive(Debug, Clone)]
 pub struct CompressedChunk {

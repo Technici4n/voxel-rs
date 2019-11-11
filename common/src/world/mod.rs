@@ -64,21 +64,21 @@ impl From<Vector3<f64>> for BlockPos {
 /// A game world
 pub struct World {
     pub chunks: HashMap<ChunkPos, Chunk>,
-    pub highest_opaque_block : HashMap<ChunkPosXZ, HighestOpaqueBlock>,
+    pub highest_opaque_block: HashMap<ChunkPosXZ, HighestOpaqueBlock>,
 }
 
 /// This data structure contains the y position of the highest opaque block
-pub struct HighestOpaqueBlock{
-    pub pos : ChunkPosXZ,
-    pub y : [i64; (CHUNK_SIZE*CHUNK_SIZE) as usize],
+#[derive(Clone, Copy)]
+pub struct HighestOpaqueBlock {
+    pub pos: ChunkPosXZ,
+    pub y: [i64; (CHUNK_SIZE * CHUNK_SIZE) as usize],
 }
 
-impl HighestOpaqueBlock{
-
-    pub fn new(pos: ChunkPosXZ) -> Self{
-        Self{
+impl HighestOpaqueBlock {
+    pub fn new(pos: ChunkPosXZ) -> Self {
+        Self {
             pos,
-            y :[0; (CHUNK_SIZE*CHUNK_SIZE) as usize],
+            y: [0; (CHUNK_SIZE * CHUNK_SIZE) as usize],
         }
     }
 }
@@ -88,7 +88,7 @@ impl World {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
-            highest_opaque_block : HashMap::new(),
+            highest_opaque_block: HashMap::new(),
         }
     }
 
@@ -137,6 +137,77 @@ impl World {
     /// Set the chunk at position `pos`
     pub fn set_chunk(&mut self, chunk: Chunk) {
         self.chunks.insert(chunk.pos, chunk);
+    }
+
+    /// Function to be called when updating a chunk to update highest
+    /// Return if they must have a large light update over the 3x3 chunk column
+    pub fn update_highest_opaque_block(&mut self, chunk_pos: ChunkPos) -> bool {
+        let chunk_pos_xz: ChunkPosXZ = chunk_pos.clone().into();
+        let mut highest_opaque_block = self.highest_opaque_block.entry(
+            chunk_pos_xz).or_insert_with(|| HighestOpaqueBlock::new(chunk_pos_xz)).clone();
+        let mut check = false;
+        let mut scan_all_chunk = false;
+
+        {
+            let chunk_opt = self.get_chunk(chunk_pos);
+
+            match chunk_opt {
+                None => return false, // no chunk at update position
+                Some(chunk) => {
+                    'ij_loop: for i in 0..CHUNK_SIZE {
+                        for j in 0..CHUNK_SIZE {
+                            if highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] < (chunk_pos.py + 1) * CHUNK_SIZE as i64 {
+                                check = true;
+                                break 'ij_loop;
+                            }
+                        }
+                    }
+
+                    if check { // if the chunks is note entirely below the highest opaque block
+                        for i in 0..CHUNK_SIZE {
+                            for j in 0..CHUNK_SIZE {
+                                if highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] < (chunk_pos.py + 1) * CHUNK_SIZE as i64 {
+                                    let mut new_max_in_the_chunk = false;
+                                    for y in CHUNK_SIZE..=0 {
+                                        if chunk.get_block_at((i, y, j)) != 0 { // TODO : Replace by is opaque
+                                            highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] = chunk_pos.py * CHUNK_SIZE as i64 + y as i64;
+                                            new_max_in_the_chunk = true;
+                                            break;
+                                        }
+                                    }
+                                    // if the old max was in the chunk but not the new one
+                                    if !new_max_in_the_chunk && highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] >= (chunk_pos.py ) * CHUNK_SIZE as i64 {
+                                        scan_all_chunk = true;
+                                        highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] = 0; // default value
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if scan_all_chunk { // we must scan the whole chunk column
+            for other_chunk in self.chunks.values() {
+                if other_chunk.pos.px == chunk_pos.px && other_chunk.pos.py < chunk_pos.py && other_chunk.pos.pz == chunk_pos.pz {
+                    for i in 0..CHUNK_SIZE {
+                        for j in 0..CHUNK_SIZE {
+                            if highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] < (other_chunk.pos.py + 1) * CHUNK_SIZE as i64 {
+                                for y in CHUNK_SIZE..=0 {
+                                    if other_chunk.get_block_at((i, y, j)) != 0 { // TODO : Replace by is opaque
+                                        highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] = other_chunk.pos.py * CHUNK_SIZE as i64 + y as i64;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        self.highest_opaque_block.insert(chunk_pos_xz ,highest_opaque_block);
+        return true;
     }
 }
 
