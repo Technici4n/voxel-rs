@@ -1,10 +1,9 @@
 use super::renderer::PrimitiveBuffer;
-use gfx_glyph::Scale;
 use quint::{Event, Layout, Position, Style, Widget};
+use crate::ui::renderer::TextPart;
 
 pub struct Text {
-    pub text: String,
-    pub font_size: Scale,
+    pub text: Vec<TextPart>,
 }
 
 pub struct WithStyle {
@@ -16,8 +15,7 @@ where
     Message: Clone,
 {
     pub message: Message,
-    pub text: String,
-    pub font_size: Scale,
+    pub text: Vec<TextPart>,
     pub style: Style,
 }
 
@@ -27,7 +25,7 @@ impl<T> Widget<PrimitiveBuffer, T> for Text {
     }
 
     fn render(&self, buffer: &mut PrimitiveBuffer, _cursor_position: Position, layout: Layout) {
-        buffer.draw_text(self.text.clone(), self.font_size, layout, 0.0);
+        buffer.draw_text(self.text.clone(), layout, 0.0, false);
     }
 }
 
@@ -47,13 +45,13 @@ where
 
     fn render(&self, buffer: &mut PrimitiveBuffer, cursor_position: Position, layout: Layout) {
         let background_color = if layout.is_position_inside(cursor_position) {
-            [0.7, 0.9, 0.7, 1.0]
+            [0.6, 0.6, 1.0, 1.0]
         } else {
             [0.7, 0.7, 0.7, 1.0]
         };
         buffer.draw_rectangle([0.0, 0.0, 0.0, 1.0], layout, 0.01);
-        buffer.draw_rectangle(background_color, layout.with_padding(4.0), 0.0);
-        buffer.draw_text_centered(self.text.clone(), self.font_size, layout, 0.1);
+        buffer.draw_rectangle(background_color, layout.with_padding(3.0), 0.0);
+        buffer.draw_text(self.text.clone(), layout, 0.1, true);
     }
 
     fn on_event(

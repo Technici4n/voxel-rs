@@ -7,6 +7,7 @@ use glutin::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
 use voxel_rs_common::debug::DebugInfo;
 use std::collections::HashMap;
+use crate::ui::renderer::TextPart;
 
 pub mod renderer;
 pub mod widgets;
@@ -80,23 +81,46 @@ impl Ui {
         &self,
         debug_info: HashMap<String, HashMap<String, String>>,
     ) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
-        let text =
+        let white = [1.0, 1.0, 1.0, 1.0];
+        let mut text =
             debug_info
                 .into_iter()
                 .map(|(section, messages)| {
-                    format!("{} DEBUG INFO\n{}\n\n",
-                        section,
-                        messages.into_iter().map(|(_id, m)| m).collect::<Vec<String>>().join("\n")
-                    )
+                    vec![
+                        TextPart {
+                            text: format!("\n{}", section),
+                            font_size: Scale::uniform(25.0),
+                            color: white,
+                            font: Some("medium_italic".to_owned()),
+                        },
+                        TextPart {
+                            text: " DEBUG INFO\n".to_owned(),
+                            font_size: Scale::uniform(25.0),
+                            color: white,
+                            font: Some("regular".to_owned()),
+                        },
+                        TextPart {
+                            text: messages.into_iter().map(|(_id, m)| m).collect::<Vec<String>>().join("\n"),
+                            font_size: Scale::uniform(20.0),
+                            color: white,
+                            font: Some("regular".to_owned()),
+                        },
+                    ]
                 })
-                .collect::<Vec<String>>()
-                .join("");
-        let text = format!("VOXEL-RS\n\n{}", text);
+                .flatten()
+                .collect::<Vec<TextPart>>();
+
+        text.insert(0, TextPart {
+            text: format!("VOXEL-RS\n"),
+            font_size: Scale::uniform(40.0),
+            color: white,
+            font: Some("medium".to_owned()),
+        });
 
         wt! {
             WithStyle { style: Style::default().percent_size(1.0, 1.0) },
             wt! {
-                Text { text: text, font_size: Scale::uniform(20.0) },
+                Text { text },
             },
         }
     }
@@ -105,8 +129,14 @@ impl Ui {
         let menu_button = |text: &'static str, message| {
             wt! {
                 Button {
-                    text: text.to_owned(),
-                    font_size: Scale::uniform(40.0),
+                    text: vec![
+                        TextPart {
+                            text: text.to_owned(),
+                            font_size: Scale::uniform(60.0),
+                            color: [0.0, 0.0, 0.0, 1.0],
+                            font: Some("bold".to_owned()),
+                        },
+                    ],
                     message,
                     style: Style::default().absolute_size(400.0, 100.0),
                 },

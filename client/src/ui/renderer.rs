@@ -5,31 +5,11 @@ use gfx::{
     traits::{Factory, FactoryExt},
     Slice,
 };
-use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Scale, Section};
+use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Scale, FontId, VariedSection, SectionText};
+use log::info;
 use quint::Layout;
-
-#[derive(Debug)]
-pub struct UiRenderingError {
-    pub what: String,
-}
-
-impl std::fmt::Display for UiRenderingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "Some error happened during rendering of the ui text: {}",
-            self.what
-        )
-    }
-}
-
-impl std::error::Error for UiRenderingError {}
-
-impl From<String> for UiRenderingError {
-    fn from(string: String) -> Self {
-        Self { what: string }
-    }
-}
+use std::collections::{BTreeMap, HashMap};
+use std::io::Read;
 
 gfx_defines! {
     vertex Vertex {
@@ -67,19 +47,26 @@ type PipeDataType = pipe::Data<R>;
 type PsoType = gfx::PipelineState<R, pipe::Meta>;
 
 #[derive(Debug, Clone)]
-pub struct RectanglePrimitive {
+struct RectanglePrimitive {
     pub layout: Layout,
     pub color: [f32; 4],
     pub z: f32,
 }
 
 #[derive(Debug, Clone)]
-pub struct TextPrimitive {
+struct TextPrimitive {
     pub layout: Layout,
-    pub text: String,
-    pub font_size: Scale,
+    pub parts: Vec<TextPart>,
     pub z: f32,
     pub centered: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TextPart {
+    pub text: String,
+    pub font_size: Scale,
+    pub color: [f32; 4],
+    pub font: Option<String>,
 }
 
 #[derive(Default, Debug)]
@@ -93,24 +80,13 @@ impl PrimitiveBuffer {
         self.rectangle.push(RectanglePrimitive { color, layout, z });
     }
 
-    pub fn draw_text(&mut self, text: String, font_size: Scale, layout: Layout, z: f32) {
+    pub fn draw_text(&mut self, parts: Vec<TextPart>, layout: Layout, z: f32, centered: bool) {
         self.text.push(TextPrimitive {
-            text,
-            font_size,
             layout,
+            parts,
             z,
-            centered: false,
-        });
-    }
-
-    pub fn draw_text_centered(&mut self, text: String, font_size: Scale, layout: Layout, z: f32) {
-        self.text.push(TextPrimitive {
-            text,
-            font_size,
-            layout,
-            z,
-            centered: true,
-        });
+            centered,
+        })
     }
 }
 
@@ -122,6 +98,7 @@ pub struct UiRenderer {
     data: PipeDataType,
     rect_vertex_buffer: gfx::handle::Buffer<R, Vertex>,
     rect_index_buffer: gfx::handle::Buffer<R, u32>,
+    fonts: HashMap<String, FontId>,
 }
 
 impl UiRenderer {
@@ -133,9 +110,23 @@ impl UiRenderer {
             ..
         } = gfx;
 
-        // Create glyph renderer
-        let font: &'static [u8] = include_bytes!("../../assets/fonts/IBMPlexMono-Regular.ttf");
-        let glyph_brush = GlyphBrushBuilder::using_font_bytes(font).build(factory.clone());
+        // Load fonts
+        let default_font: &'static [u8] = include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
+        let mut glyph_brush_builder = GlyphBrushBuilder::using_font_bytes(default_font);
+        info!("Loading fonts from assets/fonts/list.toml");
+        let mut fonts = HashMap::new();
+        let font_list = std::fs::read_to_string("assets/fonts/list.toml").expect("Couldn't read font list file");
+        let font_files: BTreeMap<String, String> = toml::de::from_str(&font_list).expect("Couldn't parse font list file");
+        for (font_name, font_file) in font_files.into_iter() {
+            info!("Loading font {} from file {}", font_name, font_file);
+            let mut font_bytes = Vec::new();
+            let mut file = std::fs::File::open(font_file).expect("Couldn't open font file");
+            file.read_to_end(&mut font_bytes).expect("Couldn't read font file");
+            dbg!(font_bytes.len());
+            fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
+        }
+        info!("Fonts successfully loaded");
+        let glyph_brush = glyph_brush_builder.build(factory.clone());
 
         // Create rectangle drawing pipeline
         let shader_set = factory.create_shader_set(
@@ -180,6 +171,7 @@ impl UiRenderer {
             data,
             rect_vertex_buffer,
             rect_index_buffer,
+            fonts,
         })
     }
 
@@ -237,36 +229,46 @@ impl UiRenderer {
         // Text
         for TextPrimitive {
             layout: l,
-            text,
-            font_size,
+            mut parts,
             z,
             centered,
         } in primitive_buffer.text.into_iter()
         {
             use gfx_glyph::{HorizontalAlign, Layout, VerticalAlign};
             let dpi = data.hidpi_factor as f32;
+
+            for p in parts.iter_mut() {
+                p.font_size.x *= dpi;
+                p.font_size.y *= dpi;
+            }
+            let Self { ref fonts, .. } = &self;
+            let parts = parts.iter().map(|part| {
+                SectionText {
+                    text: &part.text,
+                    scale: part.font_size,
+                    color: part.color,
+                    font_id: part.font.clone().and_then(|f| fonts.get(&f).cloned()).unwrap_or_default(),
+                }
+            }).collect();
             let section = if centered {
-                Section {
-                    text: &text,
+                VariedSection {
+                    text: parts,
                     screen_position: ((l.x + l.width / 2.0) * dpi, (l.y + l.height / 2.0) * dpi),
                     bounds: (l.width * dpi, l.height * dpi),
-                    scale: font_size,
                     z,
                     layout: Layout::Wrap {
                         line_breaker: Default::default(),
                         v_align: VerticalAlign::Center,
                         h_align: HorizontalAlign::Center,
                     },
-                    ..Section::default()
                 }
             } else {
-                Section {
-                    text: &text,
-                    screen_position: (l.x, l.y),
+                VariedSection {
+                    text: parts,
+                    screen_position: (l.x * dpi, l.y * dpi),
                     bounds: (l.width, l.height),
-                    scale: font_size,
                     z,
-                    ..Section::default()
+                    layout: Default::default(),
                 }
             };
             self.glyph_brush.queue(section);
@@ -322,8 +324,7 @@ impl UiRenderer {
         self.glyph_brush
             .use_queue()
             .draw(encoder, color_buffer)
-            .map_err(UiRenderingError::from)
-            .context("Drawing text glyphs in UiRenderer")?;
+            .expect("couldn't draw queued glyphs");
         Ok(())
     }
 }
