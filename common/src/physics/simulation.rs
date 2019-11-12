@@ -96,6 +96,15 @@ impl ClientPhysicsSimulation {
             .get_camera_position()
     }
 
+    /// Get the client player
+    pub fn get_player(&self) -> &PhysicsPlayer {
+        self
+            .current_state
+            .players
+            .get(&self.player_id)
+            .unwrap()
+    }
+
     /// Step the simulation according to the current input and time
     pub fn step_simulation(&mut self, input: PlayerInput, time: Instant, world: &World) {
         // Recompute simulation if necessary

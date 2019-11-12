@@ -20,6 +20,7 @@ use crate::{
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
     world::{frustum::Frustum, meshing::AdjChunkOccl, renderer::WorldRenderer},
 };
+use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
@@ -247,13 +248,27 @@ impl State for SinglePlayer {
             self.yaw_pitch,
         );
 
+        // Try raytracing
+        let pp = self.physics_simulation.get_player();
+        let pointed_block = {
+            let y = self.yaw_pitch.yaw.to_radians();
+            let p = self.yaw_pitch.pitch.to_radians();
+            let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
+            pp.get_pointed_at(dir, 10.0, &self.world)
+        };
+        if let Some(x) = pointed_block {
+            send_debug_info("Player", "pointedat", format!("Pointed block: Some({}, {}, {})", x.px, x.py, x.pz));
+        } else {
+            send_debug_info("Player", "pointedat", "Pointed block: None");
+        }
+
         // Clear buffers
         gfx.encoder
             .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
-        self.world_renderer.render(gfx, data, &frustum, input_state.enable_culling)?;
+        self.world_renderer.render(gfx, data, &frustum, input_state.enable_culling, pointed_block)?;
         // Clear depth
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);

@@ -13,6 +13,7 @@ use nalgebra::{convert, Matrix4};
 use std::collections::HashMap;
 use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
 use voxel_rs_common::debug::send_debug_info;
+use voxel_rs_common::world::BlockPos;
 
 gfx_defines! {
     vertex Vertex {
@@ -24,6 +25,10 @@ gfx_defines! {
     }
 
     vertex VertexSkybox {
+        pos: [f32; 3] = "a_Pos",
+    }
+
+    vertex VertexTarget {
         pos: [f32; 3] = "a_Pos",
     }
 
@@ -48,15 +53,25 @@ gfx_defines! {
         depth_buffer: gfx::DepthTarget<DepthFormat> =
             gfx::preset::depth::LESS_EQUAL_WRITE,
     }
+
+    pipeline pipe_target {
+        vbuf: gfx::VertexBuffer<VertexTarget> = (),
+        transform: gfx::ConstantBuffer<Transform> = "Transform",
+        color_buffer: gfx::RenderTarget<ColorFormat> = "ColorBuffer",
+        depth_buffer: gfx::DepthTarget<DepthFormat> =
+            gfx::preset::depth::LESS_EQUAL_WRITE,
+    }
 }
 
 type PsoType = gfx::PipelineState<gfx_device_gl::Resources, pipe::Meta>;
 type PsoSkyboxType = gfx::PipelineState<gfx_device_gl::Resources, pipe_skybox::Meta>;
+type PsoTargetType = gfx::PipelineState<gfx_device_gl::Resources, pipe_target::Meta>;
 
 pub struct WorldRenderer {
     pub pso_fill: PsoType,
     pub pso_wireframe: PsoType,
     pub pso_skybox: PsoSkyboxType,
+    pub pso_target: PsoTargetType,
     pub chunk_meshes: HashMap<ChunkPos, Mesh>,
     pub transform: Buffer<Resources, Transform>,
     pub block_meshes: Vec<BlockMesh>,
@@ -113,6 +128,21 @@ impl WorldRenderer {
             pipe_skybox::new(),
         )?;
 
+        let shader_set_target = factory.create_shader_set(
+            include_bytes!("../../shader/target.vert"),
+            include_bytes!("../../shader/target.frag"),
+        )?;
+        let pso_target = factory.create_pipeline_state(
+            &shader_set_target,
+            gfx::Primitive::LineList,
+            {
+                let mut r = gfx::state::Rasterizer::new_fill();
+                r.method = RasterMethod::Line(1);
+                r
+            },
+            pipe_target::new(),
+        )?;
+
         let texture_sampler = {
             use gfx::texture::*;
             factory.create_sampler(SamplerInfo {
@@ -131,6 +161,7 @@ impl WorldRenderer {
             pso_fill,
             pso_wireframe,
             pso_skybox,
+            pso_target,
             chunk_meshes: HashMap::new(),
             transform: factory.create_constant_buffer(1),
             block_meshes: block_meshes.clone(),
@@ -141,7 +172,7 @@ impl WorldRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum, enable_culling: bool) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum, enable_culling: bool, pointed_block: Option<BlockPos>) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref color_buffer,
@@ -221,6 +252,57 @@ impl WorldRenderer {
 
         encoder.update_buffer(&data.transform, &[transform], 0)?;
         encoder.draw(&self.skybox.indices, &self.pso_skybox, &data);
+
+        // drawing the target block
+        if let Some(x) = pointed_block {
+            let mut vertices = Vec::new();
+            fn vpos(i: i32, j: i32, k: i32) -> VertexTarget {
+                VertexTarget {
+                    pos: [i as f32, j as f32, k as f32],
+                }
+            }
+            for i in 0..2 {
+                for j in 0..2 {
+                    for k in 0..2 {
+                        let mut id = [i, j, k];
+                        for i in 0..3 {
+                            if id[i] == 1 {
+                                let v1 = vpos(id[0], id[1], id[2]);
+                                id[i] = 0;
+                                let v2 = vpos(id[0], id[1], id[2]);
+                                id[i] = 1;
+                                vertices.extend([v1, v2].into_iter());
+                            }
+                        }
+                    }
+                }
+            }
+            assert!(vertices.len() == 24);
+            let (buffer, slice) = gfx.factory.create_vertex_buffer_with_slice(&vertices[..], ());
+            let data = pipe_target::Data {
+                vbuf: buffer,
+                transform: self.transform.clone(),
+                color_buffer: color_buffer.clone(),
+                depth_buffer: depth_buffer.clone(),
+            };
+            let transform = Transform {
+                view_proj,
+                model: [
+                    // warning matrix is transposed
+                    [1.0, 0.0, 0.0, 0.0],
+                    [0.0, 1.0, 0.0, 0.0],
+                    [0.0, 0.0, 1.0, 0.0],
+                    [
+                        x.px as f32,
+                        x.py as f32,
+                        x.pz as f32,
+                        1.0,
+                    ],
+                ],
+            };
+            encoder.update_buffer(&data.transform, &[transform], 0)?;
+            encoder.draw(&slice, &self.pso_target, &data);
+        }
 
         Ok(())
     }

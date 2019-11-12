@@ -61,6 +61,7 @@ impl AABB {
     }
 
     /// Return true if the box intersect some block
+    // TODO: use BlockRegistry
     pub fn intersect_world(&self, world: &World) -> bool {
         let min_x = self.pos.x.floor() as i64;
         let max_x = (self.pos.x + self.size_x).ceil() as i64;

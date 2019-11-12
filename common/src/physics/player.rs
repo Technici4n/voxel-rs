@@ -1,5 +1,6 @@
 use nalgebra::Vector3;
 use crate::physics::aabb::AABB;
+use crate::world::{World, BlockPos};
 
 const PLAYER_SIDE: f64 = 0.8;
 const PLAYER_HEIGHT: f64 = 1.8;
@@ -18,6 +19,62 @@ impl PhysicsPlayer {
     /// Get the position of the camera
     pub fn get_camera_position(&self) -> Vector3<f64> {
         self.aabb.pos + Vector3::from(CAMERA_OFFSET)
+    }
+
+    /// Ray trace to find the pointed block
+    // TODO: use block registry
+    pub fn get_pointed_at(&self, dir: Vector3<f64>, mut max_dist: f64, world: &World) -> Option<BlockPos> {
+        let dir = dir.normalize();
+        let mut pos = self.get_camera_position();
+        // Check current block first
+        if world.get_block(BlockPos::from(pos)) != 0 {
+            return Some(BlockPos::from(pos));
+        }
+        let dirs = [
+            Vector3::new(-1.0, 0.0, 0.0),
+            Vector3::new(1.0, 0.0, 0.0),
+            Vector3::new(0.0, -1.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+            Vector3::new(0.0, 0.0, -1.0),
+            Vector3::new(0.0, 0.0, 1.0),
+        ];
+        loop {
+            let targets = [
+                pos.x.floor(),
+                pos.x.ceil(),
+                pos.y.floor(),
+                pos.y.ceil(),
+                pos.z.floor(),
+                pos.z.ceil(),
+            ];
+
+            let mut curr_min = 1e9;
+            let mut _face = 0;
+
+            for i in 0..6 {
+                let effective_movement = dir.dot(&dirs[i]);
+                if effective_movement > 1e-6 {
+                    let dir_offset = (targets[i].abs() - pos.dot(&dirs[i]).abs()).abs();
+                    let dist = dir_offset / effective_movement;
+                    if curr_min > dist {
+                        curr_min = dist;
+                        _face = i;
+                    }
+                }
+            }
+
+            if curr_min > max_dist {
+                return None
+            } else {
+                curr_min += 1e-5;
+                max_dist -= curr_min;
+                pos += curr_min * dir;
+                let block_pos = BlockPos::from(pos);
+                if world.get_block(block_pos) != 0 {
+                    return Some(block_pos)
+                }
+            }
+        }
     }
 }
 
