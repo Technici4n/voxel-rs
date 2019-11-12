@@ -18,7 +18,7 @@ impl LightData {
 }
 
 /// Take a 3x3x3 chunks bloc and 3x3 HighestOpaqueBlock and compute the light by using a BFS
-pub fn compute_light(chunks: &Vec<Option<Chunk>>, highest_opaque_blocks: &Vec<HighestOpaqueBlock>) -> LightData {
+pub fn compute_light(chunks: Vec<Option<&Chunk>>, highest_opaque_blocks: Vec<HighestOpaqueBlock>) -> LightData {
     let mut res = LightData::new();
     let mut bfs_queue: VecDeque<(usize, usize, usize, u8)> = VecDeque::new();
 
@@ -32,17 +32,19 @@ pub fn compute_light(chunks: &Vec<Option<Chunk>>, highest_opaque_blocks: &Vec<Hi
     for cx in 0..3 {
         for cy in 0..3 {
             for cz in 0..3 {
-                let chunk = chunks[cx * 9 + cy * 3 + cz].as_ref();
-                let highest_opaque_block = highest_opaque_blocks[cx * 9 + cy * 3 + cz];
+                let chunk = chunks[cx * 9 + cy * 3 + cz];
+                let highest_opaque_block = highest_opaque_blocks[cx * 3 + cz];
                 match chunk {
                     None => {
                         for i in 0..CHUNK_SIZE {
-                            for j in 0..CHUNK_SIZE {
-                                for k in 0..CHUNK_SIZE {
+                            for k in 0..CHUNK_SIZE {
+                                for j in (0..CHUNK_SIZE).rev() {
                                     let s = (cx * csize + i as usize) * csize * csize * 9 + (cy * csize + j as usize) * csize * 3 + (cz * csize + k as usize);
                                     if (y0 + cy as i64 - 1) * CHUNK_SIZE as i64 + j as i64 > highest_opaque_block.y[(i * CHUNK_SIZE + k) as usize] {
                                         light_data[s] = 15;
                                         bfs_queue.push_back((cx * csize + i as usize, cy * csize + j as usize, cz * csize + k as usize, 15));
+                                    } else {
+                                        break;
                                     }
                                 }
                             }
@@ -109,7 +111,7 @@ pub fn compute_light(chunks: &Vec<Option<Chunk>>, highest_opaque_blocks: &Vec<Hi
     for i in 0..csize {
         for j in 0..csize {
             for k in 0..csize {
-                res.light_level[i*csize*csize + j*csize+k] = light_data[(i+csize)*csize*csize*9 + (j+csize)*3*csize+(k+csize)];
+                res.light_level[i * csize * csize + j * csize + k] = light_data[(i + csize) * csize * csize * 9 + (j + csize) * 3 * csize + (k + csize)];
             }
         }
     }

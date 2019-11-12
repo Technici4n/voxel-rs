@@ -6,6 +6,7 @@ use crate::{
 use nalgebra::Vector3;
 use std::collections::HashMap;
 use crate::world::chunk::ChunkPosXZ;
+use crate::ligth::compute_light;
 
 pub mod chunk;
 
@@ -61,9 +62,24 @@ impl From<Vector3<f64>> for BlockPos {
     }
 }
 
+pub struct LightChunk {
+    pub light: [u8; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize],
+    pub pos: ChunkPos,
+}
+
+impl LightChunk {
+    pub fn new(pos: ChunkPos) -> Self {
+        Self {
+            light: [0; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize],
+            pos,
+        }
+    }
+}
+
 /// A game world
 pub struct World {
     pub chunks: HashMap<ChunkPos, Chunk>,
+    pub light: HashMap<ChunkPos, LightChunk>,
     pub highest_opaque_block: HashMap<ChunkPosXZ, HighestOpaqueBlock>,
 }
 
@@ -83,11 +99,11 @@ impl HighestOpaqueBlock {
     }
 }
 
-
 impl World {
     pub fn new() -> Self {
         Self {
             chunks: HashMap::new(),
+            light: HashMap::new(),
             highest_opaque_block: HashMap::new(),
         }
     }
@@ -96,6 +112,7 @@ impl World {
     /// Remove the chunk from the world
     pub fn drop_chunk(&mut self, pos: ChunkPos) {
         self.chunks.remove(&pos);
+        self.light.remove(&pos);
     }
 
     /// Return a reference to the chunk if it exists, None otherwise
@@ -168,7 +185,7 @@ impl World {
                             for j in 0..CHUNK_SIZE {
                                 if highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] < (chunk_pos.py + 1) * CHUNK_SIZE as i64 {
                                     let mut new_max_in_the_chunk = false;
-                                    for y in CHUNK_SIZE..=0 {
+                                    for y in (0..CHUNK_SIZE).rev() {
                                         if chunk.get_block_at((i, y, j)) != 0 { // TODO : Replace by is opaque
                                             highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] = chunk_pos.py * CHUNK_SIZE as i64 + y as i64;
                                             new_max_in_the_chunk = true;
@@ -176,7 +193,7 @@ impl World {
                                         }
                                     }
                                     // if the old max was in the chunk but not the new one
-                                    if !new_max_in_the_chunk && highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] >= (chunk_pos.py ) * CHUNK_SIZE as i64 {
+                                    if !new_max_in_the_chunk && highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] >= (chunk_pos.py) * CHUNK_SIZE as i64 {
                                         scan_all_chunk = true;
                                         highest_opaque_block.y[(i * CHUNK_SIZE + j) as usize] = 0; // default value
                                     }
@@ -206,8 +223,52 @@ impl World {
                 }
             }
         }
-        self.highest_opaque_block.insert(chunk_pos_xz ,highest_opaque_block);
+        self.highest_opaque_block.insert(chunk_pos_xz, highest_opaque_block);
         return true;
+    }
+
+    /// Update the light of a chunk at chunkPos
+    /// Return true if they has been an update
+    pub fn update_light(&mut self, pos: &ChunkPos) -> bool {
+        if self.chunks.contains_key(&pos) {
+            let light = {
+                let mut vec_chunk: Vec<Option<&Chunk>> = Vec::new();
+                let mut vec_highest_opaque_block: Vec<HighestOpaqueBlock> = Vec::new();
+
+
+                // Creating the datastructure to be sent to the lightning algorithm
+                for i in -1..=1 {
+                    for k in -1..=1 {
+                        let pos_act = pos.offset(i, 0, k);
+                        let pos_xz: ChunkPosXZ = pos_act.into();
+                        vec_highest_opaque_block.push((*self.highest_opaque_block.entry(pos_xz).
+                            or_insert_with(|| HighestOpaqueBlock::new(pos_xz))).clone());
+                    }
+                }
+
+                for i in -1..=1 {
+                    for j in -1..=1 {
+                        for k in -1..=1 {
+                            let pos_act = pos.offset(i, j, k);
+                            vec_chunk.push(self.get_chunk(pos_act));
+                        }
+                    }
+                }
+                compute_light(vec_chunk, vec_highest_opaque_block).light_level
+            };
+
+            // updating the light
+            self.light.insert(*pos,
+                              LightChunk {
+                                  light,
+                                  pos: *pos,
+                              },
+            );
+
+            return true;
+        } else {
+            return false;
+        }
     }
 }
 

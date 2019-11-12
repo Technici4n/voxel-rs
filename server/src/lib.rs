@@ -1,7 +1,7 @@
 use crate::worldgen::WorldGenerationWorker;
 use anyhow::Result;
 use log::info;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 use voxel_rs_common::physics::simulation::ServerPhysicsSimulation;
 use voxel_rs_common::{
@@ -44,6 +44,8 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut physics_simulation = ServerPhysicsSimulation::new();
     // Chunks that are currently generating.
     let mut generating_chunks = HashSet::new();
+    let mut update_lightning_chunks = HashSet::new();
+    let mut update_lightning_chunks_vec = VecDeque::new();
 
     info!("Server initialized successfully! Starting server loop");
     loop {
@@ -82,13 +84,46 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             if generating_chunks.contains(&chunk.pos) {
                 let pos = chunk.pos.clone();
                 world.set_chunk(chunk);
-                if world.update_highest_opaque_block(pos){
+                if world.update_highest_opaque_block(pos) {
                     // recompute the light of the 3x3 columns
-                }else{
+                    for c_pos in world.chunks.keys() {
+                        if c_pos.py <= pos.py && (c_pos.px - pos.px).abs() <= 1 && (c_pos.pz - pos.pz).abs() <= 1 {
+                            if !update_lightning_chunks.contains(c_pos){
+                                update_lightning_chunks.insert((*c_pos).clone());
+                                update_lightning_chunks_vec.push_back((*c_pos).clone());
+                            }
+
+                        }
+                    }
+
+                } else {
                     // compute only the ligth for the chunk
+                    for c_pos in world.chunks.keys() {
+                        if (c_pos.py - pos.py).abs() <= 1 && (c_pos.px - pos.px).abs() <= 1 && (c_pos.pz - pos.pz).abs() <= 1 {
+                            if !update_lightning_chunks.contains(c_pos){
+                                update_lightning_chunks.insert((*c_pos).clone());
+                                update_lightning_chunks_vec.push_back((*c_pos).clone());
+                            }
+                        }
+                    }
                 }
             }
         }
+
+        // Update light of one chunk at the time
+        if !update_lightning_chunks_vec.is_empty(){
+            let pos = update_lightning_chunks_vec.pop_front().unwrap();
+            let t1 = Instant::now();
+            world.update_light(&pos);
+            update_lightning_chunks.remove(&pos);
+            let t2 = Instant::now();
+            println!("Time to compute light : {} ms", (t2-t1).subsec_millis());
+        }
+        // TODO : Send updated light to the client
+
+
+
+
 
         // Tick game
         physics_simulation.step_simulation(Instant::now(), &world);
