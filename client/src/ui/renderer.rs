@@ -62,6 +62,13 @@ struct TextPrimitive {
 }
 
 #[derive(Debug, Clone)]
+struct TrianglesPrimitive {
+    pub vertices: Vec<[f32; 3]>,
+    pub indices: Vec<u32>,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone)]
 pub struct TextPart {
     pub text: String,
     pub font_size: Scale,
@@ -73,6 +80,7 @@ pub struct TextPart {
 pub struct PrimitiveBuffer {
     pub(self) rectangle: Vec<RectanglePrimitive>,
     pub(self) text: Vec<TextPrimitive>,
+    pub(self) triangles: Vec<TrianglesPrimitive>,
 }
 
 impl PrimitiveBuffer {
@@ -87,6 +95,12 @@ impl PrimitiveBuffer {
             z,
             centered,
         })
+    }
+
+    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
+        self.triangles.push(TrianglesPrimitive {
+            vertices, indices, color,
+        });
     }
 }
 
@@ -122,7 +136,6 @@ impl UiRenderer {
             let mut font_bytes = Vec::new();
             let mut file = std::fs::File::open(font_file).expect("Couldn't open font file");
             file.read_to_end(&mut font_bytes).expect("Couldn't read font file");
-            dbg!(font_bytes.len());
             fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
         }
         info!("Fonts successfully loaded");
@@ -136,7 +149,7 @@ impl UiRenderer {
         let pso = factory.create_pipeline_state(
             &shader_set,
             gfx::Primitive::TriangleList,
-            gfx::state::Rasterizer::new_fill().with_cull_back(),
+            gfx::state::Rasterizer::new_fill(),
             pipe::new(),
         )?;
         let buffer_bind = {
@@ -225,6 +238,16 @@ impl UiRenderer {
             let d_index = c_index + 1;
             rect_vertices.extend([a, b, c, d].into_iter());
             rect_indices.extend([b_index, a_index, c_index, b_index, c_index, d_index].into_iter());
+        }
+        // Triangles
+        for TrianglesPrimitive {
+            vertices,
+            indices,
+            color,
+        } in primitive_buffer.triangles.into_iter() {
+            let index_offset = rect_vertices.len() as u32;
+            rect_vertices.extend(vertices.into_iter().map(|v| Vertex { pos: v, color, }));
+            rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
         }
         // Text
         for TextPrimitive {

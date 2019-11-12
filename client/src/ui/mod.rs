@@ -132,9 +132,9 @@ impl Ui {
                     text: vec![
                         TextPart {
                             text: text.to_owned(),
-                            font_size: Scale::uniform(60.0),
-                            color: [0.0, 0.0, 0.0, 1.0],
-                            font: Some("bold".to_owned()),
+                            font_size: Scale::uniform(50.0),
+                            color: [1.0, 1.0, 1.0, 1.0],
+                            font: Some("arcade".to_owned()),
                         },
                     ],
                     message,
@@ -152,8 +152,8 @@ impl Ui {
                     .vertical(),
             }),
             vec![
-                menu_button("Resume", Message::ExitMenu),
-                menu_button("Exit", Message::ExitGame),
+                menu_button("RESUME", Message::ExitMenu),
+                menu_button("EXIT", Message::ExitGame),
             ],
         );
         buttons_container
