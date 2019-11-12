@@ -72,7 +72,7 @@ impl DefaultWorldGenerator {
         }
 
         let tree_decorator = Decorator {
-            number_of_try: 128,
+            number_of_try: 32,
             block_start_whitelist: set![grass_block],
             pass: vec![pass_leaves, pass_wood],
 
@@ -96,9 +96,9 @@ impl DefaultWorldGenerator {
         if py > 100.0 {
             return;
         } else if py + CHUNK_SIZE as f32 + 13.0 < 0.0 {
-            for i in 0..32 {
-                for j in 0..32 {
-                    for k in 0..32 {
+            for i in 0..CHUNK_SIZE {
+                for j in 0..CHUNK_SIZE {
+                    for k in 0..CHUNK_SIZE {
                         chunk.set_block_at((i as u32, j as u32, k as u32), stone_block);
                     }
                 }
@@ -106,12 +106,12 @@ impl DefaultWorldGenerator {
             return;
         }
 
-        let s = (CHUNK_SIZE + 3) as usize;
-        let noise = perlin::perlin(px, py, pz, s, freq, freq * 2.0, freq, 5, 0.4, 42);
+        let s = CHUNK_SIZE + 3;
+        let noise = perlin::perlin(px, py, pz, s as usize, freq, freq * 2.0, freq, 5, 0.4, 42);
 
-        for i in 0..32 {
-            for j in 0..32 {
-                for k in 0..32 {
+        for i in 0..CHUNK_SIZE {
+            for j in 0..CHUNK_SIZE {
+                for k in 0..CHUNK_SIZE {
                     // warning : indexing order
                     if noise[(i * s * s + j * s + k) as usize] > (py + j as f32 + 10.0) / 110.0 {
                         if noise[(i * s * s + (j + 1) * s + k) as usize]
@@ -134,7 +134,7 @@ impl DefaultWorldGenerator {
             }
         }
         let t2 = Instant::now();
-        println!("Time to generate chunk : {} ms", (t2 - t1).subsec_millis());
+        println!("Time to generate chunk : {} micros", (t2 - t1).subsec_micros());
     }
 
     fn decorate_chunk(chunks: &mut Vec<Chunk>, decorator: &Decorator) {

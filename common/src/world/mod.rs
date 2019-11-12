@@ -130,7 +130,7 @@ impl World {
 
     /// Create a new chunk at position `pos` if not already present
     /// Anyway, return the a mutable reference to the chunk created or existing
-    pub fn get_add_chunk(&mut self, pos: ChunkPos) -> &mut Chunk {
+    pub fn get_add_chunk(&mut self, pos: ChunkPos) -> &mut Chunk { // TODO : remove this
         self.chunks.entry(pos).or_insert_with(|| Chunk::new(pos))
     }
 

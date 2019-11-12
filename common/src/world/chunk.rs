@@ -1,7 +1,7 @@
 use crate::block::BlockId;
 
 /// Number of blocks along an axis of the chunk
-pub const CHUNK_SIZE: u32 = 32;
+pub const CHUNK_SIZE: u32 = 16;
 
 /// Position of a chunk in the world
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

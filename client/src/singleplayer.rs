@@ -73,12 +73,12 @@ impl SinglePlayer {
 
         // Set render distance
         let render_distance = RenderDistance {
-            x_max: 6,
-            x_min: 6,
-            y_max: 3,
-            y_min: 3,
-            z_max: 6,
-            z_min: 6,
+            x_max: 12,
+            x_min: 12,
+            y_max: 6,
+            y_min: 6,
+            z_max: 12,
+            z_min: 12,
         };
         client.send(ToServer::SetRenderDistance(render_distance));
 

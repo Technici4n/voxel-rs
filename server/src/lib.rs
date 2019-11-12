@@ -80,7 +80,13 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         for chunk in world_generator.get_processed_chunks().into_iter() {
             // Only insert the chunk in the world if it was still being generated.
             if generating_chunks.contains(&chunk.pos) {
+                let pos = chunk.pos.clone();
                 world.set_chunk(chunk);
+                if world.update_highest_opaque_block(pos){
+                    // recompute the light of the 3x3 columns
+                }else{
+                    // compute only the ligth for the chunk
+                }
             }
         }
 
