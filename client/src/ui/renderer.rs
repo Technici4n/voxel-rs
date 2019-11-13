@@ -193,6 +193,7 @@ impl UiRenderer {
         gfx: &mut Gfx,
         data: &WindowData,
         ui: &quint::Ui<PrimitiveBuffer, Message>,
+        draw_crosshair: bool,
     ) -> Result<()> {
         let Gfx {
             ref mut encoder,
@@ -295,6 +296,24 @@ impl UiRenderer {
                 }
             };
             self.glyph_brush.queue(section);
+        }
+        // Crosshair
+        if draw_crosshair {
+            let (cx, cy) = (data.logical_window_size.width as f32/2.0, data.logical_window_size.height as f32/2.0);
+            const HALF_HEIGHT: f32 = 15.0;
+            const HALF_WIDTH: f32 = 2.0;
+            const COLOR: [f32; 4] = [1.0, 1.0, 1.0, 0.5];
+            let v1 = Vertex { pos: [cx - HALF_WIDTH, cy - HALF_HEIGHT, -1.0], color: COLOR };
+            let v2 = Vertex { pos: [cx + HALF_WIDTH, cy - HALF_HEIGHT, -1.0], color: COLOR };
+            let v3 = Vertex { pos: [cx - HALF_WIDTH, cy + HALF_HEIGHT, -1.0], color: COLOR };
+            let v4 = Vertex { pos: [cx + HALF_WIDTH, cy + HALF_HEIGHT, -1.0], color: COLOR };
+            let v5 = Vertex { pos: [cx - HALF_HEIGHT, cy - HALF_WIDTH, -1.0], color: COLOR };
+            let v6 = Vertex { pos: [cx + HALF_HEIGHT, cy - HALF_WIDTH, -1.0], color: COLOR };
+            let v7 = Vertex { pos: [cx - HALF_HEIGHT, cy + HALF_WIDTH, -1.0], color: COLOR };
+            let v8 = Vertex { pos: [cx + HALF_HEIGHT, cy + HALF_WIDTH, -1.0], color: COLOR };
+            let voffset = rect_vertices.len() as u32;
+            rect_vertices.extend([v1, v2, v3, v4, v5, v6, v7, v8].into_iter());
+            rect_indices.extend([0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7].into_iter().map(|id| id + voffset));
         }
 
         // Draw rectangles

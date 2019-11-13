@@ -256,8 +256,8 @@ impl State for SinglePlayer {
             let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
             pp.get_pointed_at(dir, 10.0, &self.world)
         };
-        if let Some(x) = pointed_block {
-            send_debug_info("Player", "pointedat", format!("Pointed block: Some({}, {}, {})", x.px, x.py, x.pz));
+        if let Some((x, face)) = pointed_block {
+            send_debug_info("Player", "pointedat", format!("Pointed block: Some({}, {}, {}), face: {}", x.px, x.py, x.pz, face));
         } else {
             send_debug_info("Player", "pointedat", "Pointed block: None");
         }
@@ -274,7 +274,7 @@ impl State for SinglePlayer {
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
-        self.ui_renderer.render(gfx, &data, &self.ui.ui)?;
+        self.ui_renderer.render(gfx, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);
         gfx.context.swap_buffers()?;

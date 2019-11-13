@@ -137,7 +137,7 @@ impl WorldRenderer {
             gfx::Primitive::LineList,
             {
                 let mut r = gfx::state::Rasterizer::new_fill();
-                r.method = RasterMethod::Line(1);
+                r.method = RasterMethod::Line(2);
                 r
             },
             pipe_target::new(),
@@ -172,7 +172,7 @@ impl WorldRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum, enable_culling: bool, pointed_block: Option<BlockPos>) -> Result<()> {
+    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum, enable_culling: bool, pointed_block: Option<(BlockPos, usize)>) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref color_buffer,
@@ -254,22 +254,36 @@ impl WorldRenderer {
         encoder.draw(&self.skybox.indices, &self.pso_skybox, &data);
 
         // drawing the target block
-        if let Some(x) = pointed_block {
+        if let Some((x, face)) = pointed_block {
             let mut vertices = Vec::new();
-            fn vpos(i: i32, j: i32, k: i32) -> VertexTarget {
+            fn vpos(i: i32, j: i32, k: i32, face: usize) -> VertexTarget {
+                let mut v = [i as f32, j as f32, k as f32];
+                for i in 0..3 {
+                    if i == face/2 { // Move face forward
+                        v[i] += 0.001 * (if face % 2 == 0 { 1.0 } else { -1.0 });
+                    } else { // Move edges inside the face
+                        if v[i] == 1.0 {
+                            v[i] = 0.999;
+                        } else {
+                            v[i] = 0.001;
+                        }
+                    }
+                }
                 VertexTarget {
-                    pos: [i as f32, j as f32, k as f32],
+                    pos: v,
                 }
             }
-            for i in 0..2 {
-                for j in 0..2 {
-                    for k in 0..2 {
+            let end_coord = [if face == 1 {1} else {2}, if face == 3 {1} else {2}, if face == 5 {1} else {2}];
+            let start_coord = [if face == 0 {1} else {0}, if face == 2 {1} else {0}, if face == 4 {1} else {0}];
+            for i in start_coord[0]..end_coord[0] {
+                for j in start_coord[1]..end_coord[1] {
+                    for k in start_coord[2]..end_coord[2] {
                         let mut id = [i, j, k];
                         for i in 0..3 {
-                            if id[i] == 1 {
-                                let v1 = vpos(id[0], id[1], id[2]);
+                            if id[i] > start_coord[i] {
+                                let v1 = vpos(id[0], id[1], id[2], face);
                                 id[i] = 0;
-                                let v2 = vpos(id[0], id[1], id[2]);
+                                let v2 = vpos(id[0], id[1], id[2], face);
                                 id[i] = 1;
                                 vertices.extend([v1, v2].into_iter());
                             }
@@ -277,7 +291,6 @@ impl WorldRenderer {
                     }
                 }
             }
-            assert!(vertices.len() == 24);
             let (buffer, slice) = gfx.factory.create_vertex_buffer_with_slice(&vertices[..], ());
             let data = pipe_target::Data {
                 vbuf: buffer,
