@@ -25,6 +25,7 @@ use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
+use crate::world::meshing::AdjChunkLight;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -74,12 +75,12 @@ impl SinglePlayer {
 
         // Set render distance
         let render_distance = RenderDistance {
-            x_max: 12,
-            x_min: 12,
-            y_max: 6,
-            y_min: 6,
-            z_max: 12,
-            z_min: 12,
+            x_max: 6,
+            x_min: 6,
+            y_max: 3,
+            y_min: 3,
+            z_max: 6,
+            z_min: 6,
         };
         client.send(ToServer::SetRenderDistance(render_distance));
 
@@ -215,6 +216,10 @@ impl State for SinglePlayer {
                         chunk_pos,
                         &self.world_renderer.block_meshes,
                     ),
+                    AdjChunkLight::create_from_world(
+                        &self.world,
+                        chunk_pos,
+                    )
                 );
             }
         }

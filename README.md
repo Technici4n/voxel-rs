@@ -12,12 +12,13 @@ We are still looking for a better name...
 - [x] Procedural generation blueprints
 - [x] Frustum culling for chunks
 - [x] Ambient occlusion using textures
-- [ ] Lighting (@Azercoco)
+- [x] Lighting
 - [ ] Entities and player mesh (@Azercoco)
 - [ ] Block placing and breaking (@Azercoco)
 - [ ] Custom network protocol on top of UDP (@Technici4n)
 - [ ] Clean custom GUI (@Technici4n)
 - [ ] Custom key mapping (@Technici4n)
+- [ ] Smooth Lightning (@Azercoco)
 - [ ] Biomes (@Azercoco)
 - [ ] Ambient color in shaders (@Azercoco)
 - [ ] Day/night cycle (@Azercoco)
@@ -34,4 +35,4 @@ We are still looking for a better name...
 
 ## Screenshots
 Current state:
-![Current state](screenshots/20191107.png)
+![Current state](screenshots/20191113.png)
