@@ -1,6 +1,6 @@
 use super::renderer::PrimitiveBuffer;
-use quint::{Event, Layout, Position, Style, Widget};
 use crate::ui::renderer::TextPart;
+use quint::{Event, Layout, Position, Style, Widget};
 
 pub struct Text {
     pub text: Vec<TextPart>,
@@ -52,15 +52,31 @@ where
             pl.y += 2.0;
         }
 
-        let main_color = if hovering {[0.75, 0.22, 0.22, 1.0]} else {[0.8, 0.2, 0.2, 1.0]};
-        let dark_shade = if hovering {[0.55, 0.12, 0.12, 1.0]} else {[0.6, 0.1, 0.1, 1.0]};
-        let light_shade = if hovering {[0.95, 0.32, 0.32, 1.0]} else {[1.0, 0.3, 0.3, 1.0]};
+        let main_color = if hovering {
+            [0.75, 0.22, 0.22, 1.0]
+        } else {
+            [0.8, 0.2, 0.2, 1.0]
+        };
+        let dark_shade = if hovering {
+            [0.55, 0.12, 0.12, 1.0]
+        } else {
+            [0.6, 0.1, 0.1, 1.0]
+        };
+        let light_shade = if hovering {
+            [0.95, 0.32, 0.32, 1.0]
+        } else {
+            [1.0, 0.3, 0.3, 1.0]
+        };
 
         // Top-left lighter shade
         buffer.draw_triangles(
             vec![
-                [l.x, l.y+l.height, 0.0], [l.x, l.y, 0.0], [l.x+l.width, l.y, 0.0],
-                [pl.x, pl.y+pl.height, 0.0], [pl.x, pl.y, 0.0], [pl.x+pl.width, pl.y, 0.0],
+                [l.x, l.y + l.height, 0.0],
+                [l.x, l.y, 0.0],
+                [l.x + l.width, l.y, 0.0],
+                [pl.x, pl.y + pl.height, 0.0],
+                [pl.x, pl.y, 0.0],
+                [pl.x + pl.width, pl.y, 0.0],
             ],
             vec![0, 3, 1, 1, 3, 4, 4, 5, 1, 1, 5, 2],
             light_shade,
@@ -68,8 +84,12 @@ where
         // Bottom-right darker shade
         buffer.draw_triangles(
             vec![
-                [l.x+l.width, l.y, 0.0], [l.x+l.width, l.y+l.height, 0.0], [l.x, l.y+l.height, 0.0],
-                [pl.x+pl.width, pl.y, 0.0], [pl.x+pl.width, pl.y+pl.height, 0.0], [pl.x, pl.y+pl.height, 0.0],
+                [l.x + l.width, l.y, 0.0],
+                [l.x + l.width, l.y + l.height, 0.0],
+                [l.x, l.y + l.height, 0.0],
+                [pl.x + pl.width, pl.y, 0.0],
+                [pl.x + pl.width, pl.y + pl.height, 0.0],
+                [pl.x, pl.y + pl.height, 0.0],
             ],
             vec![0, 3, 1, 1, 3, 4, 4, 5, 1, 1, 5, 2],
             dark_shade,

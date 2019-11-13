@@ -1,7 +1,7 @@
 use crate::block::BlockId;
 
 /// Number of blocks along an axis of the chunk
-pub const CHUNK_SIZE: u32 = 16;
+pub const CHUNK_SIZE: u32 = 32;
 
 /// Position of a chunk in the world
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -83,7 +83,10 @@ impl From<[i64; 2]> for ChunkPosXZ {
 
 impl From<ChunkPos> for ChunkPosXZ {
     fn from(chunk_pos: ChunkPos) -> Self {
-        Self { px: chunk_pos.px, pz :chunk_pos.pz }
+        Self {
+            px: chunk_pos.px,
+            pz: chunk_pos.pz,
+        }
     }
 }
 

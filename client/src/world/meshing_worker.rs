@@ -4,6 +4,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::world::chunk::{Chunk, ChunkPos};
+use voxel_rs_common::world::LightChunk;
 
 pub type ChunkMesh = (ChunkPos, Vec<Vertex>, Vec<u32>);
 
@@ -15,7 +16,7 @@ pub struct MeshingWorker {
 
 /// Message sent to the other threads.
 enum ToOtherThread {
-    Enqueue(Chunk, AdjChunkOccl),
+    Enqueue(Chunk, LightChunk, AdjChunkOccl),
     Dequeue(ChunkPos),
 }
 
@@ -36,9 +37,9 @@ impl MeshingWorker {
     }
 
     /// Enqueue a chunk
-    pub fn enqueue_chunk(&mut self, chunk: Chunk, adj: AdjChunkOccl) {
+    pub fn enqueue_chunk(&mut self, chunk: Chunk, light_chunk: LightChunk, adj: AdjChunkOccl) {
         self.sender
-            .send(ToOtherThread::Enqueue(chunk, adj))
+            .send(ToOtherThread::Enqueue(chunk, light_chunk, adj))
             .unwrap();
     }
 
@@ -81,9 +82,9 @@ fn launch_worker(
             }
         } {
             match message {
-                ToOtherThread::Enqueue(chunk, adj) => {
+                ToOtherThread::Enqueue(chunk, light_chunk, adj) => {
                     ordered_positions.push_back(chunk.pos);
-                    queued_chunks.insert(chunk.pos, (chunk, adj));
+                    queued_chunks.insert(chunk.pos, (chunk, light_chunk, adj));
                 }
                 ToOtherThread::Dequeue(pos) => {
                     queued_chunks.remove(&pos);
@@ -93,9 +94,9 @@ fn launch_worker(
 
         // Mesh the first chunk that is in the queue
         while let Some(chunk_pos) = ordered_positions.pop_front() {
-            if let Some((chunk, adj)) = queued_chunks.remove(&chunk_pos) {
+            if let Some((chunk, light_chunk, adj)) = queued_chunks.remove(&chunk_pos) {
                 let (vertices, indices, _, _) =
-                    greedy_meshing(&chunk, Some(adj), &block_meshes, &mut quads);
+                    greedy_meshing(&chunk, &light_chunk, Some(adj), &block_meshes, &mut quads);
                 sender.send((chunk_pos, vertices, indices)).unwrap();
                 break;
             }

@@ -1,8 +1,8 @@
 use crate::{
-    player::{PlayerId, PlayerInput},
-    world::World,
     physics::camera::default_camera,
     physics::player::PhysicsPlayer,
+    player::{PlayerId, PlayerInput},
+    world::World,
 };
 use nalgebra::Vector3;
 use std::{
@@ -28,10 +28,7 @@ impl PhysicsState {
     pub fn step_simulation(&mut self, input: &Input, dt: Duration, world: &World) {
         let seconds_delta = dt.as_secs_f64();
         for (&id, input) in input.player_inputs.iter() {
-            let player = self
-                .players
-                .entry(id)
-                .or_insert(Default::default());
+            let player = self.players.entry(id).or_insert(Default::default());
             default_camera(player, *input, seconds_delta, world);
         }
         // Remove players that don't exist anymore
@@ -88,8 +85,7 @@ impl ClientPhysicsSimulation {
 
     /// Get the camera position of the client
     pub fn get_camera_position(&self) -> Vector3<f64> {
-        self
-            .current_state
+        self.current_state
             .players
             .get(&self.player_id)
             .unwrap()
@@ -98,11 +94,7 @@ impl ClientPhysicsSimulation {
 
     /// Get the client player
     pub fn get_player(&self) -> &PhysicsPlayer {
-        self
-            .current_state
-            .players
-            .get(&self.player_id)
-            .unwrap()
+        self.current_state.players.get(&self.player_id).unwrap()
     }
 
     /// Step the simulation according to the current input and time

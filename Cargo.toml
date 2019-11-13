@@ -3,3 +3,4 @@ members = ["client", "common", "quint", "server"]
 
 [profile.release]
 debug = true
+opt-level = 2

@@ -1,13 +1,13 @@
 use self::widgets::{Text, WithStyle};
+use crate::ui::renderer::TextPart;
 use crate::ui::widgets::Button;
 use crate::window::WindowData;
 use anyhow::Result;
 use gfx_glyph::Scale;
 use glutin::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
-use voxel_rs_common::debug::DebugInfo;
 use std::collections::HashMap;
-use crate::ui::renderer::TextPart;
+use voxel_rs_common::debug::DebugInfo;
 
 pub mod renderer;
 pub mod widgets;
@@ -82,40 +82,46 @@ impl Ui {
         debug_info: HashMap<String, HashMap<String, String>>,
     ) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
         let white = [1.0, 1.0, 1.0, 1.0];
-        let mut text =
-            debug_info
-                .into_iter()
-                .map(|(section, messages)| {
-                    vec![
-                        TextPart {
-                            text: format!("\n{}", section),
-                            font_size: Scale::uniform(25.0),
-                            color: white,
-                            font: Some("medium_italic".to_owned()),
-                        },
-                        TextPart {
-                            text: " DEBUG INFO\n".to_owned(),
-                            font_size: Scale::uniform(25.0),
-                            color: white,
-                            font: Some("regular".to_owned()),
-                        },
-                        TextPart {
-                            text: messages.into_iter().map(|(_id, m)| m).collect::<Vec<String>>().join("\n"),
-                            font_size: Scale::uniform(20.0),
-                            color: white,
-                            font: Some("regular".to_owned()),
-                        },
-                    ]
-                })
-                .flatten()
-                .collect::<Vec<TextPart>>();
+        let mut text = debug_info
+            .into_iter()
+            .map(|(section, messages)| {
+                vec![
+                    TextPart {
+                        text: format!("\n{}", section),
+                        font_size: Scale::uniform(25.0),
+                        color: white,
+                        font: Some("medium_italic".to_owned()),
+                    },
+                    TextPart {
+                        text: " DEBUG INFO\n".to_owned(),
+                        font_size: Scale::uniform(25.0),
+                        color: white,
+                        font: Some("regular".to_owned()),
+                    },
+                    TextPart {
+                        text: messages
+                            .into_iter()
+                            .map(|(_id, m)| m)
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        font_size: Scale::uniform(20.0),
+                        color: white,
+                        font: Some("regular".to_owned()),
+                    },
+                ]
+            })
+            .flatten()
+            .collect::<Vec<TextPart>>();
 
-        text.insert(0, TextPart {
-            text: format!("VOXEL-RS\n"),
-            font_size: Scale::uniform(40.0),
-            color: white,
-            font: Some("medium".to_owned()),
-        });
+        text.insert(
+            0,
+            TextPart {
+                text: format!("VOXEL-RS\n"),
+                font_size: Scale::uniform(40.0),
+                color: white,
+                font: Some("medium".to_owned()),
+            },
+        );
 
         wt! {
             WithStyle { style: Style::default().percent_size(1.0, 1.0) },

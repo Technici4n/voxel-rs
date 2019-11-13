@@ -2,15 +2,10 @@
 //!
 //! A `Camera` defines how a player's entity reacts to that player's inputs.
 
-use nalgebra::Vector3;
 use crate::{
-    debug::send_debug_info,
-    player::PlayerInput,
-    world::World,
-    physics::{
-        player::PhysicsPlayer,
-    },
+    debug::send_debug_info, physics::player::PhysicsPlayer, player::PlayerInput, world::World,
 };
+use nalgebra::Vector3;
 
 /// The default camera. It doesn't let you go inside blocks unless you are already inside blocks.
 // TODO: use better integrator (RK4 ?)
@@ -54,7 +49,8 @@ pub fn default_camera(
         }
         let auto_acceleration = -normalize_or_zero(player.velocity);
         let player_acceleration = normalize_or_zero(player_acceleration);
-        let player_acceleration = (player_acceleration * 1.5 + auto_acceleration * 0.5) * ACCELERATION;
+        let player_acceleration =
+            (player_acceleration * 1.5 + auto_acceleration * 0.5) * ACCELERATION;
         player.velocity += player_acceleration * seconds_delta;
         if player.velocity.norm() > MAX_SPEED {
             player.velocity *= MAX_SPEED / player.velocity.norm();
@@ -89,11 +85,7 @@ pub fn default_camera(
         }
         let horizontal_velocity = normalize_or_zero(horizontal_velocity) * HORIZONTAL_SPEED;
         if player.aabb.is_on_the_ground(world) {
-            player.velocity.y = if input.key_move_up {
-                JUMP_SPEED
-            } else {
-                0.0
-            };
+            player.velocity.y = if input.key_move_up { JUMP_SPEED } else { 0.0 };
         } else {
             player.velocity.y -= GRAVITY_ACCELERATION * seconds_delta;
             if player.velocity.y < -MAX_DOWN_SPEED {
@@ -104,7 +96,18 @@ pub fn default_camera(
         player.aabb.move_check_collision(world, expected_movement);
     }
     // TODO: add a noclip camera mode
-    send_debug_info("Physics", "ontheground", format!("Player 0 on the ground? {}", player.aabb.is_on_the_ground(world)));
+    send_debug_info(
+        "Physics",
+        "ontheground",
+        format!(
+            "Player 0 on the ground? {}",
+            player.aabb.is_on_the_ground(world)
+        ),
+    );
     let [vx, vy, vz]: [f64; 3] = player.velocity.into();
-    send_debug_info("Physics", "velocity", format!("velocity: {:.2} {:.2} {:.2}", vx, vy, vz));
+    send_debug_info(
+        "Physics",
+        "velocity",
+        format!("velocity: {:.2} {:.2} {:.2}", vx, vy, vz),
+    );
 }

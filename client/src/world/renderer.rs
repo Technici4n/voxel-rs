@@ -9,11 +9,13 @@ use gfx::handle::Buffer;
 use gfx::state::RasterMethod;
 use gfx::traits::{Factory, FactoryExt};
 use gfx_device_gl::Resources;
+use log::info;
 use nalgebra::{convert, Matrix4};
 use std::collections::HashMap;
-use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
+use std::path::Path;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::world::BlockPos;
+use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
 
 gfx_defines! {
     vertex Vertex {
@@ -81,6 +83,11 @@ pub struct WorldRenderer {
     pub meshing_worker: MeshingWorker,
 }
 
+pub fn load_shader<P: AsRef<Path>>(path: P) -> String {
+    info!("Loading shader from {}", path.as_ref().display());
+    std::fs::read_to_string(path).expect("Couldn't read shader from file")
+}
+
 impl WorldRenderer {
     pub fn new(
         gfx: &mut Gfx,
@@ -92,8 +99,8 @@ impl WorldRenderer {
         } = gfx;
 
         let shader_set = factory.create_shader_set(
-            include_bytes!("../../shader/world.vert"),
-            include_bytes!("../../shader/world.frag"),
+            load_shader("assets/shaders/world.vert").as_bytes(),
+            load_shader("assets/shaders/world.frag").as_bytes(),
         )?;
         let pso_fill = factory.create_pipeline_state(
             &shader_set,
@@ -103,8 +110,8 @@ impl WorldRenderer {
         )?;
 
         let shader_set_wireframe = factory.create_shader_set(
-            include_bytes!("../../shader/world.vert"),
-            include_bytes!("../../shader/world_wireframe.frag"),
+            load_shader("assets/shaders/world.vert").as_bytes(),
+            load_shader("assets/shaders/world_wireframe.frag").as_bytes(),
         )?;
         let pso_wireframe = factory.create_pipeline_state(
             &shader_set_wireframe,
@@ -118,8 +125,8 @@ impl WorldRenderer {
         )?;
 
         let shader_set_skybox = factory.create_shader_set(
-            include_bytes!("../../shader/skybox.vert"),
-            include_bytes!("../../shader/skybox.frag"),
+            load_shader("assets/shaders/skybox.vert").as_bytes(),
+            load_shader("assets/shaders/skybox.frag").as_bytes(),
         )?;
         let pso_skybox = factory.create_pipeline_state(
             &shader_set_skybox,
@@ -129,8 +136,8 @@ impl WorldRenderer {
         )?;
 
         let shader_set_target = factory.create_shader_set(
-            include_bytes!("../../shader/target.vert"),
-            include_bytes!("../../shader/target.frag"),
+            load_shader("assets/shaders/target.vert").as_bytes(),
+            load_shader("assets/shaders/target.frag").as_bytes(),
         )?;
         let pso_target = factory.create_pipeline_state(
             &shader_set_target,
@@ -172,7 +179,14 @@ impl WorldRenderer {
         })
     }
 
-    pub fn render(&mut self, gfx: &mut Gfx, data: &WindowData, frustum: &Frustum, enable_culling: bool, pointed_block: Option<(BlockPos, usize)>) -> Result<()> {
+    pub fn render(
+        &mut self,
+        gfx: &mut Gfx,
+        data: &WindowData,
+        frustum: &Frustum,
+        enable_culling: bool,
+        pointed_block: Option<(BlockPos, usize)>,
+    ) -> Result<()> {
         let Gfx {
             ref mut encoder,
             ref color_buffer,
@@ -191,8 +205,7 @@ impl WorldRenderer {
         let view_mat = frustum.get_view_matrix();
         let planes = frustum.get_planes(aspect_ratio);
         let view_proj_mat = frustum.get_view_projection(aspect_ratio);
-        let view_proj =
-            convert::<Matrix4<f64>, Matrix4<f32>>(view_proj_mat).into();
+        let view_proj = convert::<Matrix4<f64>, Matrix4<f32>>(view_proj_mat).into();
 
         // drawing all the meshes
         let mut count = 0;
@@ -224,7 +237,11 @@ impl WorldRenderer {
                 encoder.draw(&mesh.indices, &self.pso_fill, &data);
             }
         }
-        send_debug_info("Render", "renderedchunks", format!("{} chunks were rendered", count));
+        send_debug_info(
+            "Render",
+            "renderedchunks",
+            format!("{} chunks were rendered", count),
+        );
 
         // drawing the Skybox
         let transform = Transform {
@@ -259,9 +276,11 @@ impl WorldRenderer {
             fn vpos(i: i32, j: i32, k: i32, face: usize) -> VertexTarget {
                 let mut v = [i as f32, j as f32, k as f32];
                 for i in 0..3 {
-                    if i == face/2 { // Move face forward
+                    if i == face / 2 {
+                        // Move face forward
                         v[i] += 0.001 * (if face % 2 == 0 { 1.0 } else { -1.0 });
-                    } else { // Move edges inside the face
+                    } else {
+                        // Move edges inside the face
                         if v[i] == 1.0 {
                             v[i] = 0.999;
                         } else {
@@ -269,12 +288,18 @@ impl WorldRenderer {
                         }
                     }
                 }
-                VertexTarget {
-                    pos: v,
-                }
+                VertexTarget { pos: v }
             }
-            let end_coord = [if face == 1 {1} else {2}, if face == 3 {1} else {2}, if face == 5 {1} else {2}];
-            let start_coord = [if face == 0 {1} else {0}, if face == 2 {1} else {0}, if face == 4 {1} else {0}];
+            let end_coord = [
+                if face == 1 { 1 } else { 2 },
+                if face == 3 { 1 } else { 2 },
+                if face == 5 { 1 } else { 2 },
+            ];
+            let start_coord = [
+                if face == 0 { 1 } else { 0 },
+                if face == 2 { 1 } else { 0 },
+                if face == 4 { 1 } else { 0 },
+            ];
             for i in start_coord[0]..end_coord[0] {
                 for j in start_coord[1]..end_coord[1] {
                     for k in start_coord[2]..end_coord[2] {
@@ -291,7 +316,9 @@ impl WorldRenderer {
                     }
                 }
             }
-            let (buffer, slice) = gfx.factory.create_vertex_buffer_with_slice(&vertices[..], ());
+            let (buffer, slice) = gfx
+                .factory
+                .create_vertex_buffer_with_slice(&vertices[..], ());
             let data = pipe_target::Data {
                 vbuf: buffer,
                 transform: self.transform.clone(),
@@ -305,12 +332,7 @@ impl WorldRenderer {
                     [1.0, 0.0, 0.0, 0.0],
                     [0.0, 1.0, 0.0, 0.0],
                     [0.0, 0.0, 1.0, 0.0],
-                    [
-                        x.px as f32,
-                        x.py as f32,
-                        x.pz as f32,
-                        1.0,
-                    ],
+                    [x.px as f32, x.py as f32, x.pz as f32, 1.0],
                 ],
             };
             encoder.update_buffer(&data.transform, &[transform], 0)?;

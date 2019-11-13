@@ -75,7 +75,6 @@ impl DefaultWorldGenerator {
             number_of_try: 32,
             block_start_whitelist: set![grass_block],
             pass: vec![pass_leaves, pass_wood],
-
         };
         Self {
             tree_decorator,
@@ -120,7 +119,7 @@ impl DefaultWorldGenerator {
                             if noise[(i * s * s + (j + 2) * s + k) as usize]
                                 > (py + j as f32 + 12.0) / 110.0
                                 && noise[(i * s * s + (j + 3) * s + k) as usize]
-                                > (py + j as f32 + 13.0) / 110.0
+                                    > (py + j as f32 + 13.0) / 110.0
                             {
                                 chunk.set_block_at((i as u32, j as u32, k as u32), stone_block);
                             } else {
@@ -134,7 +133,10 @@ impl DefaultWorldGenerator {
             }
         }
         let t2 = Instant::now();
-        println!("Time to generate chunk : {} micros", (t2 - t1).subsec_micros());
+        println!(
+            "Time to generate chunk : {} micros",
+            (t2 - t1).subsec_micros()
+        );
     }
 
     fn decorate_chunk(chunks: &mut Vec<Chunk>, decorator: &Decorator) {
@@ -144,7 +146,6 @@ impl DefaultWorldGenerator {
         let max_y = (chunks[0].pos.py + 3) * CHUNK_SIZE as i64;
         let min_z = chunks[0].pos.pz * CHUNK_SIZE as i64;
         let max_z = (chunks[0].pos.pz + 3) * CHUNK_SIZE as i64;
-
 
         let chunk_size_64 = CHUNK_SIZE as i64;
         let mut blocks_to_place: Vec<Vec<BlockToPlace>> = Vec::new();
@@ -157,8 +158,7 @@ impl DefaultWorldGenerator {
             for j in -1..=1 {
                 for k in -1..=1 {
                     for l in 0..decorator.number_of_try as i32 {
-                        let current_chunk =
-                            &chunks[((i + 1) * 9 + (j + 1) * 3 + (k + 1)) as usize];
+                        let current_chunk = &chunks[((i + 1) * 9 + (j + 1) * 3 + (k + 1)) as usize];
                         let cc_pos = current_chunk.pos;
                         let cbx = cc_pos.px * chunk_size_64;
                         let cby = cc_pos.py * chunk_size_64;
@@ -187,8 +187,9 @@ impl DefaultWorldGenerator {
                         ty = (ty % chunk_size_64 + chunk_size_64) % chunk_size_64;
                         tz = (tz % chunk_size_64 + chunk_size_64) % chunk_size_64;
 
-                        if decorator.block_start_whitelist.contains(&current_chunk.get_block_at((tx as u32, ty as u32, tz as u32)))
-                        {
+                        if decorator.block_start_whitelist.contains(
+                            &current_chunk.get_block_at((tx as u32, ty as u32, tz as u32)),
+                        ) {
                             tx += cbx;
                             ty += cby;
                             tz += cbz;
@@ -222,9 +223,21 @@ impl DefaultWorldGenerator {
                                         );
                                         let chunk = &chunks[(x * 9 + y * 3 + z) as usize];
                                         let (ux, uy, uz) = pos.pos_in_containing_chunk();
-                                        if decorator_pass.block_whitelist.contains(&chunk.get_block_at((ux, uy, uz))) {
-                                            blocks_to_place_one[pass_count].push(BlockToPlace::new((pos.px, pos.py, pos.pz), decorator_pass.block_type));
-                                        } else if !decorator_pass.block_non_blocking.contains(&chunk.get_block_at((ux, uy, uz))) { // still checking if not blocking block
+                                        if decorator_pass
+                                            .block_whitelist
+                                            .contains(&chunk.get_block_at((ux, uy, uz)))
+                                        {
+                                            blocks_to_place_one[pass_count].push(
+                                                BlockToPlace::new(
+                                                    (pos.px, pos.py, pos.pz),
+                                                    decorator_pass.block_type,
+                                                ),
+                                            );
+                                        } else if !decorator_pass
+                                            .block_non_blocking
+                                            .contains(&chunk.get_block_at((ux, uy, uz)))
+                                        {
+                                            // still checking if not blocking block
                                             place = false;
                                             break;
                                         }

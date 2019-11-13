@@ -1,4 +1,4 @@
-#version 150 core
+#version 330
 
 in vec3 a_Pos;
 in vec2 a_UvPos;
@@ -16,18 +16,10 @@ out float occl;
 out vec2 v_UvPos;
 out vec2 v_UvOffset;
 out vec2 v_UvSize;
+out float v_LightLevel;
 
-
-uint get_occl_code(uint code){
-  if(code < 8u){
-    return 0u;
-  }else if(code < 16u){
-    return 1u;
-  }else if(code < 24u){
-    return 2u;
-  }else{
-    return 3u;
-  }
+uint get_light_level(uint norm) {
+    return norm >> 5;
 }
 
 vec3 get_normal(uint id) {
@@ -49,8 +41,13 @@ vec3 get_normal(uint id) {
 void main() {
     gl_Position = u_ViewProj * u_Model * vec4(a_Pos, 1.0);
 
-    uint code_occl = get_occl_code(a_Norm);
-    uint code_normal = a_Norm - code_occl*8u;
+    uint norm = a_Norm;
+
+    uint light_level = norm >> 5;
+    norm -= light_level << 5;
+    uint code_occl = norm >> 3;
+    norm -= code_occl << 3;
+    uint code_normal = norm;
 
     v_Norm = get_normal(code_normal);
 
@@ -67,4 +64,5 @@ void main() {
     v_UvPos = a_UvPos;
     v_UvOffset = a_UvOffset;
     v_UvSize = a_UvSize;
+    v_LightLevel = float(light_level);
 }

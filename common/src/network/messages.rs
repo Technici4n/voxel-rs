@@ -1,9 +1,9 @@
-use crate::player::PlayerId;
 use crate::{
     data::Data,
     physics::simulation::ServerState,
+    player::PlayerId,
     player::{PlayerInput, RenderDistance},
-    world::chunk::CompressedChunk,
+    world::{chunk::CompressedChunk, CompressedLightChunk},
 };
 
 /// A message sent to the server by the client
@@ -21,7 +21,7 @@ pub enum ToClient {
     /// Send the game data
     GameData(Data),
     /// Send the chunk at some position
-    Chunk(CompressedChunk),
+    Chunk(CompressedChunk, CompressedLightChunk),
     /// Update the whole of the physics simulation
     // TODO: only send part of the physics simulation
     UpdatePhysics(ServerState),

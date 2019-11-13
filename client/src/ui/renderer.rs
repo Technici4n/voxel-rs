@@ -1,11 +1,12 @@
 use crate::window::{Gfx, WindowData};
+use crate::world::renderer::load_shader;
 use anyhow::{Context, Result};
 use gfx;
 use gfx::{
     traits::{Factory, FactoryExt},
     Slice,
 };
-use gfx_glyph::{GlyphBrush, GlyphBrushBuilder, Scale, FontId, VariedSection, SectionText};
+use gfx_glyph::{FontId, GlyphBrush, GlyphBrushBuilder, Scale, SectionText, VariedSection};
 use log::info;
 use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
@@ -99,7 +100,9 @@ impl PrimitiveBuffer {
 
     pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
         self.triangles.push(TrianglesPrimitive {
-            vertices, indices, color,
+            vertices,
+            indices,
+            color,
         });
     }
 }
@@ -125,17 +128,21 @@ impl UiRenderer {
         } = gfx;
 
         // Load fonts
-        let default_font: &'static [u8] = include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
+        let default_font: &'static [u8] =
+            include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
         let mut glyph_brush_builder = GlyphBrushBuilder::using_font_bytes(default_font);
         info!("Loading fonts from assets/fonts/list.toml");
         let mut fonts = HashMap::new();
-        let font_list = std::fs::read_to_string("assets/fonts/list.toml").expect("Couldn't read font list file");
-        let font_files: BTreeMap<String, String> = toml::de::from_str(&font_list).expect("Couldn't parse font list file");
+        let font_list = std::fs::read_to_string("assets/fonts/list.toml")
+            .expect("Couldn't read font list file");
+        let font_files: BTreeMap<String, String> =
+            toml::de::from_str(&font_list).expect("Couldn't parse font list file");
         for (font_name, font_file) in font_files.into_iter() {
             info!("Loading font {} from file {}", font_name, font_file);
             let mut font_bytes = Vec::new();
             let mut file = std::fs::File::open(font_file).expect("Couldn't open font file");
-            file.read_to_end(&mut font_bytes).expect("Couldn't read font file");
+            file.read_to_end(&mut font_bytes)
+                .expect("Couldn't read font file");
             fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
         }
         info!("Fonts successfully loaded");
@@ -143,8 +150,8 @@ impl UiRenderer {
 
         // Create rectangle drawing pipeline
         let shader_set = factory.create_shader_set(
-            include_bytes!("../../shader/gui-rect.vert"),
-            include_bytes!("../../shader/gui-rect.frag"),
+            load_shader("assets/shaders/gui-rect.vert").as_bytes(),
+            load_shader("assets/shaders/gui-rect.frag").as_bytes(),
         )?;
         let pso = factory.create_pipeline_state(
             &shader_set,
@@ -245,9 +252,10 @@ impl UiRenderer {
             vertices,
             indices,
             color,
-        } in primitive_buffer.triangles.into_iter() {
+        } in primitive_buffer.triangles.into_iter()
+        {
             let index_offset = rect_vertices.len() as u32;
-            rect_vertices.extend(vertices.into_iter().map(|v| Vertex { pos: v, color, }));
+            rect_vertices.extend(vertices.into_iter().map(|v| Vertex { pos: v, color }));
             rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
         }
         // Text
@@ -266,14 +274,19 @@ impl UiRenderer {
                 p.font_size.y *= dpi;
             }
             let Self { ref fonts, .. } = &self;
-            let parts = parts.iter().map(|part| {
-                SectionText {
+            let parts = parts
+                .iter()
+                .map(|part| SectionText {
                     text: &part.text,
                     scale: part.font_size,
                     color: part.color,
-                    font_id: part.font.clone().and_then(|f| fonts.get(&f).cloned()).unwrap_or_default(),
-                }
-            }).collect();
+                    font_id: part
+                        .font
+                        .clone()
+                        .and_then(|f| fonts.get(&f).cloned())
+                        .unwrap_or_default(),
+                })
+                .collect();
             let section = if centered {
                 VariedSection {
                     text: parts,
@@ -299,21 +312,52 @@ impl UiRenderer {
         }
         // Crosshair
         if draw_crosshair {
-            let (cx, cy) = (data.logical_window_size.width as f32/2.0, data.logical_window_size.height as f32/2.0);
+            let (cx, cy) = (
+                data.logical_window_size.width as f32 / 2.0,
+                data.logical_window_size.height as f32 / 2.0,
+            );
             const HALF_HEIGHT: f32 = 15.0;
             const HALF_WIDTH: f32 = 2.0;
             const COLOR: [f32; 4] = [1.0, 1.0, 1.0, 0.5];
-            let v1 = Vertex { pos: [cx - HALF_WIDTH, cy - HALF_HEIGHT, -1.0], color: COLOR };
-            let v2 = Vertex { pos: [cx + HALF_WIDTH, cy - HALF_HEIGHT, -1.0], color: COLOR };
-            let v3 = Vertex { pos: [cx - HALF_WIDTH, cy + HALF_HEIGHT, -1.0], color: COLOR };
-            let v4 = Vertex { pos: [cx + HALF_WIDTH, cy + HALF_HEIGHT, -1.0], color: COLOR };
-            let v5 = Vertex { pos: [cx - HALF_HEIGHT, cy - HALF_WIDTH, -1.0], color: COLOR };
-            let v6 = Vertex { pos: [cx + HALF_HEIGHT, cy - HALF_WIDTH, -1.0], color: COLOR };
-            let v7 = Vertex { pos: [cx - HALF_HEIGHT, cy + HALF_WIDTH, -1.0], color: COLOR };
-            let v8 = Vertex { pos: [cx + HALF_HEIGHT, cy + HALF_WIDTH, -1.0], color: COLOR };
+            let v1 = Vertex {
+                pos: [cx - HALF_WIDTH, cy - HALF_HEIGHT, -1.0],
+                color: COLOR,
+            };
+            let v2 = Vertex {
+                pos: [cx + HALF_WIDTH, cy - HALF_HEIGHT, -1.0],
+                color: COLOR,
+            };
+            let v3 = Vertex {
+                pos: [cx - HALF_WIDTH, cy + HALF_HEIGHT, -1.0],
+                color: COLOR,
+            };
+            let v4 = Vertex {
+                pos: [cx + HALF_WIDTH, cy + HALF_HEIGHT, -1.0],
+                color: COLOR,
+            };
+            let v5 = Vertex {
+                pos: [cx - HALF_HEIGHT, cy - HALF_WIDTH, -1.0],
+                color: COLOR,
+            };
+            let v6 = Vertex {
+                pos: [cx + HALF_HEIGHT, cy - HALF_WIDTH, -1.0],
+                color: COLOR,
+            };
+            let v7 = Vertex {
+                pos: [cx - HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
+                color: COLOR,
+            };
+            let v8 = Vertex {
+                pos: [cx + HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
+                color: COLOR,
+            };
             let voffset = rect_vertices.len() as u32;
             rect_vertices.extend([v1, v2, v3, v4, v5, v6, v7, v8].into_iter());
-            rect_indices.extend([0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7].into_iter().map(|id| id + voffset));
+            rect_indices.extend(
+                [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]
+                    .into_iter()
+                    .map(|id| id + voffset),
+            );
         }
 
         // Draw rectangles

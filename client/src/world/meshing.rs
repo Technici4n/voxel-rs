@@ -1,4 +1,5 @@
 use super::renderer::Vertex;
+use voxel_rs_common::world::LightChunk;
 use voxel_rs_common::{
     block::BlockMesh,
     collections::zero_initialized_vec,
@@ -277,6 +278,7 @@ fn ambiant_occl(corners: u32, edge: u32) -> u32 {
 /// `quads`: Buffer that is reused every time.
 pub fn greedy_meshing(
     chunk: &Chunk,
+    light_chunk: &LightChunk,
     adj: Option<AdjChunkOccl>,
     meshes: &Vec<BlockMesh>,
     quads: &mut Vec<Quad>,
@@ -314,6 +316,15 @@ pub fn greedy_meshing(
             }
         }
     }
+
+    let mut light_levels = [15; N_SIZE * N_SIZE * N_SIZE];
+    /*for i in 0..CHUNK_SIZE {
+        for j in 0..CHUNK_SIZE {
+            for k in 0..CHUNK_SIZE {
+                light_levels[ind(i as i32+1, j as i32+1, k as i32+1)] = light_chunk.get_light_at((i, j, k));
+            }
+        }
+    }*/
 
     for i in 0..CHUNK_SIZE {
         for j in 0..CHUNK_SIZE {
@@ -418,11 +429,25 @@ pub fn greedy_meshing(
                                 }
                             }
 
+                            let light_level = light_levels
+                                [ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])];
                             let quad = Quad {
-                                v1: (s as u32) + (ambiant_occl(coins[0], edge[0]) << 3),
-                                v2: (s as u32) + (ambiant_occl(coins[1], edge[1]) << 3),
-                                v3: (s as u32) + (ambiant_occl(coins[2], edge[2]) << 3),
-                                v4: (s as u32) + (ambiant_occl(coins[3], edge[3]) << 3),
+                                v1: (s as u32)
+                                    + (ambiant_occl(coins[0], edge[0]) << 3)
+                                    + (light_level as u32)
+                                    << 5,
+                                v2: (s as u32)
+                                    + (ambiant_occl(coins[1], edge[1]) << 3)
+                                    + (light_level as u32)
+                                    << 5,
+                                v3: (s as u32)
+                                    + (ambiant_occl(coins[2], edge[2]) << 3)
+                                    + (light_level as u32)
+                                    << 5,
+                                v4: (s as u32)
+                                    + (ambiant_occl(coins[3], edge[3]) << 3)
+                                    + (light_level as u32)
+                                    << 5,
                                 block_id: chunk.get_block_at((i as u32, j as u32, k as u32)),
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
@@ -640,9 +665,9 @@ pub fn greedy_meshing(
                         let a10 = v[2] >> 3;
 
                         for kk in 0..6 {
-                            if a00 + a11 < a01 + a10{
+                            if a00 + a11 < a01 + a10 {
                                 res_index.push(n_of_different_vertex + order1[s][kk]);
-                            }else{
+                            } else {
                                 res_index.push(n_of_different_vertex + order2[s][kk]);
                             }
                         }

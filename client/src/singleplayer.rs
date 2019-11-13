@@ -23,8 +23,8 @@ use crate::{
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
-use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
+use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -127,9 +127,10 @@ impl State for SinglePlayer {
             match self.client.receive_event() {
                 ClientEvent::NoEvent => break,
                 ClientEvent::ServerMessage(message) => match message {
-                    ToClient::Chunk(chunk) => {
+                    ToClient::Chunk(chunk, light_chunk) => {
                         // TODO: make sure this only happens once
                         self.world.set_chunk(chunk.to_chunk());
+                        self.world.set_light_chunk(light_chunk.to_chunk());
                         // Queue chunks for meshing
                         for i in -1..=1 {
                             for j in -1..=1 {
@@ -163,8 +164,22 @@ impl State for SinglePlayer {
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
 
         // Debug current player position, yaw and pitch
-        send_debug_info("Player", "position", format!("x = {:.2}\ny = {:.2}\nz = {:.2}\nchunk x = {}\nchunk y={}\nchunk z = {}", p[0], p[1], p[2], player_chunk.px, player_chunk.py, player_chunk.pz));
-        send_debug_info("Player", "yawpitch", format!("yaw = {:.0}\npitch = {:.0}", self.yaw_pitch.yaw, self.yaw_pitch.pitch));
+        send_debug_info(
+            "Player",
+            "position",
+            format!(
+                "x = {:.2}\ny = {:.2}\nz = {:.2}\nchunk x = {}\nchunk y={}\nchunk z = {}",
+                p[0], p[1], p[2], player_chunk.px, player_chunk.py, player_chunk.pz
+            ),
+        );
+        send_debug_info(
+            "Player",
+            "yawpitch",
+            format!(
+                "yaw = {:.0}\npitch = {:.0}",
+                self.yaw_pitch.yaw, self.yaw_pitch.pitch
+            ),
+        );
 
         // Remove chunks that are too far
         // damned borrow checker :(
@@ -190,9 +205,11 @@ impl State for SinglePlayer {
         // Sort the chunks so that the nearest ones are meshed first
         chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
         for chunk_pos in chunk_updates.into_iter() {
+            self.world.get_add_light_chunk(chunk_pos);
             if let Some(chunk) = self.world.get_chunk(chunk_pos) {
                 self.world_renderer.meshing_worker.enqueue_chunk(
                     chunk.clone(),
+                    self.world.get_light_chunk(chunk_pos).cloned().unwrap(),
                     AdjChunkOccl::create_from_world(
                         &self.world,
                         chunk_pos,
@@ -257,7 +274,14 @@ impl State for SinglePlayer {
             pp.get_pointed_at(dir, 10.0, &self.world)
         };
         if let Some((x, face)) = pointed_block {
-            send_debug_info("Player", "pointedat", format!("Pointed block: Some({}, {}, {}), face: {}", x.px, x.py, x.pz, face));
+            send_debug_info(
+                "Player",
+                "pointedat",
+                format!(
+                    "Pointed block: Some({}, {}, {}), face: {}",
+                    x.px, x.py, x.pz, face
+                ),
+            );
         } else {
             send_debug_info("Player", "pointedat", "Pointed block: None");
         }
@@ -268,13 +292,20 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
-        self.world_renderer.render(gfx, data, &frustum, input_state.enable_culling, pointed_block)?;
+        self.world_renderer.render(
+            gfx,
+            data,
+            &frustum,
+            input_state.enable_culling,
+            pointed_block,
+        )?;
         // Clear depth
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
-        self.ui_renderer.render(gfx, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
+        self.ui_renderer
+            .render(gfx, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
         // Flush and swap buffers
         gfx.encoder.flush(&mut gfx.device);
         gfx.context.swap_buffers()?;

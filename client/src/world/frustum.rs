@@ -103,7 +103,11 @@ impl Frustum {
     }
 
     /// Checks whether the frustum contains the chunk. This function may return false positives.
-    pub fn contains_chunk(planes: &[[Plane; 2]; 3], view_matrix: &Matrix4<f64>, chunk_pos: ChunkPos) -> bool {
+    pub fn contains_chunk(
+        planes: &[[Plane; 2]; 3],
+        view_matrix: &Matrix4<f64>,
+        chunk_pos: ChunkPos,
+    ) -> bool {
         #[inline(always)]
         fn to_chunk_center(chunk_pos: i64) -> f64 {
             (chunk_pos * CHUNK_SIZE as i64 + CHUNK_SIZE as i64 / 2) as f64
@@ -124,9 +128,11 @@ impl Frustum {
         for [plane1, plane2] in planes.iter() {
             let d1 = plane1.dist(chunk_center);
             let d2 = plane2.dist(chunk_center);
-            if d1 > 0.0 && d2 > 0.0 { // inside both
+            if d1 > 0.0 && d2 > 0.0 {
+                // inside both
                 keep = true;
-            } else if d1.abs().max(d2.abs()) < radius { // close enough to the planes
+            } else if d1.abs().max(d2.abs()) < radius {
+                // close enough to the planes
                 keep = true;
             }
         }

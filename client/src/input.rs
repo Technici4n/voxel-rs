@@ -1,7 +1,7 @@
 use glutin::{ElementState, KeyboardInput, ModifiersState, MouseButton};
 use std::collections::HashMap;
-use voxel_rs_common::player::PlayerInput;
 use voxel_rs_common::debug::send_debug_info;
+use voxel_rs_common::player::PlayerInput;
 
 /// A helper struct to keep track of the yaw and pitch of a player
 #[derive(Debug, Clone, Copy, Default)]
@@ -41,7 +41,7 @@ pub struct InputState {
     keys: HashMap<u32, ElementState>,
     mouse_buttons: HashMap<MouseButton, ElementState>,
     modifiers_state: ModifiersState,
-    flying: bool, // TODO: reset this on game start
+    flying: bool,             // TODO: reset this on game start
     pub enable_culling: bool, // TODO: don't put this here
 }
 
@@ -67,7 +67,14 @@ impl InputState {
             }
             if input.scancode == TOGGLE_CULLING {
                 self.enable_culling = !self.enable_culling;
-                send_debug_info("Render", "chunkculling", format!("Chunk culling is {}enabled", if self.enable_culling { "" } else { "not "}));
+                send_debug_info(
+                    "Render",
+                    "chunkculling",
+                    format!(
+                        "Chunk culling is {}enabled",
+                        if self.enable_culling { "" } else { "not " }
+                    ),
+                );
             }
         }
         previous_state != Some(input.state)

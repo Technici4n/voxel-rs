@@ -1,10 +1,6 @@
-use crossbeam_channel::{Sender, Receiver, unbounded};
+use crossbeam_channel::{unbounded, Receiver, Sender};
 use lazy_static::lazy_static;
-use std::{
-    sync::Arc,
-    sync::RwLock,
-    collections::HashMap,
-};
+use std::{collections::HashMap, sync::Arc, sync::RwLock};
 lazy_static! {
     static ref DEBUG_INFO: Arc<RwLock<Option<Sender<DebugInfoUnit>>>> = Arc::new(RwLock::new(None));
 }
@@ -48,9 +44,13 @@ impl DebugInfo {
 
 /// Send debug info to the current `DebugInfo` if there is one
 pub fn send_debug_info(section: impl ToString, id: impl ToString, message: impl ToString) {
-    DEBUG_INFO.read().unwrap().as_ref().map(|sender| sender.send(DebugInfoUnit {
-        section: section.to_string(),
-        id: id.to_string(),
-        message: message.to_string(),
-    }).unwrap());
+    DEBUG_INFO.read().unwrap().as_ref().map(|sender| {
+        sender
+            .send(DebugInfoUnit {
+                section: section.to_string(),
+                id: id.to_string(),
+                message: message.to_string(),
+            })
+            .unwrap()
+    });
 }
