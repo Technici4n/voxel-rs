@@ -26,6 +26,7 @@ use std::time::Instant;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use crate::world::meshing::AdjChunkLight;
+use voxel_rs_common::world::chunk::ChunkPos;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -41,6 +42,7 @@ pub struct SinglePlayer {
     physics_simulation: ClientPhysicsSimulation,
     yaw_pitch: YawPitch,
     debug_info: DebugInfo,
+    premeshed_chunks: HashSet<ChunkPos>,
 }
 
 impl SinglePlayer {
@@ -108,6 +110,7 @@ impl SinglePlayer {
             ),
             yaw_pitch: Default::default(),
             debug_info: DebugInfo::new_current(),
+            premeshed_chunks: Default::default(),
         }))
     }
 }
@@ -122,7 +125,7 @@ impl State for SinglePlayer {
         _seconds_delta: f64,
         gfx: &mut Gfx,
     ) -> Result<StateTransition> {
-        let mut chunk_updates = HashSet::new();
+        let mut chunks_to_mesh = HashSet::new();
         // Handle server messages
         loop {
             match self.client.receive_event() {
@@ -136,7 +139,7 @@ impl State for SinglePlayer {
                         for i in -1..=1 {
                             for j in -1..=1 {
                                 for k in -1..=1 {
-                                    chunk_updates.insert(chunk.pos.offset(i, j, k));
+                                    chunks_to_mesh.insert(chunk.pos.offset(i, j, k));
                                 }
                             }
                         }
@@ -202,12 +205,31 @@ impl State for SinglePlayer {
 
         // Update meshing
         // TODO: put this in the renderer ?
-        let mut chunk_updates: Vec<_> = chunk_updates.into_iter().collect();
+        let mut chunk_updates: Vec<_> = chunks_to_mesh.into_iter().collect();
         // Sort the chunks so that the nearest ones are meshed first
         chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
         for chunk_pos in chunk_updates.into_iter() {
-            self.world.get_add_light_chunk(chunk_pos);
-            if let Some(chunk) = self.world.get_chunk(chunk_pos) {
+            // Only mesh the chunks if it needs updating
+            let mut adj_received = 0;
+            for i in -1..=1 {
+                for j in -1..=1 {
+                    for k in -1..=1 {
+                        if self.world.has_chunk(chunk_pos.offset(i, j, k)) {
+                            adj_received += 1;
+                        }
+                    }
+                }
+            }
+            if adj_received == 27 {
+                self.premeshed_chunks.remove(&chunk_pos);
+            } else {
+                if !self.premeshed_chunks.insert(chunk_pos) {
+                    continue
+                }
+            }
+            if self.world.has_chunk(chunk_pos) {
+                self.world.get_add_light_chunk(chunk_pos);
+                let chunk = self.world.get_chunk(chunk_pos).unwrap();
                 self.world_renderer.meshing_worker.enqueue_chunk(
                     chunk.clone(),
                     self.world.get_light_chunk(chunk_pos).cloned().unwrap(),
