@@ -71,8 +71,10 @@ pub struct LightChunk {
 
 impl LightChunk {
     pub fn new(pos: ChunkPos) -> Self {
+        let mut light = Vec::new();
+        light.resize((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize, 15);
         Self {
-            light: unsafe { zero_initialized_vec((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize) },
+            light,
             pos,
         }
     }
