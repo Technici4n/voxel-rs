@@ -3,8 +3,6 @@ use anyhow::Result;
 use log::info;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
-use voxel_rs_common::physics::simulation::ServerPhysicsSimulation;
-use voxel_rs_common::world::CompressedLightChunk;
 use voxel_rs_common::{
     data::load_data,
     network::{
@@ -17,6 +15,9 @@ use voxel_rs_common::{
         BlockPos, World,
     },
     worldgen::DefaultWorldGenerator,
+    world::CompressedLightChunk,
+    physics::simulation::ServerPhysicsSimulation,
+    debug::send_debug_info,
 };
 
 mod worldgen;
@@ -87,7 +88,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
 
         for chunk in world_generator.get_processed_chunks().into_iter() {
             // Only insert the chunk in the world if it was still being generated.
-            if generating_chunks.contains(&chunk.pos) {
+            if generating_chunks.remove(&chunk.pos) {
                 let pos = chunk.pos.clone();
                 world.set_chunk(chunk);
                 if world.update_highest_opaque_block(pos) {
@@ -121,8 +122,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         }
 
         // Update light of one chunk at the time
-        if !update_lightning_chunks_vec.is_empty() {
-            let pos = update_lightning_chunks_vec.pop_front().unwrap();
+        if let Some(pos) = update_lightning_chunks_vec.pop_front() {
             let t1 = Instant::now();
             world.update_light(&pos, &mut light_bfs_queue);
             update_lightning_chunks.remove(&pos);
@@ -191,12 +191,18 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         }
 
         // Drop chunks that are far from all players (and update chunk priorities)
-        world.chunks.retain(|chunk_pos, _| {
+        let World {
+            ref mut chunks,
+            ref mut light,
+            ..
+        } = world;
+        chunks.retain(|chunk_pos, _| {
             for (player_position, render_distance) in player_positions.iter() {
                 if render_distance.is_chunk_visible(*player_position, *chunk_pos) {
                     return true;
                 }
             }
+            light.remove(chunk_pos);
             false
         });
         generating_chunks.retain(|chunk_pos| {
@@ -217,6 +223,15 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             }
             retain
         });
+
+        send_debug_info("Chunks", "server",
+                        format!(
+                            "Server loaded chunks = {}\nServer loaded light chunks = {}\nServer generating chunks = {}\nServer pending lighting chunks = {}",
+                            world.chunks.len(),
+                            world.light.len(),
+                            generating_chunks.len(),
+                            update_lightning_chunks_vec.len(),
+                        ));
 
         // Nothing else to do for now :-)
     }

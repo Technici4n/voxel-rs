@@ -5,6 +5,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::world::chunk::{Chunk, ChunkPos};
 use voxel_rs_common::world::LightChunk;
+use voxel_rs_common::debug::send_debug_info;
 
 pub type ChunkMesh = (ChunkPos, Vec<Vertex>, Vec<u32>);
 
@@ -71,6 +72,7 @@ fn launch_worker(
     let mut queued_chunks = HashMap::new();
     let mut ordered_positions = VecDeque::new();
     loop {
+        send_debug_info("Chunks", "meshing", format!("Meshing pending chunks = {}", queued_chunks.len()));
         // Process all messages
         while let Some(message) = {
             if queued_chunks.len() > 0 {

@@ -12,6 +12,7 @@ use crate::{
 
 use crate::worldgen::decorator::Decorator;
 use crate::worldgen::decorator::DecoratorPass;
+use crate::debug::send_debug_info;
 
 pub mod perlin;
 #[macro_use]
@@ -336,6 +337,27 @@ impl WorldGenerator for DefaultWorldGenerator {
             self.pregenerated_chunks.insert(chunk.pos, chunk);
         }
 
+        send_debug_info("Chunks", "worldgenstruct", format!("Stored pregenerated chunks = {}", self.pregenerated_chunks.len()));
+
         self.pregenerated_chunks.remove(&pos).unwrap()
+    }
+}
+
+pub struct DebugWorldGenerator;
+
+impl WorldGenerator for DebugWorldGenerator {
+    fn generate_chunk(&mut self, pos: ChunkPos, block_registry: &Registry<Block>) -> Chunk {
+        let stone = block_registry.get_id_by_name(&"stone".to_owned()).unwrap() as u16;
+        let mut c = Chunk::new(pos);
+        for i in 0..CHUNK_SIZE {
+            for j in 0..CHUNK_SIZE {
+                if j as i64 + CHUNK_SIZE as i64 * pos.py > 0 {
+                    for k in 0..CHUNK_SIZE {
+                        c.set_block_at((i, j, k), stone);
+                    }
+                }
+            }
+        }
+        c
     }
 }

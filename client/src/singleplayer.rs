@@ -193,12 +193,18 @@ impl State for SinglePlayer {
             ref render_distance,
             ..
         } = self;
-        world.chunks.retain(|chunk_pos, _| {
+        let World {
+            ref mut chunks,
+            ref mut light,
+            ..
+        } = world;
+        chunks.retain(|chunk_pos, _| {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
                 world_renderer.chunk_meshes.remove(chunk_pos);
                 world_renderer.meshing_worker.dequeue_chunk(*chunk_pos);
+                light.remove(chunk_pos);
                 false
             }
         });
@@ -267,6 +273,8 @@ impl State for SinglePlayer {
         }
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
+
+        send_debug_info("Chunks", "client", format!("Client loaded chunks = {}\nClient loaded light chunks = {}", self.world.chunks.len(), self.world.light.len()));
 
         if self.ui.should_exit() {
             //Ok(StateTransition::ReplaceCurrent(Box::new(crate::mainmenu::MainMenu::new)))

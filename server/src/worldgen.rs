@@ -6,6 +6,7 @@ use voxel_rs_common::{
     world::chunk::{Chunk, ChunkPos},
     world::WorldGenerator,
 };
+use voxel_rs_common::debug::send_debug_info;
 
 /// A worker that runs the world generation on one or more other threads.
 /// Chunks are processed lowest priority first.
@@ -80,6 +81,7 @@ fn launch_worker(
     let mut queued_chunks = HashSet::new();
     let mut priorities = BTreeMap::new();
     loop {
+        send_debug_info("Chunks", "worldgen", format!("World generation pending chunks = {}", queued_chunks.len()));
         // Process all messages
         while let Some(message) = {
             if queued_chunks.len() > 0 {
@@ -102,10 +104,12 @@ fn launch_worker(
                     queued_chunks.remove(&pos);
                 }
                 ToOtherThread::SetPriority(pos, priority) => {
-                    priorities
-                        .entry(priority)
-                        .or_insert_with(Vec::new)
-                        .push(pos);
+                    if queued_chunks.contains(&pos) {
+                        priorities
+                            .entry(priority)
+                            .or_insert_with(Vec::new)
+                            .push(pos);
+                    }
                 }
             }
         }
