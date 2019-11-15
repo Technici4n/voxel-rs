@@ -16,6 +16,9 @@ use std::path::Path;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::world::BlockPos;
 use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
+use crate::render::ensure_buffer_capacity;
+use voxel_rs_common::world::chunk::CHUNK_SIZE;
+use gfx::IndexBuffer;
 
 gfx_defines! {
     vertex Vertex {
@@ -225,7 +228,7 @@ impl WorldRenderer {
 
                 let data = pipe::Data {
                     // data object controlling the rendering
-                    vbuf: mesh.v_buffer.clone(), // set the vertex buffer to be drawn
+                    vbuf: mesh.vertex_buffer.clone(), // set the vertex buffer to be drawn
                     transform: self.transform.clone(),
                     texture_atlas: (self.texture_atlas.clone(), self.texture_sampler.clone()),
                     color_buffer: color_buffer.clone(),
@@ -233,8 +236,15 @@ impl WorldRenderer {
                 };
 
                 encoder.update_buffer(&data.transform, &[transform], 0)?;
-                // (index buffer, pso, full data with vertex buffer and uniform buffer inside)
-                encoder.draw(&mesh.indices, &self.pso_fill, &data);
+
+                let slice = gfx::Slice {
+                    start: 0,
+                    end: mesh.index_len as u32,
+                    base_vertex: 0,
+                    instances: None,
+                    buffer: IndexBuffer::Index32(mesh.index_buffer.clone()),
+                };
+                encoder.draw(&slice, &self.pso_fill, &data);
             }
         }
         send_debug_info(
@@ -343,7 +353,47 @@ impl WorldRenderer {
     }
 
     /// Add a new chunk mesh to the rendering or update one if already exists
-    pub fn update_chunk_mesh(&mut self, pos: ChunkPos, mesh: Mesh) {
-        self.chunk_meshes.insert(pos, mesh);
+    pub fn update_chunk_mesh(&mut self, gfx: &mut Gfx, pos: ChunkPos, vertices: Vec<Vertex>, indices: Vec<u32>) {
+        if let Some(mesh) = self.chunk_meshes.get_mut(&pos) {
+            // Resize if necessary and update
+            let Mesh { ref mut vertex_buffer, ref mut index_buffer, ref mut index_len, .. } = mesh;
+            ensure_buffer_capacity(vertex_buffer, vertices.len(), &mut gfx.factory).expect("Failed to resize chunk vertex buffer");
+            gfx.encoder.update_buffer(vertex_buffer, &vertices, 0).expect("Failed to update chunk vertex buffer");
+            ensure_buffer_capacity(index_buffer, indices.len(), &mut gfx.factory).expect("Failed to resize chunk index buffer");
+            gfx.encoder.update_buffer(index_buffer, &indices, 0).expect("Failed to update chunk index buffer");
+            *index_len = indices.len();
+        } else {
+            // Create new buffers
+            let buffer_bind = {
+                use gfx::memory::Bind;
+                let mut bind = Bind::empty();
+                bind.insert(Bind::SHADER_RESOURCE);
+                bind.insert(Bind::TRANSFER_DST);
+                bind
+            };
+            let vertex_buffer = gfx.factory.create_buffer(
+                vertices.len(),
+                gfx::buffer::Role::Vertex,
+                gfx::memory::Usage::Dynamic,
+                buffer_bind.clone(),
+            ).expect("Failed to create chunk vertex buffer");
+            gfx.encoder.update_buffer(&vertex_buffer, &vertices, 0).expect("Failed to update chunk vertex buffer");
+            let index_buffer = gfx.factory.create_buffer(
+                indices.len(),
+                gfx::buffer::Role::Index,
+                gfx::memory::Usage::Dynamic,
+                buffer_bind.clone(),
+            ).expect("Failed to create chunk index buffer");
+            gfx.encoder.update_buffer(&index_buffer, &indices, 0).expect("Failed to update chunk index buffer");
+            // Add mesh to HashMap
+            self.chunk_meshes.insert(pos, Mesh {
+                pos_x: (pos.px * CHUNK_SIZE as i64) as f32,
+                pos_y: (pos.py * CHUNK_SIZE as i64) as f32,
+                pos_z: (pos.pz * CHUNK_SIZE as i64) as f32,
+                vertex_buffer,
+                index_buffer,
+                index_len: indices.len(),
+            });
+        }
     }
 }

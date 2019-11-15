@@ -11,6 +11,7 @@ use log::info;
 use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
+use crate::render::ensure_buffer_capacity;
 
 gfx_defines! {
     vertex Vertex {
@@ -413,18 +414,4 @@ impl UiRenderer {
             .expect("couldn't draw queued glyphs");
         Ok(())
     }
-}
-
-pub fn ensure_buffer_capacity<T>(
-    buffer: &mut gfx::handle::Buffer<R, T>,
-    min_num: usize,
-    factory: &mut gfx_device_gl::Factory,
-) -> Result<(), gfx::buffer::CreationError> {
-    let info = buffer.get_info().clone();
-    let buffer_num = info.size / std::mem::size_of::<T>();
-    if buffer_num < min_num {
-        let new_buffer = factory.create_buffer(min_num, info.role, info.usage, info.bind)?;
-        *buffer = new_buffer;
-    }
-    Ok(())
 }

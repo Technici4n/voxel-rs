@@ -7,7 +7,7 @@ use voxel_rs_common::{
     network::{messages::ToClient, messages::ToServer, Client, ClientEvent},
     player::RenderDistance,
     registry::Registry,
-    world::{chunk::CHUNK_SIZE, BlockPos, World},
+    world::{BlockPos, World},
 };
 
 use crate::input::YawPitch;
@@ -15,7 +15,6 @@ use crate::world::meshing::AdjChunkLight;
 use crate::{
     fps::FpsCounter,
     input::InputState,
-    mesh::Mesh,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
@@ -42,7 +41,7 @@ pub struct SinglePlayer {
     physics_simulation: ClientPhysicsSimulation,
     yaw_pitch: YawPitch,
     debug_info: DebugInfo,
-    premeshed_chunks: HashSet<ChunkPos>,
+    chunks_to_mesh: HashSet<ChunkPos>,
 }
 
 impl SinglePlayer {
@@ -110,7 +109,7 @@ impl SinglePlayer {
             ),
             yaw_pitch: Default::default(),
             debug_info: DebugInfo::new_current(),
-            premeshed_chunks: Default::default(),
+            chunks_to_mesh: Default::default(),
         }))
     }
 }
@@ -125,7 +124,6 @@ impl State for SinglePlayer {
         _seconds_delta: f64,
         gfx: &mut Gfx,
     ) -> Result<StateTransition> {
-        let mut chunks_to_mesh = HashSet::new();
         // Handle server messages
         loop {
             match self.client.receive_event() {
@@ -139,7 +137,7 @@ impl State for SinglePlayer {
                         for i in -1..=1 {
                             for j in -1..=1 {
                                 for k in -1..=1 {
-                                    chunks_to_mesh.insert(chunk.pos.offset(i, j, k));
+                                    self.chunks_to_mesh.insert(chunk.pos.offset(i, j, k));
                                 }
                             }
                         }
@@ -209,30 +207,18 @@ impl State for SinglePlayer {
             }
         });
 
-        // Update meshing
+        // Update meshing (for roughly 10 milliseconds)
         // TODO: put this in the renderer ?
-        let mut chunk_updates: Vec<_> = chunks_to_mesh.into_iter().collect();
+        let meshing_start = Instant::now();
+        let mut chunk_updates: Vec<_> = self.chunks_to_mesh.iter().cloned().collect();
         // Sort the chunks so that the nearest ones are meshed first
         chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
         for chunk_pos in chunk_updates.into_iter() {
+            if (Instant::now() - meshing_start).subsec_millis() > 10 {
+                break
+            }
             // Only mesh the chunks if it needs updating
-            let mut adj_received = 0;
-            for i in -1..=1 {
-                for j in -1..=1 {
-                    for k in -1..=1 {
-                        if self.world.has_chunk(chunk_pos.offset(i, j, k)) {
-                            adj_received += 1;
-                        }
-                    }
-                }
-            }
-            if adj_received == 27 {
-                self.premeshed_chunks.remove(&chunk_pos);
-            } else {
-                if !self.premeshed_chunks.insert(chunk_pos) {
-                    continue;
-                }
-            }
+            self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 self.world.get_add_light_chunk(chunk_pos);
                 let chunk = self.world.get_chunk(chunk_pos).unwrap();
@@ -258,14 +244,7 @@ impl State for SinglePlayer {
         {
             // Add the mesh if the chunk is still loaded
             if self.world.has_chunk(chunk_pos) {
-                let world_pos = (
-                    (chunk_pos.px * CHUNK_SIZE as i64) as f32,
-                    (chunk_pos.py * CHUNK_SIZE as i64) as f32,
-                    (chunk_pos.pz * CHUNK_SIZE as i64) as f32,
-                );
-                // TODO: reuse existing meshes when possible if that bottlenecks
-                let chunk_mesh = Mesh::new(world_pos, vertices, indices, &mut gfx.factory);
-                self.world_renderer.update_chunk_mesh(chunk_pos, chunk_mesh);
+                self.world_renderer.update_chunk_mesh(gfx, chunk_pos, vertices, indices);
             }
         }
 
