@@ -10,9 +10,9 @@ use crate::{
     world::WorldGenerator,
 };
 
+use crate::debug::send_debug_info;
 use crate::worldgen::decorator::Decorator;
 use crate::worldgen::decorator::DecoratorPass;
-use crate::debug::send_debug_info;
 
 pub mod perlin;
 #[macro_use]
@@ -337,7 +337,14 @@ impl WorldGenerator for DefaultWorldGenerator {
             self.pregenerated_chunks.insert(chunk.pos, chunk);
         }
 
-        send_debug_info("Chunks", "worldgenstruct", format!("Stored pregenerated chunks = {}", self.pregenerated_chunks.len()));
+        send_debug_info(
+            "Chunks",
+            "worldgenstruct",
+            format!(
+                "Stored pregenerated chunks = {}",
+                self.pregenerated_chunks.len()
+            ),
+        );
 
         self.pregenerated_chunks.remove(&pos).unwrap()
     }

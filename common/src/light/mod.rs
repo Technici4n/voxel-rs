@@ -145,7 +145,7 @@ pub fn compute_light(
 
         for i in 0..6 {
             let (nx, ny, nz) = (x as isize + DX[i], y as isize + DY[i], z as isize + DZ[i]);
-            let s = (nx as usize) * csize * csize * 9 + (ny as usize)*csize*3+(nz as usize);
+            let s = (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
             if MIN_VAL <= nx
                 && nx < MAX_VAL
                 && MIN_VAL <= ny

@@ -1,11 +1,11 @@
-use crate::world::meshing::{greedy_meshing, AdjChunkOccl, AdjChunkLight};
+use crate::world::meshing::{greedy_meshing, AdjChunkLight, AdjChunkOccl};
 use crate::world::renderer::Vertex;
 use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
+use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::world::chunk::{Chunk, ChunkPos};
 use voxel_rs_common::world::LightChunk;
-use voxel_rs_common::debug::send_debug_info;
 
 pub type ChunkMesh = (ChunkPos, Vec<Vertex>, Vec<u32>);
 
@@ -38,7 +38,13 @@ impl MeshingWorker {
     }
 
     /// Enqueue a chunk
-    pub fn enqueue_chunk(&mut self, chunk: Chunk, light_chunk: LightChunk, adj: AdjChunkOccl, adj_light : AdjChunkLight) {
+    pub fn enqueue_chunk(
+        &mut self,
+        chunk: Chunk,
+        light_chunk: LightChunk,
+        adj: AdjChunkOccl,
+        adj_light: AdjChunkLight,
+    ) {
         self.sender
             .send(ToOtherThread::Enqueue(chunk, light_chunk, adj, adj_light))
             .unwrap();
@@ -72,7 +78,11 @@ fn launch_worker(
     let mut queued_chunks = HashMap::new();
     let mut ordered_positions = VecDeque::new();
     loop {
-        send_debug_info("Chunks", "meshing", format!("Meshing pending chunks = {}", queued_chunks.len()));
+        send_debug_info(
+            "Chunks",
+            "meshing",
+            format!("Meshing pending chunks = {}", queued_chunks.len()),
+        );
         // Process all messages
         while let Some(message) = {
             if queued_chunks.len() > 0 {
@@ -97,8 +107,14 @@ fn launch_worker(
         // Mesh the first chunk that is in the queue
         while let Some(chunk_pos) = ordered_positions.pop_front() {
             if let Some((chunk, light_chunk, adj, adj_light)) = queued_chunks.remove(&chunk_pos) {
-                let (vertices, indices, _, _) =
-                    greedy_meshing(&chunk, &light_chunk, Some(adj), adj_light, &block_meshes,  &mut quads);
+                let (vertices, indices, _, _) = greedy_meshing(
+                    &chunk,
+                    &light_chunk,
+                    Some(adj),
+                    adj_light,
+                    &block_meshes,
+                    &mut quads,
+                );
                 sender.send((chunk_pos, vertices, indices)).unwrap();
                 break;
             }

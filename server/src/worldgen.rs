@@ -1,12 +1,12 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::{
     block::Block,
     registry::Registry,
     world::chunk::{Chunk, ChunkPos},
     world::WorldGenerator,
 };
-use voxel_rs_common::debug::send_debug_info;
 
 /// A worker that runs the world generation on one or more other threads.
 /// Chunks are processed lowest priority first.
@@ -81,7 +81,11 @@ fn launch_worker(
     let mut queued_chunks = HashSet::new();
     let mut priorities = BTreeMap::new();
     loop {
-        send_debug_info("Chunks", "worldgen", format!("World generation pending chunks = {}", queued_chunks.len()));
+        send_debug_info(
+            "Chunks",
+            "worldgen",
+            format!("World generation pending chunks = {}", queued_chunks.len()),
+        );
         // Process all messages
         while let Some(message) = {
             if queued_chunks.len() > 0 {

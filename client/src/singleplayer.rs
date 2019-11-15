@@ -11,6 +11,7 @@ use voxel_rs_common::{
 };
 
 use crate::input::YawPitch;
+use crate::world::meshing::AdjChunkLight;
 use crate::{
     fps::FpsCounter,
     input::InputState,
@@ -25,7 +26,6 @@ use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
-use crate::world::meshing::AdjChunkLight;
 use voxel_rs_common::world::chunk::ChunkPos;
 
 /// State of a singleplayer world
@@ -230,7 +230,7 @@ impl State for SinglePlayer {
                 self.premeshed_chunks.remove(&chunk_pos);
             } else {
                 if !self.premeshed_chunks.insert(chunk_pos) {
-                    continue
+                    continue;
                 }
             }
             if self.world.has_chunk(chunk_pos) {
@@ -244,10 +244,7 @@ impl State for SinglePlayer {
                         chunk_pos,
                         &self.world_renderer.block_meshes,
                     ),
-                    AdjChunkLight::create_from_world(
-                        &self.world,
-                        chunk_pos,
-                    )
+                    AdjChunkLight::create_from_world(&self.world, chunk_pos),
                 );
             }
         }
@@ -274,7 +271,15 @@ impl State for SinglePlayer {
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
-        send_debug_info("Chunks", "client", format!("Client loaded chunks = {}\nClient loaded light chunks = {}", self.world.chunks.len(), self.world.light.len()));
+        send_debug_info(
+            "Chunks",
+            "client",
+            format!(
+                "Client loaded chunks = {}\nClient loaded light chunks = {}",
+                self.world.chunks.len(),
+                self.world.light.len()
+            ),
+        );
 
         if self.ui.should_exit() {
             //Ok(StateTransition::ReplaceCurrent(Box::new(crate::mainmenu::MainMenu::new)))

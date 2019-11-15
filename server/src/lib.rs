@@ -5,19 +5,19 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
 use voxel_rs_common::{
     data::load_data,
+    debug::send_debug_info,
     network::{
         messages::{ToClient, ToServer},
         Server, ServerEvent,
     },
+    physics::simulation::ServerPhysicsSimulation,
     player::RenderDistance,
+    world::CompressedLightChunk,
     world::{
         chunk::{ChunkPos, CompressedChunk},
         BlockPos, World,
     },
     worldgen::DefaultWorldGenerator,
-    world::CompressedLightChunk,
-    physics::simulation::ServerPhysicsSimulation,
-    debug::send_debug_info,
 };
 
 mod worldgen;

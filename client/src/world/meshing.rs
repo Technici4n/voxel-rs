@@ -22,7 +22,7 @@ pub struct AdjChunkOccl {
 
 /// Same as AdjChunkOccl but for the light, need only the face
 #[derive(Clone)]
-pub struct  AdjChunkLight{
+pub struct AdjChunkLight {
     faces: [[[u8; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6],
 }
 
@@ -234,10 +234,7 @@ impl AdjChunkOccl {
 impl AdjChunkLight {
     /// Generate the AdjChunkOccl struct used in the meshing containing the
     /// informations about adjacent chunks
-    pub fn create_from_world(
-        world: &World,
-        pos: ChunkPos,
-    ) -> AdjChunkLight {
+    pub fn create_from_world(world: &World, pos: ChunkPos) -> AdjChunkLight {
         const ICHUNK_SIZE: i64 = CHUNK_SIZE as i64;
         // Transform every number to 0 except -1.
         // This allows us to transform chunk deltas into block deltas.
@@ -279,7 +276,7 @@ impl AdjChunkLight {
                                 uy = k;
                                 uz = (ICHUNK_SIZE + f(da[i][2])) as u32 % CHUNK_SIZE;
                             }
-                            res[j as usize][k as usize] = chunk_light.get_light_at((ux,uy, uz));
+                            res[j as usize][k as usize] = chunk_light.get_light_at((ux, uy, uz));
                         }
                     }
                     res
@@ -288,13 +285,10 @@ impl AdjChunkLight {
             };
         }
 
-        AdjChunkLight {
-            faces,
-        }
+        AdjChunkLight { faces }
     }
     /// Return the light at some position (only on the face)
     pub fn get_light(&self, x: i32, y: i32, z: i32) -> u8 {
-
         let mut n_outside = 0;
         if x == -1 || x == CHUNK_SIZE as i32 {
             n_outside += 1;
@@ -319,15 +313,13 @@ impl AdjChunkLight {
                 return self.faces[4][x as usize][y as usize];
             } else if z == -1 {
                 return self.faces[5][x as usize][y as usize];
-            }else{
+            } else {
                 unreachable!()
             }
         }
         unreachable!()
     }
-
 }
-
 
 const D: [[i32; 3]; 6] = [
     [1, 0, 0],
@@ -384,7 +376,7 @@ pub fn greedy_meshing(
     chunk: &Chunk,
     light_chunk: &LightChunk,
     adj: Option<AdjChunkOccl>,
-    adj_light : AdjChunkLight,
+    adj_light: AdjChunkLight,
     meshes: &Vec<BlockMesh>,
     quads: &mut Vec<Quad>,
 ) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
@@ -422,7 +414,6 @@ pub fn greedy_meshing(
         }
     }
 
-
     for i in 0..CHUNK_SIZE {
         for j in 0..CHUNK_SIZE {
             for k in 0..CHUNK_SIZE {
@@ -437,33 +428,28 @@ pub fn greedy_meshing(
     for i in 0..CHUNK_SIZE {
         for j in 0..CHUNK_SIZE {
             for k in 0..CHUNK_SIZE {
-                light_levels[ind(i as i32+1, j as i32+1, k as i32+1)] = light_chunk.get_light_at((i, j, k));
+                light_levels[ind(i as i32 + 1, j as i32 + 1, k as i32 + 1)] =
+                    light_chunk.get_light_at((i, j, k));
             }
         }
     }
     for i in 0..IN_SIZE {
         for j in 0..IN_SIZE {
             for k in 0..IN_SIZE {
-                if ((i == 0
-                    || i == IN_SIZE - 1)
-                    ^ (j == 0
-                    || j == IN_SIZE - 1)
-                     ^ (k == 0
-                    || k == IN_SIZE - 1))
-                    && !((i == 0
-                    || i == IN_SIZE - 1)
-                    && (j == 0
-                    || j == IN_SIZE - 1)
-                    && (k == 0
-                    || k == IN_SIZE - 1
-                    )) // exclusive or with 3 value (check if only on a face and note an edge or corner)
+                if ((i == 0 || i == IN_SIZE - 1)
+                    ^ (j == 0 || j == IN_SIZE - 1)
+                    ^ (k == 0 || k == IN_SIZE - 1))
+                    && !((i == 0 || i == IN_SIZE - 1)
+                        && (j == 0 || j == IN_SIZE - 1)
+                        && (k == 0 || k == IN_SIZE - 1))
+                // exclusive or with 3 value (check if only on a face and note an edge or corner)
                 {
-                    light_levels[ind(i as i32 , j as i32, k as i32)] = adj_light.get_light(i as i32 -1 , j as i32 - 1, k as i32 - 1);
+                    light_levels[ind(i as i32, j as i32, k as i32)] =
+                        adj_light.get_light(i as i32 - 1, j as i32 - 1, k as i32 - 1);
                 }
             }
         }
     }
-
 
     const D_DELTA0: [[i32; 3]; 6] = [
         [1, 0, 0],
@@ -564,20 +550,16 @@ pub fn greedy_meshing(
                             let quad = Quad {
                                 v1: (s as u32)
                                     + (ambiant_occl(coins[0], edge[0]) << 3)
-                                    + ((light_level as u32)
-                                    << 5),
+                                    + ((light_level as u32) << 5),
                                 v2: (s as u32)
                                     + (ambiant_occl(coins[1], edge[1]) << 3)
-                                    + ((light_level as u32)
-                                    << 5),
+                                    + ((light_level as u32) << 5),
                                 v3: (s as u32)
                                     + (ambiant_occl(coins[2], edge[2]) << 3)
-                                    + ((light_level as u32)
-                                    << 5),
+                                    + ((light_level as u32) << 5),
                                 v4: (s as u32)
                                     + (ambiant_occl(coins[3], edge[3]) << 3)
-                                    + ((light_level as u32)
-                                    << 5),
+                                    + ((light_level as u32) << 5),
                                 block_id: chunk.get_block_at((i as u32, j as u32, k as u32)),
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
