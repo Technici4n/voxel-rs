@@ -24,7 +24,7 @@ fn main() -> Result<()> {
 
     info!("Starting up...");
     let config_folder = Path::new("config");
-    let config_file = Path::new("config/Settings.ron");
+    let config_file = Path::new("config/settings.toml");
     let mut settings = settings::load_settings(&config_folder, &config_file)?;
     info!("Current settings: {:?}", settings);
 

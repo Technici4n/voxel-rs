@@ -29,14 +29,16 @@ pub fn load_settings(folder_path: &Path, file_path: &Path) -> Result<Settings> {
             folder_path.display(),
             file_path.display()
         ))?;
-        ron::de::from_str(&buf).context(format!(
+        toml::de::from_str(&buf).context(format!(
             "Failed to parse settings file from folder path {} and file path {}...",
             folder_path.display(),
             file_path.display()
         ))?
     } else {
         std::fs::create_dir_all(folder_path)?;
-        Settings::default()
+        let settings = Settings::default();
+        write_settings(file_path, &settings)?;
+        settings
     };
 
     // TODO: write settings
@@ -44,7 +46,7 @@ pub fn load_settings(folder_path: &Path, file_path: &Path) -> Result<Settings> {
     Ok(settings)
 }
 
-fn _write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
+fn write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
     info!("Writing settings...");
     let path = path.as_ref();
     let mut settings_file = OpenOptions::new()
@@ -53,7 +55,7 @@ fn _write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
         .create(true)
         .open(&path)
         .context(format!("Failed to open settings file {}", path.display()))?;
-    let string = ron::ser::to_string(settings).context("Failed to serialize settings")?;
+    let string = toml::ser::to_string(settings).context("Failed to serialize settings")?;
     settings_file
         .write(string.as_bytes())
         .context(format!("Failed to write settings file {}", path.display()))?;
@@ -67,6 +69,7 @@ fn _write_settings(path: impl AsRef<Path>, settings: &Settings) -> Result<()> {
 pub struct Settings {
     pub window_size: (u32, u32),
     pub invert_mouse: bool,
+    pub render_distance: (u64, u64, u64, u64, u64, u64),
 }
 
 impl Default for Settings {
@@ -74,6 +77,7 @@ impl Default for Settings {
         Self {
             window_size: (1600, 900),
             invert_mouse: false,
+            render_distance: (4, 4, 3, 3, 4, 4),
         }
     }
 }

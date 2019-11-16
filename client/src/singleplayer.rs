@@ -50,7 +50,7 @@ impl SinglePlayer {
     }
 
     pub fn new(
-        _settings: &mut Settings,
+        settings: &mut Settings,
         gfx: &mut Gfx,
         mut client: Box<dyn Client>,
     ) -> Result<Box<dyn State>> {
@@ -75,13 +75,14 @@ impl SinglePlayer {
         info!("Received game data from the server");
 
         // Set render distance
+        let (x1, x2, y1, y2, z1, z2) = settings.render_distance;
         let render_distance = RenderDistance {
-            x_max: 6,
-            x_min: 6,
-            y_max: 3,
-            y_min: 3,
-            z_max: 6,
-            z_min: 6,
+            x_max: x1,
+            x_min: x2,
+            y_max: y1,
+            y_min: y2,
+            z_max: z1,
+            z_min: z2,
         };
         client.send(ToServer::SetRenderDistance(render_distance));
 
