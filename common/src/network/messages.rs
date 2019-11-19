@@ -5,6 +5,7 @@ use crate::{
     player::{PlayerInput, RenderDistance},
     world::{chunk::CompressedChunk, CompressedLightChunk},
 };
+use nalgebra::Vector3;
 
 /// A message sent to the server by the client
 #[derive(Debug, Clone)]
@@ -13,6 +14,8 @@ pub enum ToServer {
     SetRenderDistance(RenderDistance),
     /// Update the player's input
     UpdateInput(PlayerInput),
+    /// Break a block (player pos, yaw, pitch)
+    BreakBlock(Vector3<f64>, f64, f64),
 }
 
 /// A message sent to the client by the server

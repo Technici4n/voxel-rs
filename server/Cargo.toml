@@ -12,3 +12,6 @@ voxel-rs-common = { path = "../common" }
 anyhow = "1.0"
 env_logger = "0.7"
 log = "0.4"
+
+# Math
+nalgebra = "0.18"

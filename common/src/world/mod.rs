@@ -1,5 +1,4 @@
 use self::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
-use crate::collections::zero_initialized_vec;
 use crate::light::compute_light;
 use crate::world::chunk::ChunkPosXZ;
 use crate::{
@@ -186,7 +185,7 @@ impl World {
     }
 
     /// Return a mutable reference to the chunk if it exists and None otherwise
-    pub fn _get_chunk_mut(&mut self, pos: ChunkPos) -> Option<&mut Chunk> {
+    pub fn get_chunk_mut(&mut self, pos: ChunkPos) -> Option<&mut Chunk> {
         self.chunks.get_mut(&pos)
     }
 

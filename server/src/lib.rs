@@ -19,6 +19,9 @@ use voxel_rs_common::{
     },
     worldgen::DefaultWorldGenerator,
 };
+use voxel_rs_common::physics::player::PhysicsPlayer;
+use voxel_rs_common::physics::aabb::AABB;
+use nalgebra::Vector3;
 
 mod worldgen;
 
@@ -48,7 +51,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut generating_chunks = HashSet::new();
     // Pending light updates
     let mut update_lightning_chunks = HashSet::new();
-    let mut update_lightning_chunks_vec = VecDeque::new();
+    let mut update_lightning_chunks_vec = Vec::new();
     // Light update BFS queue
     let mut light_bfs_queue = VecDeque::new();
     let mut total_light_time = 0;
@@ -82,6 +85,59 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             player_data.render_distance = render_distance
                         });
                     }
+                    ToServer::BreakBlock(player_pos, yaw, pitch) => {
+                        // TODO: check player pos and block
+                        let physics_player = PhysicsPlayer {
+                            aabb: AABB {
+                                pos: player_pos,
+                                size_x: 0.0,
+                                size_y: 0.0,
+                                size_z: 0.0,
+                            },
+                            velocity: Vector3::zeros(),
+                        };
+                        let y = yaw.to_radians();
+                        let p = pitch.to_radians();
+                        let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
+                        // TODO: don't hardcode max dist
+                        println!("Received message");
+                        if let Some((block, _face)) = physics_player.get_pointed_at(dir, 10.0, &world) {
+                            println!("found block!");
+                            let chunk_pos = block.containing_chunk_pos();
+                            if world.has_chunk(chunk_pos) {
+                                world.get_chunk_mut(chunk_pos).unwrap().set_block_at(block.pos_in_containing_chunk(), 0);
+                                println!("updated block");
+                                // TODO: remove copy paste
+                                if world.update_highest_opaque_block(chunk_pos) {
+                                    // recompute the light of the 3x3 columns
+                                    for &c_pos in world.chunks.keys() {
+                                        if c_pos.py <= chunk_pos.py
+                                            && (c_pos.px - chunk_pos.px).abs() <= 1
+                                            && (c_pos.pz - chunk_pos.pz).abs() <= 1
+                                        {
+                                            if !update_lightning_chunks.contains(&c_pos) {
+                                                update_lightning_chunks.insert(c_pos);
+                                                update_lightning_chunks_vec.push(c_pos);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // compute only the light for the chunk
+                                    for &c_pos in world.chunks.keys() {
+                                        if (c_pos.py - chunk_pos.py).abs() <= 1
+                                            && (c_pos.px - chunk_pos.px).abs() <= 1
+                                            && (c_pos.pz - chunk_pos.pz).abs() <= 1
+                                        {
+                                            if !update_lightning_chunks.contains(&c_pos) {
+                                                update_lightning_chunks.insert(c_pos);
+                                                update_lightning_chunks_vec.push(c_pos);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 },
             }
         }
@@ -93,27 +149,27 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 world.set_chunk(chunk);
                 if world.update_highest_opaque_block(pos) {
                     // recompute the light of the 3x3 columns
-                    for c_pos in world.chunks.keys() {
+                    for &c_pos in world.chunks.keys() {
                         if c_pos.py <= pos.py
                             && (c_pos.px - pos.px).abs() <= 1
                             && (c_pos.pz - pos.pz).abs() <= 1
                         {
-                            if !update_lightning_chunks.contains(c_pos) {
-                                update_lightning_chunks.insert((*c_pos).clone());
-                                update_lightning_chunks_vec.push_back((*c_pos).clone());
+                            if !update_lightning_chunks.contains(&c_pos) {
+                                update_lightning_chunks.insert(c_pos);
+                                update_lightning_chunks_vec.push(c_pos);
                             }
                         }
                     }
                 } else {
                     // compute only the light for the chunk
-                    for c_pos in world.chunks.keys() {
+                    for &c_pos in world.chunks.keys() {
                         if (c_pos.py - pos.py).abs() <= 1
                             && (c_pos.px - pos.px).abs() <= 1
                             && (c_pos.pz - pos.pz).abs() <= 1
                         {
-                            if !update_lightning_chunks.contains(c_pos) {
-                                update_lightning_chunks.insert((*c_pos).clone());
-                                update_lightning_chunks_vec.push_back((*c_pos).clone());
+                            if !update_lightning_chunks.contains(&c_pos) {
+                                update_lightning_chunks.insert(c_pos);
+                                update_lightning_chunks_vec.push(c_pos);
                             }
                         }
                     }
@@ -122,7 +178,18 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         }
 
         // Update light of one chunk at the time
-        if let Some(pos) = update_lightning_chunks_vec.pop_front() {
+        update_lightning_chunks_vec.sort_unstable_by_key(|pos| {
+            let mut min_distance = 1_000_000_000;
+            for (player, _) in players.iter() {
+                if let Some(pl) = physics_simulation.get_state().physics_state.players.get(player) {
+                    min_distance = min_distance.min(pos.squared_euclidian_distance(
+                        BlockPos::from(pl.aabb.pos).containing_chunk_pos(),
+                    ));
+                }
+            }
+            -(min_distance as i64)
+        });
+        if let Some(pos) = update_lightning_chunks_vec.pop() {
             let t1 = Instant::now();
             world.update_light(&pos, &mut light_bfs_queue);
             update_lightning_chunks.remove(&pos);

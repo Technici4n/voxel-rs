@@ -26,6 +26,7 @@ use std::time::Instant;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
+use glutin::{ElementState, MouseButton};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -37,7 +38,8 @@ pub struct SinglePlayer {
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     client: Box<dyn Client>,
-    render_distance: RenderDistance, // TODO: put this in the settigs
+    render_distance: RenderDistance,
+    // TODO: put this in the settigs
     physics_simulation: ClientPhysicsSimulation,
     yaw_pitch: YawPitch,
     debug_info: DebugInfo,
@@ -216,7 +218,7 @@ impl State for SinglePlayer {
         chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
         for chunk_pos in chunk_updates.into_iter() {
             if (Instant::now() - meshing_start).subsec_millis() > 10 {
-                break
+                break;
             }
             // Only mesh the chunks if it needs updating
             self.chunks_to_mesh.remove(&chunk_pos);
@@ -242,12 +244,12 @@ impl State for SinglePlayer {
             .meshing_worker
             .get_processed_chunks()
             .into_iter()
-        {
-            // Add the mesh if the chunk is still loaded
-            if self.world.has_chunk(chunk_pos) {
-                self.world_renderer.update_chunk_mesh(gfx, chunk_pos, vertices, indices);
+            {
+                // Add the mesh if the chunk is still loaded
+                if self.world.has_chunk(chunk_pos) {
+                    self.world_renderer.update_chunk_mesh(gfx, chunk_pos, vertices, indices);
+                }
             }
-        }
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
@@ -348,6 +350,20 @@ impl State for SinglePlayer {
         &mut self,
         changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
     ) {
+        for (button, state) in changes.iter() {
+            match *button {
+                MouseButton::Left => match *state {
+                    ElementState::Pressed => {
+                        let pp = self.physics_simulation.get_player();
+                        let y = self.yaw_pitch.yaw;
+                        let p = self.yaw_pitch.pitch;
+                        self.client.send(ToServer::BreakBlock(pp.aabb.pos, y, p));
+                    }
+                    _ => {}
+                }
+                _ => {}
+            }
+        }
         self.ui.handle_mouse_state_changes(changes);
     }
 
