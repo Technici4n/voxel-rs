@@ -304,7 +304,7 @@ impl UiRenderer {
                 VariedSection {
                     text: parts,
                     screen_position: (l.x * dpi, l.y * dpi),
-                    bounds: (l.width, l.height),
+                    bounds: (l.width * dpi, l.height * dpi),
                     z,
                     layout: Default::default(),
                 }
