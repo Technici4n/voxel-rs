@@ -1,3 +1,5 @@
+pub mod vox;
+
 use crate::{
     block::{Block, BlockMesh, BlockType},
     registry::Registry,
@@ -10,6 +12,7 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use texture_packer::{TexturePacker, TexturePackerConfig};
+use crate::data::vox::load_voxel_model;
 
 #[derive(Debug, Clone)]
 pub struct Data {
@@ -53,6 +56,9 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     }
 
     let (texture_atlas, texture_rects) = load_textures(textures)?;
+
+    //Load model
+    load_voxel_model("data/model/tree.vox");
 
     // Load blocks
     let mut block_datas: Vec<(String, BlockType)> = Vec::new();

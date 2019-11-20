@@ -1,4 +1,5 @@
 use crate::world::renderer::VertexRGB;
+use voxel_rs_common::data::vox::VoxelModel;
 
 const D: [[i32; 3]; 6] = [
     [1, 0, 0],
@@ -34,10 +35,15 @@ fn ambiant_occl(corners: u32, edge: u32) -> u32 {
     }
 }
 
-pub fn mesh_model((size_x, size_y, size_z): (usize, usize, usize), color: Vec<u32>, block: Vec<bool>) -> (Vec<VertexRGB>, Vec<u32>){
+pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
     let mut res_vertex: Vec<VertexRGB> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
+    let size_x = model.size_x;
+    let size_y = model.size_y;
+    let size_z = model.size_z;
+    let block = &model.full;
+    let color = &model.voxels;
 
     let n_size_x = size_x + 2;
     let n_size_y = size_y + 2;
