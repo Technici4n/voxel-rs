@@ -98,6 +98,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
             .with_dimensions(settings.window_size.into());
         let context_builder = glutin::ContextBuilder::new()
             .with_vsync(false)
+            .with_multisampling(4)
             .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)));
         gfx_window_glutin::init::<ColorFormat, DepthFormat>(
             window_builder,

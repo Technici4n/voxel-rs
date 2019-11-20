@@ -6,7 +6,7 @@ use crate::{
 use anyhow::Result;
 use gfx;
 use gfx::handle::Buffer;
-use gfx::state::RasterMethod;
+use gfx::state::{RasterMethod, FrontFace, CullFace, MultiSample};
 use gfx::traits::{Factory, FactoryExt};
 use gfx_device_gl::Resources;
 use log::info;
@@ -101,6 +101,13 @@ impl WorldRenderer {
             ref mut factory, ..
         } = gfx;
 
+        let rasterizer = gfx::state::Rasterizer {
+            front_face: FrontFace::CounterClockwise,
+            cull_face: CullFace::Back,
+            method: RasterMethod::Fill,
+            offset: None,
+            samples: Some(MultiSample),
+        };
         let shader_set = factory.create_shader_set(
             load_shader("assets/shaders/world.vert").as_bytes(),
             load_shader("assets/shaders/world.frag").as_bytes(),
@@ -108,7 +115,7 @@ impl WorldRenderer {
         let pso_fill = factory.create_pipeline_state(
             &shader_set,
             gfx::Primitive::TriangleList,
-            gfx::state::Rasterizer::new_fill().with_cull_back(),
+            rasterizer,
             pipe::new(),
         )?;
 
@@ -122,6 +129,7 @@ impl WorldRenderer {
             {
                 let mut r = gfx::state::Rasterizer::new_fill().with_cull_back();
                 r.method = RasterMethod::Line(1);
+                r.samples = Some(MultiSample);
                 r
             },
             pipe::new(),
@@ -148,6 +156,7 @@ impl WorldRenderer {
             {
                 let mut r = gfx::state::Rasterizer::new_fill();
                 r.method = RasterMethod::Line(2);
+                r.samples = Some(MultiSample);
                 r
             },
             pipe_target::new(),

@@ -157,7 +157,11 @@ impl UiRenderer {
         let pso = factory.create_pipeline_state(
             &shader_set,
             gfx::Primitive::TriangleList,
-            gfx::state::Rasterizer::new_fill(),
+            {
+                let mut r = gfx::state::Rasterizer::new_fill();
+                r.samples = Some(gfx::state::MultiSample);
+                r
+            },
             pipe::new(),
         )?;
         let buffer_bind = {
