@@ -18,6 +18,7 @@ mod texture;
 mod ui;
 mod window;
 mod world;
+mod model;
 
 fn main() -> Result<()> {
     env_logger::init();

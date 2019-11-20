@@ -17,6 +17,8 @@ const float SUN_FRACTION = 0.3;
 void main() {
     float lightFactor = pow(0.8, 15.0 - v_LightLevel);
     vec2 actualPosition = v_UvPos + mod(v_UvOffset, v_UvSize);
+
     ColorBuffer = lightFactor * texture(TextureAtlas, actualPosition) * occl * vec4(1.0, 1.0, 1.0, 1.0) * (1.0 - SUN_FRACTION + SUN_FRACTION * abs(dot(v_Norm, SUN_DIRECTION)));
+    ColorBuffer.a = 1.0;
 
 }

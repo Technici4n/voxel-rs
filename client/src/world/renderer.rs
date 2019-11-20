@@ -37,6 +37,12 @@ gfx_defines! {
         pos: [f32; 3] = "a_Pos",
     }
 
+    vertex VertexRGB {
+        pos: [f32; 3] = "a_Pos",
+        info: u32 = "a_Info", // 24 bits for color, 8 bits for normal + occlusion
+    }
+
+
     constant Transform {
         view_proj: [[f32; 4]; 4] = "u_ViewProj",
         model: [[f32; 4]; 4] = "u_Model",
