@@ -19,6 +19,10 @@ use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
 use crate::render::ensure_buffer_capacity;
 use voxel_rs_common::world::chunk::CHUNK_SIZE;
 use gfx::IndexBuffer;
+use voxel_rs_common::registry::Registry;
+use crate::model::model::{ModelBuffer, Model};
+use crate::model::mesh_model;
+use voxel_rs_common::data::vox::VoxelModel;
 
 gfx_defines! {
     vertex Vertex {
@@ -65,6 +69,14 @@ gfx_defines! {
             gfx::preset::depth::LESS_EQUAL_WRITE,
     }
 
+    pipeline pipe_model {
+        vbuf: gfx::VertexBuffer<VertexRGB> = (),
+        transform: gfx::ConstantBuffer<Transform> = "Transform",
+        color_buffer: gfx::RenderTarget<ColorFormat> = "ColorBuffer",
+        depth_buffer: gfx::DepthTarget<DepthFormat> =
+            gfx::preset::depth::LESS_EQUAL_WRITE,
+    }
+
     pipeline pipe_target {
         vbuf: gfx::VertexBuffer<VertexTarget> = (),
         transform: gfx::ConstantBuffer<Transform> = "Transform",
@@ -77,18 +89,22 @@ gfx_defines! {
 type PsoType = gfx::PipelineState<gfx_device_gl::Resources, pipe::Meta>;
 type PsoSkyboxType = gfx::PipelineState<gfx_device_gl::Resources, pipe_skybox::Meta>;
 type PsoTargetType = gfx::PipelineState<gfx_device_gl::Resources, pipe_target::Meta>;
+type PsoModelType = gfx::PipelineState<gfx_device_gl::Resources, pipe_model::Meta>;
+
 
 pub struct WorldRenderer {
     pub pso_fill: PsoType,
     pub pso_wireframe: PsoType,
     pub pso_skybox: PsoSkyboxType,
     pub pso_target: PsoTargetType,
+    pub pso_model: PsoModelType,
     pub chunk_meshes: HashMap<ChunkPos, Mesh>,
     pub transform: Buffer<Resources, Transform>,
     pub block_meshes: Vec<BlockMesh>,
     pub texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
     pub texture_sampler: gfx::handle::Sampler<gfx_device_gl::Resources>,
     pub skybox: Skybox,
+    pub models_buffer : HashMap<u32, ModelBuffer>,
     pub meshing_worker: MeshingWorker,
 }
 
@@ -102,6 +118,7 @@ impl WorldRenderer {
         gfx: &mut Gfx,
         block_meshes: Vec<BlockMesh>,
         texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
+        models : &Registry<VoxelModel>,
     ) -> Result<Self> {
         let Gfx {
             ref mut factory, ..
@@ -168,6 +185,17 @@ impl WorldRenderer {
             pipe_target::new(),
         )?;
 
+        let shader_set_model = factory.create_shader_set(
+            load_shader("assets/shaders/model.vert").as_bytes(),
+            load_shader("assets/shaders/model.frag").as_bytes(),
+        )?;
+        let pso_model = factory.create_pipeline_state(
+            &shader_set_model,
+            gfx::Primitive::TriangleList,
+            gfx::state::Rasterizer::new_fill(),
+            pipe_model::new(),
+        )?;
+
         let texture_sampler = {
             use gfx::texture::*;
             factory.create_sampler(SamplerInfo {
@@ -182,17 +210,60 @@ impl WorldRenderer {
 
         let skybox = Skybox::new(factory);
 
+        let mut models_buffer = HashMap::new();
+        let buffer_bind = {
+            use gfx::memory::Bind;
+            let mut bind = Bind::empty();
+            bind.insert(Bind::SHADER_RESOURCE);
+            bind.insert(Bind::TRANSFER_DST);
+            bind
+        };
+
+
+        for i in 0..models.get_number_of_ids(){
+            match models.get_value_by_id(i){
+                Some(model) =>{
+                    let (vertices, indices) = mesh_model(&model);
+                    let n_index = indices.len() as u32;
+                    let vertex_buffer = factory.create_buffer(
+                        vertices.len(),
+                        gfx::buffer::Role::Vertex,
+                        gfx::memory::Usage::Dynamic,
+                        buffer_bind.clone(),
+                    ).expect("Failed to create chunk vertex buffer");
+                    gfx.encoder.update_buffer(&vertex_buffer, &vertices, 0).expect("Failed to update model vertex buffer");
+                    let index_buffer = factory.create_buffer(
+                        indices.len(),
+                        gfx::buffer::Role::Index,
+                        gfx::memory::Usage::Dynamic,
+                        buffer_bind.clone(),
+                    ).expect("Failed to create chunk index buffer");
+                    gfx.encoder.update_buffer(&index_buffer, &indices, 0).expect("Failed to update model index buffer");
+
+                    let buffer = ModelBuffer{
+                        vertex_buffer,
+                        index_buffer,
+                        n_index,
+                    };
+                    models_buffer.insert(i, buffer);
+                },
+                None => (),
+            }
+        }
+
         Ok(Self {
             pso_fill,
             pso_wireframe,
             pso_skybox,
             pso_target,
+            pso_model,
             chunk_meshes: HashMap::new(),
             transform: factory.create_constant_buffer(1),
             block_meshes: block_meshes.clone(),
             texture_atlas,
             texture_sampler,
             skybox,
+            models_buffer,
             meshing_worker: MeshingWorker::new(block_meshes),
         })
     }
@@ -204,6 +275,7 @@ impl WorldRenderer {
         frustum: &Frustum,
         enable_culling: bool,
         pointed_block: Option<(BlockPos, usize)>,
+        models : Vec<Model>,
     ) -> Result<()> {
         let Gfx {
             ref mut encoder,
@@ -362,6 +434,50 @@ impl WorldRenderer {
             };
             encoder.update_buffer(&data.transform, &[transform], 0)?;
             encoder.draw(&slice, &self.pso_target, &data);
+        }
+
+        for model in models{
+            let model_buffer = self.models_buffer.get(&model.model_mesh_id);
+            match model_buffer{
+                Some(m_buffer) =>{
+                    // drawing the model
+                    let transform = Transform {
+                        view_proj,
+                        model: [
+                            // warning matrix is transposed
+                            [model.scale, 0.0, 0.0, 0.0],
+                            [0.0, model.scale, 0.0, 0.0],
+                            [0.0, 0.0, model.scale, 0.0],
+                            [
+                                model.pos_x,
+                                model.pos_y,
+                                model.pos_z,
+                                1.0,
+                            ], // set model position
+                        ],
+                    };
+
+                    let data = pipe_model::Data {
+                        vbuf: m_buffer.vertex_buffer.clone(),
+                        transform: self.transform.clone(),
+                        color_buffer: color_buffer.clone(),
+                        depth_buffer: depth_buffer.clone(),
+                    };
+
+                    encoder.update_buffer(&data.transform, &[transform], 0)?;
+                    let slice = gfx::Slice {
+                        start: 0,
+                        end: m_buffer.n_index,
+                        base_vertex: 0,
+                        instances: None,
+                        buffer: IndexBuffer::Index32(m_buffer.index_buffer.clone()),
+                    };
+                    encoder.draw(&slice, &self.pso_model, &data);
+
+                },
+                None =>()
+            }
+
         }
 
         Ok(())

@@ -12,13 +12,14 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use texture_packer::{TexturePacker, TexturePackerConfig};
-use crate::data::vox::load_voxel_model;
+use crate::data::vox::{load_voxel_model, VoxelModel};
 
 #[derive(Debug, Clone)]
 pub struct Data {
     pub blocks: Registry<Block>,
     pub meshes: Vec<BlockMesh>,
     pub texture_atlas: ImageBuffer<Rgba<u8>, Vec<u8>>,
+    pub models : Registry<VoxelModel>,
 }
 
 // TODO: decent error handling
@@ -58,7 +59,26 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     let (texture_atlas, texture_rects) = load_textures(textures)?;
 
     //Load model
-    load_voxel_model("data/model/tree.vox");
+    let mut models = Registry::default();
+
+    let mut full = vec![false; 5*5*5];
+    for i in 1..3{
+        for j in 1..3{
+            for k in 1..3{
+                full[i*5*5+j*5+k] = true;
+            }
+        }
+    }
+    let model_tree = VoxelModel{
+        size_x: 5,
+        size_y: 5,
+        size_z: 5,
+        voxels: vec![0x00FF0000; 5*5*5],
+        full,
+    };
+
+    //let model_tree = load_voxel_model("data/model/tree.vox").unwrap();
+    models.register("tree".to_owned(), model_tree)?;
 
     // Load blocks
     let mut block_datas: Vec<(String, BlockType)> = Vec::new();
@@ -145,6 +165,7 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
         blocks,
         meshes,
         texture_atlas,
+        models,
     })
 }
 

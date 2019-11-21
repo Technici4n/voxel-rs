@@ -27,6 +27,8 @@ use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
 use glutin::{ElementState, MouseButton};
+use crate::model::model::Model;
+use voxel_rs_common::data::vox::VoxelModel;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -37,6 +39,7 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
+    model_regitry : Registry<VoxelModel>,
     client: Box<dyn Client>,
     render_distance: RenderDistance,
     // TODO: put this in the settigs
@@ -91,7 +94,7 @@ impl SinglePlayer {
         // Load texture atlas
         let texture_atlas = crate::texture::load_image(&mut gfx.factory, data.texture_atlas)?;
 
-        let world_renderer = WorldRenderer::new(gfx, data.meshes, texture_atlas);
+        let world_renderer = WorldRenderer::new(gfx, data.meshes, texture_atlas, &data.models);
 
         Ok(Box::new(Self {
             fps_counter: FpsCounter::new(),
@@ -100,6 +103,7 @@ impl SinglePlayer {
             world: World::new(),
             world_renderer: world_renderer?,
             block_registry: data.blocks,
+            model_regitry : data.models,
             client,
             render_distance,
             physics_simulation: ClientPhysicsSimulation::new(
@@ -314,12 +318,22 @@ impl State for SinglePlayer {
         gfx.encoder
             .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw world
+
+        let mut model_to_draw = Vec::new();
+        model_to_draw.push(Model{
+            model_mesh_id : self.model_regitry.get_id_by_name(&"tree".to_owned()).unwrap(),
+            pos_x: 0.0,
+            pos_y: 55.0,
+            pos_z: 0.0,
+            scale: 0.3
+        });
         self.world_renderer.render(
             gfx,
             data,
             &frustum,
             input_state.enable_culling,
             pointed_block,
+            model_to_draw,
         )?;
         // Clear depth
         gfx.encoder
