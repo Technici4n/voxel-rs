@@ -199,10 +199,10 @@ impl WorldRenderer {
         let texture_sampler = {
             use gfx::texture::*;
             factory.create_sampler(SamplerInfo {
-                filter: FilterMethod::Scale,
+                filter: FilterMethod::Mipmap,
                 wrap_mode: (WrapMode::Clamp, WrapMode::Clamp, WrapMode::Clamp),
                 lod_bias: 0f32.into(),
-                lod_range: (0f32.into(), 1f32.into()),
+                lod_range: (0f32.into(), 2.0f32.into()),
                 comparison: None,
                 border: PackedColor(0xffffffff),
             })
