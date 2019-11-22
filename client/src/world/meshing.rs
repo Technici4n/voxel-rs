@@ -6,25 +6,7 @@ use voxel_rs_common::{
     world::chunk::{Chunk, ChunkPos, CHUNK_SIZE},
     world::World,
 };
-
-/// Structure containing information about adjacent chunks for the meshing
-/// Order of face 1x, -1x, 1y, -1y, 1z, -1z => the two order component are in the (x,y,z) order
-/// Order of edges (yz), (y-z), (-y z), (-y - z), (xz), (x -z), (-x z), (x - z), (xy), (x - y), (-x y) (-x - y)
-/// ( xy means variation along z with x, y = (1+chunk_size, 1+chunk_size), -x y means variation along z with x, y= (-1, 1)
-/// Order of coins (1,1,1), (1, 1 -1), (1, -1, 1), (1, -1, -1),
-///  ... (-1,1,1), (-1, 1 -1), (-1, -1, 1), (-1, -1, -1),
-#[derive(Clone)]
-pub struct AdjChunkOccl {
-    faces: [[[bool; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6],
-    edges: [[bool; CHUNK_SIZE as usize]; 12],
-    corners: [bool; 8],
-}
-
-/// Same as AdjChunkOccl but for the light, need only the face
-#[derive(Clone)]
-pub struct AdjChunkLight {
-    faces: [[[u8; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6],
-}
+use std::sync::Arc;
 
 #[derive(Clone, Copy, Default)]
 pub struct Quad {
@@ -44,283 +26,6 @@ impl Quad {
     }
 }
 
-impl AdjChunkOccl {
-    /// Generate the AdjChunkOccl struct used in the meshing containing the
-    /// informations about adjacent chunks
-    pub fn create_from_world(
-        world: &World,
-        pos: ChunkPos,
-        meshes: &Vec<BlockMesh>,
-    ) -> AdjChunkOccl {
-        const ICHUNK_SIZE: i64 = CHUNK_SIZE as i64;
-        // Transform every number to 0 except -1.
-        // This allows us to transform chunk deltas into block deltas.
-        #[inline(always)]
-        fn f(x: i64) -> i64 {
-            if x == -1 {
-                -1
-            } else {
-                0
-            }
-        }
-        // faces
-        let da = [
-            [1, 0, 0],
-            [-1, 0, 0],
-            [0, 1, 0],
-            [0, -1, 0],
-            [0, 0, 1],
-            [0, 0, -1],
-        ];
-        let mut faces = [[[false; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6];
-        for i in 0..6 {
-            faces[i] = match world.get_chunk(pos.offset_by_pos(da[i].into())) {
-                Some(chunk) => {
-                    let mut res = [[false; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
-                    for j in 0..CHUNK_SIZE {
-                        for k in 0..CHUNK_SIZE {
-                            let (ux, uy, uz);
-                            if i / 2 == 0 {
-                                ux = (ICHUNK_SIZE + f(da[i][0])) as u32 % CHUNK_SIZE;
-                                uy = j;
-                                uz = k;
-                            } else if i / 2 == 1 {
-                                ux = j;
-                                uy = (ICHUNK_SIZE + f(da[i][1])) as u32 % CHUNK_SIZE;
-                                uz = k;
-                            } else {
-                                ux = j;
-                                uy = k;
-                                uz = (ICHUNK_SIZE + f(da[i][2])) as u32 % CHUNK_SIZE;
-                            }
-                            res[j as usize][k as usize] =
-                                meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
-                        }
-                    }
-                    res
-                }
-                None => [[false; CHUNK_SIZE as usize]; CHUNK_SIZE as usize],
-            };
-        }
-        // edges
-        let mut edges = [[false; CHUNK_SIZE as usize]; 12];
-        let de = [
-            [0, 1, 1],
-            [0, 1, -1],
-            [0, -1, 1],
-            [0, -1, -1],
-            [1, 0, 1],
-            [1, 0, -1],
-            [-1, 0, 1],
-            [-1, 0, -1],
-            [1, 1, 0],
-            [1, -1, 0],
-            [-1, 1, 0],
-            [-1, -1, 0],
-        ];
-        for i in 0..12 {
-            edges[i] = match world.get_chunk(pos.offset_by_pos(de[i].into())) {
-                Some(chunk) => {
-                    let mut res = [false; CHUNK_SIZE as usize];
-                    for j in 0..CHUNK_SIZE {
-                        let (ux, uy, uz);
-                        if i / 4 == 0 {
-                            ux = j;
-                            uy = (ICHUNK_SIZE + f(de[i][1])) as u32 % CHUNK_SIZE;
-                            uz = (ICHUNK_SIZE + f(de[i][2])) as u32 % CHUNK_SIZE;
-                        } else if i / 4 == 1 {
-                            ux = (ICHUNK_SIZE + f(de[i][0])) as u32 % CHUNK_SIZE;
-                            uy = j;
-                            uz = (ICHUNK_SIZE + f(de[i][2])) as u32 % CHUNK_SIZE;
-                        } else {
-                            ux = (ICHUNK_SIZE + f(de[i][0])) as u32 % CHUNK_SIZE;
-                            uy = (ICHUNK_SIZE + f(de[i][1])) as u32 % CHUNK_SIZE;
-                            uz = j;
-                        }
-                        res[j as usize] =
-                            meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque();
-                    }
-                    res
-                }
-                None => [false; CHUNK_SIZE as usize],
-            };
-        }
-        // corners
-        let mut corners = [false; 8];
-        let dc = [
-            [1, 1, 1],
-            [1, 1, -1],
-            [1, -1, 1],
-            [1, -1, -1],
-            [-1, 1, 1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [-1, -1, -1],
-        ];
-        for i in 0..8 {
-            corners[i] = match world.get_chunk(pos.offset_by_pos(dc[i].into())) {
-                None => false,
-                Some(chunk) => {
-                    let ux = (ICHUNK_SIZE + f(dc[i][0])) as u32 % CHUNK_SIZE;
-                    let uy = (ICHUNK_SIZE + f(dc[i][1])) as u32 % CHUNK_SIZE;
-                    let uz = (ICHUNK_SIZE + f(dc[i][2])) as u32 % CHUNK_SIZE;
-                    meshes[chunk.get_block_at((ux, uy, uz)) as usize].is_opaque()
-                }
-            };
-        }
-        AdjChunkOccl {
-            faces,
-            edges,
-            corners,
-        }
-    }
-    /// x, y, z are the position relative to the chunk (0, 0, 0)
-    /// Return if the block outside the chunk is opaque
-    pub fn is_full(&self, x: i32, y: i32, z: i32) -> bool {
-        fn delta(x: i32) -> usize {
-            if x == CHUNK_SIZE as i32 {
-                0
-            } else if x == -1 {
-                1
-            } else {
-                unreachable!()
-            }
-        }
-
-        let mut n_outside = 0;
-        if x == -1 || x == CHUNK_SIZE as i32 {
-            n_outside += 1;
-        }
-        if y == -1 || y == CHUNK_SIZE as i32 {
-            n_outside += 1;
-        }
-        if z == -1 || z == CHUNK_SIZE as i32 {
-            n_outside += 1;
-        }
-
-        if n_outside == 1 {
-            if x == CHUNK_SIZE as i32 {
-                return self.faces[0][y as usize][z as usize];
-            } else if x == -1 {
-                return self.faces[1][y as usize][z as usize];
-            } else if y == CHUNK_SIZE as i32 {
-                return self.faces[2][x as usize][z as usize];
-            } else if y == -1 {
-                return self.faces[3][x as usize][z as usize];
-            } else if z == CHUNK_SIZE as i32 {
-                return self.faces[4][x as usize][y as usize];
-            } else if z == -1 {
-                return self.faces[5][x as usize][y as usize];
-            }
-        } else if n_outside == 2 {
-            if x >= 0 && x < CHUNK_SIZE as i32 {
-                let i = delta(y) * 2 + delta(z);
-                return self.edges[i][x as usize];
-            } else if y >= 0 && y < CHUNK_SIZE as i32 {
-                let i = delta(x) * 2 + delta(z);
-                return self.edges[i + 4][y as usize];
-            } else if z >= 0 && z < CHUNK_SIZE as i32 {
-                let i = delta(x) * 2 + delta(y);
-                return self.edges[i + 8][z as usize];
-            }
-        } else if n_outside == 3 {
-            let i = delta(x) * 4 + delta(y) * 2 + delta(z);
-            return self.corners[i];
-        }
-        unreachable!();
-    }
-}
-
-impl AdjChunkLight {
-    /// Generate the AdjChunkOccl struct used in the meshing containing the
-    /// informations about adjacent chunks
-    pub fn create_from_world(world: &World, pos: ChunkPos) -> AdjChunkLight {
-        const ICHUNK_SIZE: i64 = CHUNK_SIZE as i64;
-        // Transform every number to 0 except -1.
-        // This allows us to transform chunk deltas into block deltas.
-        #[inline(always)]
-        fn f(x: i64) -> i64 {
-            if x == -1 {
-                -1
-            } else {
-                0
-            }
-        }
-        // faces
-        let da = [
-            [1, 0, 0],
-            [-1, 0, 0],
-            [0, 1, 0],
-            [0, -1, 0],
-            [0, 0, 1],
-            [0, 0, -1],
-        ];
-        let mut faces = [[[0; CHUNK_SIZE as usize]; CHUNK_SIZE as usize]; 6];
-        for i in 0..6 {
-            faces[i] = match world.get_light_chunk(pos.offset_by_pos(da[i].into())) {
-                Some(chunk_light) => {
-                    let mut res = [[15; CHUNK_SIZE as usize]; CHUNK_SIZE as usize];
-                    for j in 0..CHUNK_SIZE {
-                        for k in 0..CHUNK_SIZE {
-                            let (ux, uy, uz);
-                            if i / 2 == 0 {
-                                ux = (ICHUNK_SIZE + f(da[i][0])) as u32 % CHUNK_SIZE;
-                                uy = j;
-                                uz = k;
-                            } else if i / 2 == 1 {
-                                ux = j;
-                                uy = (ICHUNK_SIZE + f(da[i][1])) as u32 % CHUNK_SIZE;
-                                uz = k;
-                            } else {
-                                ux = j;
-                                uy = k;
-                                uz = (ICHUNK_SIZE + f(da[i][2])) as u32 % CHUNK_SIZE;
-                            }
-                            res[j as usize][k as usize] = chunk_light.get_light_at((ux, uy, uz));
-                        }
-                    }
-                    res
-                }
-                None => [[15; CHUNK_SIZE as usize]; CHUNK_SIZE as usize], // no chunk => full light
-            };
-        }
-
-        AdjChunkLight { faces }
-    }
-    /// Return the light at some position (only on the face)
-    pub fn get_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        let mut n_outside = 0;
-        if x == -1 || x == CHUNK_SIZE as i32 {
-            n_outside += 1;
-        }
-        if y == -1 || y == CHUNK_SIZE as i32 {
-            n_outside += 1;
-        }
-        if z == -1 || z == CHUNK_SIZE as i32 {
-            n_outside += 1;
-        }
-
-        if n_outside == 1 {
-            if x == CHUNK_SIZE as i32 {
-                return self.faces[0][y as usize][z as usize];
-            } else if x == -1 {
-                return self.faces[1][y as usize][z as usize];
-            } else if y == CHUNK_SIZE as i32 {
-                return self.faces[2][x as usize][z as usize];
-            } else if y == -1 {
-                return self.faces[3][x as usize][z as usize];
-            } else if z == CHUNK_SIZE as i32 {
-                return self.faces[4][x as usize][y as usize];
-            } else if z == -1 {
-                return self.faces[5][x as usize][y as usize];
-            } else {
-                unreachable!()
-            }
-        }
-        unreachable!()
-    }
-}
-
 const D: [[i32; 3]; 6] = [
     [1, 0, 0],
     [-1, 0, 0],
@@ -329,32 +34,6 @@ const D: [[i32; 3]; 6] = [
     [0, 0, 1],
     [0, 0, -1],
 ];
-
-/// Return True if full block (taking into account adjacent chunks)
-fn is_full(
-    chunk: &Chunk,
-    (i, j, k): (i32, i32, i32),
-    adj: &Option<AdjChunkOccl>,
-    meshes: &Vec<BlockMesh>,
-) -> bool {
-    let size = CHUNK_SIZE as i32;
-    if i >= 0 && j >= 0 && k >= 0 && i < size && j < size && k < size {
-        return meshes[chunk.get_block_at((i as u32, j as u32, k as u32)) as usize].is_opaque();
-    } else {
-        match adj {
-            Some(_adj) => _adj.is_full(i, j, k),
-            None => false,
-        }
-    }
-}
-
-/// Return true if pos (x,y,z) is in block (i,j,k)
-fn _in_block((i, j, k): (i32, i32, i32), (x, y, z): (f32, f32, f32)) -> bool {
-    let dx = x - i as f32;
-    let dy = y - j as f32;
-    let dz = z - k as f32;
-    dx >= 0.0 && dx <= 1.0 && dy >= 0.0 && dy <= 1.0 && dz >= 0.0 && dz <= 1.0
-}
 
 /// Ambient occlusion code (cf : https://0fps.net/2013/07/03/ambient-occlusion-for-minecraft-like-worlds/)
 fn ambiant_occl(corners: u32, edge: u32) -> u32 {
@@ -369,14 +48,50 @@ fn ambiant_occl(corners: u32, edge: u32) -> u32 {
     }
 }
 
+/// The chunk-specific data that is needed to mesh it.
+pub struct ChunkMeshData {
+    /// The chunk to mesh
+    pub chunk: Arc<Chunk>,
+    /// The chunks that are adjacent to the current chunk (the value at position 9+3+1, i.e. the current chunk, doesn't matter)
+    pub all_chunks: [Option<Arc<Chunk>>; 27],
+    /// The light chunk of the current chunk
+    pub light_chunk: Arc<LightChunk>,
+    /// The light chunks that are adjacent to the current light chunk
+    pub all_light_chunks: [Option<Arc<LightChunk>>; 27],
+}
+
+impl ChunkMeshData {
+    /// Extract the data from the world. Panics if the world doesn't contain the current chunk and the current light chunk
+    pub fn create_from_world(world: &World, pos: ChunkPos) -> Self {
+        let chunk = world.get_chunk(pos).expect("no chunk at current position to create ChunkMeshData");
+        let light_chunk = world.get_light_chunk(pos).expect("no light chunk at current position to create ChunkMeshData");
+        let mut all_chunks: [Option<Arc<Chunk>>; 27] = Default::default();
+        let mut all_light_chunks: [Option<Arc<LightChunk>>; 27] = Default::default();
+        for i in 0..3 {
+            for j in 0..3 {
+                for k in 0..3 {
+                    let np = pos.offset(i, j, k);
+                    let idx = (i*9 + j*3 + k) as usize;
+                    all_chunks[idx] = world.get_chunk(np);
+                    all_light_chunks[idx] = world.get_light_chunk(np);
+                }
+            }
+        }
+
+        Self {
+            chunk,
+            light_chunk,
+            all_chunks,
+            all_light_chunks,
+        }
+    }
+}
+
 /// Greedy meshing : compressed adjacent quads, return the number of uncompressed and compressed quads
 ///
 /// `quads`: Buffer that is reused every time.
 pub fn greedy_meshing(
-    chunk: &Chunk,
-    light_chunk: &LightChunk,
-    adj: Option<AdjChunkOccl>,
-    adj_light: AdjChunkLight,
+    chunk_data: ChunkMeshData,
     meshes: &Vec<BlockMesh>,
     quads: &mut Vec<Quad>,
 ) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
@@ -390,62 +105,64 @@ pub fn greedy_meshing(
 
     const N_SIZE: usize = (CHUNK_SIZE + 2) as usize;
     let mut chunk_mask = [false; N_SIZE * N_SIZE * N_SIZE];
+    let mut light_levels = [15; N_SIZE * N_SIZE * N_SIZE];
 
     #[inline(always)]
     fn ind(x: i32, y: i32, z: i32) -> usize {
         let (a, b, c) = (x as usize, y as usize, z as usize);
+        uind(a, b, c)
+    }
+
+    #[inline(always)]
+    fn uind(a: usize, b: usize, c: usize) -> usize {
         (a * N_SIZE * N_SIZE + b * N_SIZE + c) as usize
     }
 
-    const IN_SIZE: i32 = N_SIZE as i32;
-    for i in 0..IN_SIZE {
-        for j in 0..IN_SIZE {
-            for k in 0..IN_SIZE {
-                if i == 0
-                    || i == IN_SIZE - 1
-                    || j == 0
-                    || j == IN_SIZE - 1
-                    || k == 0
-                    || k == IN_SIZE - 1
-                {
-                    chunk_mask[ind(i, j, k)] = is_full(chunk, (i - 1, j - 1, k - 1), &adj, meshes);
-                }
+    #[inline(always)]
+    fn chunk_index(x: usize, y: usize, z: usize) -> usize {
+        #[inline(always)]
+        fn f(x: usize) -> usize {
+            if x == 0 {
+                0
+            } else if x == N_SIZE - 1 {
+                2
+            } else {
+                1
             }
         }
+        9*f(x) + 3*f(y) + f(z)
     }
 
-    for i in 0..CHUNK_SIZE {
-        for j in 0..CHUNK_SIZE {
-            for k in 0..CHUNK_SIZE {
-                chunk_mask[ind(i as i32 + 1, j as i32 + 1, k as i32 + 1)] =
-                    meshes[chunk.get_block_at((i, j, k)) as usize].is_opaque();
+    #[inline(always)]
+    fn outside_position(x: usize, y: usize, z: usize) -> (u32, u32, u32) {
+        #[inline(always)]
+        fn f(x: usize) -> u32 {
+            if x == 0 {
+                CHUNK_SIZE - 1
+            } else if x == N_SIZE - 1 {
+                0
+            } else {
+                x as u32 - 1
             }
         }
+        (f(x), f(y), f(z))
     }
 
-    // Generating the light levels
-    let mut light_levels = [15; N_SIZE * N_SIZE * N_SIZE];
-    for i in 0..CHUNK_SIZE {
-        for j in 0..CHUNK_SIZE {
-            for k in 0..CHUNK_SIZE {
-                light_levels[ind(i as i32 + 1, j as i32 + 1, k as i32 + 1)] =
-                    light_chunk.get_light_at((i, j, k));
-            }
-        }
-    }
-    for i in 0..IN_SIZE {
-        for j in 0..IN_SIZE {
-            for k in 0..IN_SIZE {
-                if ((i == 0 || i == IN_SIZE - 1)
-                    ^ (j == 0 || j == IN_SIZE - 1)
-                    ^ (k == 0 || k == IN_SIZE - 1))
-                    && !((i == 0 || i == IN_SIZE - 1)
-                        && (j == 0 || j == IN_SIZE - 1)
-                        && (k == 0 || k == IN_SIZE - 1))
-                // exclusive or with 3 value (check if only on a face and note an edge or corner)
-                {
-                    light_levels[ind(i as i32, j as i32, k as i32)] =
-                        adj_light.get_light(i as i32 - 1, j as i32 - 1, k as i32 - 1);
+    // TODO: for light, we don't need the 8 corners
+    for i in 0..N_SIZE {
+        for j in 0..N_SIZE {
+            for k in 0..N_SIZE {
+                let ci = chunk_index(i, j, k);
+                if ci == 13 { // 13 = 9 + 3 + 1 is the current chunk
+                    chunk_mask[uind(i, j, k)] = meshes[chunk_data.chunk.get_block_at((i as u32 - 1, j as u32 - 1, k as u32 - 1)) as usize].is_opaque();
+                    light_levels[uind(i, j, k)] = chunk_data.light_chunk.get_light_at((i as u32 - 1, j as u32 - 1, k as u32 - 1));
+                } else {
+                    if let Some(c) = &chunk_data.all_chunks[ci] {
+                        chunk_mask[uind(i, j, k)] = meshes[c.get_block_at(outside_position(i, j, k)) as usize].is_opaque();
+                    }
+                    if let Some(lc) = &chunk_data.all_light_chunks[ci] {
+                        light_levels[uind(i, j, k)] = lc.get_light_at(outside_position(i, j, k));
+                    }
                 }
             }
         }
@@ -560,7 +277,7 @@ pub fn greedy_meshing(
                                 v4: (s as u32)
                                     + (ambiant_occl(coins[3], edge[3]) << 3)
                                     + ((light_level as u32) << 5),
-                                block_id: chunk.get_block_at((i as u32, j as u32, k as u32)),
+                                block_id: chunk_data.chunk.get_block_at((i as u32, j as u32, k as u32)),
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
                             to_mesh[ind_mesh(s, i, j, k)] = true;

@@ -7,6 +7,7 @@ use crate::{
 };
 use nalgebra::Vector3;
 use std::collections::{HashMap, VecDeque};
+use std::sync::Arc;
 
 pub mod chunk;
 
@@ -137,8 +138,8 @@ impl CompressedLightChunk {
 
 /// A game world
 pub struct World {
-    pub chunks: HashMap<ChunkPos, Chunk>,
-    pub light: HashMap<ChunkPos, LightChunk>,
+    pub chunks: HashMap<ChunkPos, Arc<Chunk>>,
+    pub light: HashMap<ChunkPos, Arc<LightChunk>>,
     pub highest_opaque_block: HashMap<ChunkPosXZ, HighestOpaqueBlock>,
 }
 
@@ -175,23 +176,23 @@ impl World {
     }
 
     /// Return a reference to the chunk if it exists, None otherwise
-    pub fn get_chunk(&self, pos: ChunkPos) -> Option<&Chunk> {
-        self.chunks.get(&pos)
+    pub fn get_chunk(&self, pos: ChunkPos) -> Option<Arc<Chunk>> {
+        self.chunks.get(&pos).cloned()
     }
 
     /// Return a reference to the light chunk if it exists, None otherwise
-    pub fn get_light_chunk(&self, pos: ChunkPos) -> Option<&LightChunk> {
-        self.light.get(&pos)
-    }
-
-    /// Return a mutable reference to the chunk if it exists and None otherwise
-    pub fn get_chunk_mut(&mut self, pos: ChunkPos) -> Option<&mut Chunk> {
-        self.chunks.get_mut(&pos)
+    pub fn get_light_chunk(&self, pos: ChunkPos) -> Option<Arc<LightChunk>> {
+        self.light.get(&pos).cloned()
     }
 
     /// Return true if there exists a chunk at `pos`
     pub fn has_chunk(&self, pos: ChunkPos) -> bool {
-        return self.chunks.contains_key(&pos);
+        self.chunks.contains_key(&pos)
+    }
+
+    /// Return true if there exists a light chunk at `pos`
+    pub fn has_light_chunk(&self, pos: ChunkPos) -> bool {
+        self.light.contains_key(&pos)
     }
 
     /// Return block at position `pos` in the world. 0 is returned if the chunk does not exists/is not loaded
@@ -202,37 +203,24 @@ impl World {
         }
     }
 
-    /// Set block at position `pos`
-    /// Create a new empty chunk if necessary
-    pub fn set_block(&mut self, pos: BlockPos, block: BlockId) {
-        self.get_add_chunk(pos.containing_chunk_pos())
-            .set_block_at(pos.pos_in_containing_chunk(), block);
-    }
-
-    /// Create a new chunk at position `pos` if not already present
-    /// Anyway, return the a mutable reference to the chunk created or existing
-    pub fn get_add_chunk(&mut self, pos: ChunkPos) -> &mut Chunk {
-        // TODO : remove this
-        self.chunks.entry(pos).or_insert_with(|| Chunk::new(pos))
-    }
-
     /// Create a new light chunk at position `pos` if not already present
     /// Anyway, return the a mutable reference to the chunk created or existing
-    pub fn get_add_light_chunk(&mut self, pos: ChunkPos) -> &mut LightChunk {
+    pub fn get_add_light_chunk(&mut self, pos: ChunkPos) -> Arc<LightChunk> {
         // TODO : remove this
         self.light
             .entry(pos)
-            .or_insert_with(|| LightChunk::new(pos))
+            .or_insert_with(|| Arc::new(LightChunk::new(pos)))
+            .clone()
     }
 
     /// Set the chunk at position `pos`
     pub fn set_chunk(&mut self, chunk: Chunk) {
-        self.chunks.insert(chunk.pos, chunk);
+        self.chunks.insert(chunk.pos, Arc::new(chunk));
     }
 
     /// Set the light chunk at position `pos`
     pub fn set_light_chunk(&mut self, chunk: LightChunk) {
-        self.light.insert(chunk.pos, chunk);
+        self.light.insert(chunk.pos, Arc::new(chunk));
     }
 
     /// Function to be called when updating a chunk to update highest
@@ -338,7 +326,7 @@ impl World {
     ) -> bool {
         if self.chunks.contains_key(&pos) {
             let light = {
-                let mut vec_chunk: Vec<Option<&Chunk>> = Vec::new();
+                let mut vec_chunk: Vec<Option<Arc<Chunk>>> = Vec::new();
                 let mut vec_highest_opaque_block: Vec<HighestOpaqueBlock> = Vec::new();
 
                 // Creating the datastructure to be sent to the lightning algorithm
@@ -370,15 +358,15 @@ impl World {
             // updating the light
             self.light.insert(
                 *pos,
-                LightChunk {
+                Arc::new(LightChunk {
                     light: light.to_vec(),
                     pos: *pos,
-                },
+                }),
             );
 
-            return true;
+            true
         } else {
-            return false;
+            false
         }
     }
 }

@@ -11,14 +11,14 @@ use voxel_rs_common::{
 };
 
 use crate::input::YawPitch;
-use crate::world::meshing::AdjChunkLight;
+use crate::world::meshing::ChunkMeshData;
 use crate::{
     fps::FpsCounter,
     input::InputState,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{frustum::Frustum, meshing::AdjChunkOccl, renderer::WorldRenderer},
+    world::{frustum::Frustum, renderer::WorldRenderer},
 };
 use nalgebra::Vector3;
 use std::collections::HashSet;
@@ -227,17 +227,9 @@ impl State for SinglePlayer {
             // Only mesh the chunks if it needs updating
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
-                self.world.get_add_light_chunk(chunk_pos);
-                let chunk = self.world.get_chunk(chunk_pos).unwrap();
+                assert_eq!(self.world.has_light_chunk(chunk_pos), true);
                 self.world_renderer.meshing_worker.enqueue_chunk(
-                    chunk.clone(),
-                    self.world.get_light_chunk(chunk_pos).cloned().unwrap(),
-                    AdjChunkOccl::create_from_world(
-                        &self.world,
-                        chunk_pos,
-                        &self.world_renderer.block_meshes,
-                    ),
-                    AdjChunkLight::create_from_world(&self.world, chunk_pos),
+                    ChunkMeshData::create_from_world(&self.world, chunk_pos),
                 );
             }
         }

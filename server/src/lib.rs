@@ -105,7 +105,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             println!("found block!");
                             let chunk_pos = block.containing_chunk_pos();
                             if world.has_chunk(chunk_pos) {
-                                world.get_chunk_mut(chunk_pos).unwrap().set_block_at(block.pos_in_containing_chunk(), 0);
+                                let mut new_chunk = (*world.get_chunk(chunk_pos).unwrap()).clone();
+                                new_chunk.set_block_at(block.pos_in_containing_chunk(), 0);
+                                world.set_chunk(new_chunk);
+
                                 println!("updated block");
                                 // TODO: remove copy paste
                                 if world.update_highest_opaque_block(chunk_pos) {
@@ -235,9 +238,9 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         server.send(
                             *player,
                             ToClient::Chunk(
-                                CompressedChunk::from_chunk(chunk),
+                                CompressedChunk::from_chunk(&chunk),
                                 CompressedLightChunk::from_chunk(
-                                    world.get_add_light_chunk(chunk_pos),
+                                    &world.get_add_light_chunk(chunk_pos),
                                 ),
                             ),
                         );

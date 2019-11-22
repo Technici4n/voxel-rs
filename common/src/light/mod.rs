@@ -1,6 +1,7 @@
 use crate::world::chunk::{Chunk, CHUNK_SIZE};
 use crate::world::HighestOpaqueBlock;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 // TODO : Add block that are source of light
 
@@ -18,7 +19,7 @@ impl LightData {
 
 /// Take a 3x3x3 chunks bloc and 3x3 HighestOpaqueBlock and compute the light by using a BFS
 pub fn compute_light(
-    chunks: Vec<Option<&Chunk>>,
+    chunks: Vec<Option<Arc<Chunk>>>,
     highest_opaque_blocks: Vec<HighestOpaqueBlock>,
     bfs_queue: &mut VecDeque<(usize, usize, usize, u8)>,
 ) -> LightData {
@@ -32,7 +33,7 @@ pub fn compute_light(
     let csize = CHUNK_SIZE as usize;
 
     let mut transparent_count = 0;
-    let c = chunks[9 + 3 + 1].unwrap();
+    let c = chunks[9 + 3 + 1].clone().unwrap();
 
     for i in 0..CHUNK_SIZE {
         for j in 0..CHUNK_SIZE {
@@ -50,7 +51,7 @@ pub fn compute_light(
     for cx in 0..3 {
         for cy in 0..3 {
             for cz in 0..3 {
-                let chunk = chunks[cx * 9 + cy * 3 + cz];
+                let chunk = chunks[cx * 9 + cy * 3 + cz].clone();
                 let highest_opaque_block = &highest_opaque_blocks[cx * 3 + cz];
                 // First we compute the range of the blocks we have to check in the chunk.
                 let mut i_range = 0..CHUNK_SIZE;

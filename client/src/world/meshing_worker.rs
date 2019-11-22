@@ -1,11 +1,10 @@
-use crate::world::meshing::{greedy_meshing, AdjChunkLight, AdjChunkOccl};
+use crate::world::meshing::{greedy_meshing, ChunkMeshData};
 use crate::world::renderer::Vertex;
 use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::debug::send_debug_info;
-use voxel_rs_common::world::chunk::{Chunk, ChunkPos};
-use voxel_rs_common::world::LightChunk;
+use voxel_rs_common::world::chunk::ChunkPos;
 
 pub type ChunkMesh = (ChunkPos, Vec<Vertex>, Vec<u32>);
 
@@ -17,7 +16,7 @@ pub struct MeshingWorker {
 
 /// Message sent to the other threads.
 enum ToOtherThread {
-    Enqueue(Chunk, LightChunk, AdjChunkOccl, AdjChunkLight),
+    Enqueue(ChunkMeshData),
     Dequeue(ChunkPos),
 }
 
@@ -40,13 +39,10 @@ impl MeshingWorker {
     /// Enqueue a chunk
     pub fn enqueue_chunk(
         &mut self,
-        chunk: Chunk,
-        light_chunk: LightChunk,
-        adj: AdjChunkOccl,
-        adj_light: AdjChunkLight,
+        data: ChunkMeshData,
     ) {
         self.sender
-            .send(ToOtherThread::Enqueue(chunk, light_chunk, adj, adj_light))
+            .send(ToOtherThread::Enqueue(data))
             .unwrap();
     }
 
@@ -94,9 +90,9 @@ fn launch_worker(
             }
         } {
             match message {
-                ToOtherThread::Enqueue(chunk, light_chunk, adj, adj_light) => {
-                    ordered_positions.push_back(chunk.pos);
-                    queued_chunks.insert(chunk.pos, (chunk, light_chunk, adj, adj_light));
+                ToOtherThread::Enqueue(data) => {
+                    ordered_positions.push_back(data.chunk.pos);
+                    queued_chunks.insert(data.chunk.pos, data);
                 }
                 ToOtherThread::Dequeue(pos) => {
                     queued_chunks.remove(&pos);
@@ -106,12 +102,9 @@ fn launch_worker(
 
         // Mesh the first chunk that is in the queue
         while let Some(chunk_pos) = ordered_positions.pop_front() {
-            if let Some((chunk, light_chunk, adj, adj_light)) = queued_chunks.remove(&chunk_pos) {
+            if let Some(data) = queued_chunks.remove(&chunk_pos) {
                 let (vertices, indices, _, _) = greedy_meshing(
-                    &chunk,
-                    &light_chunk,
-                    Some(adj),
-                    adj_light,
+                    data,
                     &block_meshes,
                     &mut quads,
                 );
