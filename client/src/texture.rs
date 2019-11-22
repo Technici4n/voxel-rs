@@ -19,24 +19,30 @@ where
     // Generate mipmaps
     let mut mipmaps = Vec::new();
     mipmaps.push(Vec::from(&*image));
-    for level in 1..5 { // 5 mip maps only
+    for level in 1..5 {
+        // 5 mip maps only
         let current_size = (image_size >> level) as usize;
         if current_size == 0 {
-            break
+            break;
         }
-        let previous_size = (image_size >> (level-1)) as usize;
+        let previous_size = (image_size >> (level - 1)) as usize;
         let mut new_layer = Vec::with_capacity(current_size * current_size * 4);
         let previous_layer = mipmaps.last().unwrap();
         for row in 0..current_size {
             for col in 0..current_size {
                 for color in 0..4 {
                     new_layer.push(
-                        (
-                            (previous_layer[2*row*previous_size*4 + 2*col*4 + color] as u16
-                                + previous_layer[2*row*previous_size*4 + (2*col+1)*4 + color] as u16
-                                + previous_layer[(2*row+1)*previous_size*4 + 2*col*4 + color] as u16
-                                + previous_layer[(2*row+1)*previous_size*4 + (2*col+1)*4 + color] as u16)
-                        / 4) as u8
+                        ((previous_layer[2 * row * previous_size * 4 + 2 * col * 4 + color] as u16
+                            + previous_layer
+                                [2 * row * previous_size * 4 + (2 * col + 1) * 4 + color]
+                                as u16
+                            + previous_layer
+                                [(2 * row + 1) * previous_size * 4 + 2 * col * 4 + color]
+                                as u16
+                            + previous_layer
+                                [(2 * row + 1) * previous_size * 4 + (2 * col + 1) * 4 + color]
+                                as u16)
+                            / 4) as u8,
                     );
                 }
             }
@@ -52,7 +58,13 @@ where
     let (_, texture_view) = factory.create_texture_immutable_u8::<gfx::format::Rgba8>(
         texture_kind,
         gfx::texture::Mipmap::Provided,
-        &[&mipmaps[0], &mipmaps[1], &mipmaps[2], &mipmaps[3], &mipmaps[4]],
+        &[
+            &mipmaps[0],
+            &mipmaps[1],
+            &mipmaps[2],
+            &mipmaps[3],
+            &mipmaps[4],
+        ],
     )?;
     Ok(texture_view)
 }

@@ -1,3 +1,6 @@
+use crate::model::mesh_model;
+use crate::model::model::{Model, ModelBuffer};
+use crate::render::ensure_buffer_capacity;
 use crate::{
     mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
@@ -6,23 +9,20 @@ use crate::{
 use anyhow::Result;
 use gfx;
 use gfx::handle::Buffer;
-use gfx::state::{RasterMethod, FrontFace, CullFace, MultiSample};
+use gfx::state::{CullFace, FrontFace, MultiSample, RasterMethod};
 use gfx::traits::{Factory, FactoryExt};
+use gfx::IndexBuffer;
 use gfx_device_gl::Resources;
 use log::info;
 use nalgebra::{convert, Matrix4};
 use std::collections::HashMap;
 use std::path::Path;
+use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::send_debug_info;
+use voxel_rs_common::registry::Registry;
+use voxel_rs_common::world::chunk::CHUNK_SIZE;
 use voxel_rs_common::world::BlockPos;
 use voxel_rs_common::{block::BlockMesh, world::chunk::ChunkPos};
-use crate::render::ensure_buffer_capacity;
-use voxel_rs_common::world::chunk::CHUNK_SIZE;
-use gfx::IndexBuffer;
-use voxel_rs_common::registry::Registry;
-use crate::model::model::{ModelBuffer, Model};
-use crate::model::mesh_model;
-use voxel_rs_common::data::vox::VoxelModel;
 
 gfx_defines! {
     vertex Vertex {
@@ -91,7 +91,6 @@ type PsoSkyboxType = gfx::PipelineState<gfx_device_gl::Resources, pipe_skybox::M
 type PsoTargetType = gfx::PipelineState<gfx_device_gl::Resources, pipe_target::Meta>;
 type PsoModelType = gfx::PipelineState<gfx_device_gl::Resources, pipe_model::Meta>;
 
-
 pub struct WorldRenderer {
     pub pso_fill: PsoType,
     pub pso_wireframe: PsoType,
@@ -104,7 +103,7 @@ pub struct WorldRenderer {
     pub texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
     pub texture_sampler: gfx::handle::Sampler<gfx_device_gl::Resources>,
     pub skybox: Skybox,
-    pub models_buffer : HashMap<u32, ModelBuffer>,
+    pub models_buffer: HashMap<u32, ModelBuffer>,
     pub meshing_worker: MeshingWorker,
 }
 
@@ -118,7 +117,7 @@ impl WorldRenderer {
         gfx: &mut Gfx,
         block_meshes: Vec<BlockMesh>,
         texture_atlas: gfx::handle::ShaderResourceView<gfx_device_gl::Resources, [f32; 4]>,
-        models : &Registry<VoxelModel>,
+        models: &Registry<VoxelModel>,
     ) -> Result<Self> {
         let Gfx {
             ref mut factory, ..
@@ -219,34 +218,41 @@ impl WorldRenderer {
             bind
         };
 
-
-        for i in 0..models.get_number_of_ids(){
-            match models.get_value_by_id(i){
-                Some(model) =>{
+        for i in 0..models.get_number_of_ids() {
+            match models.get_value_by_id(i) {
+                Some(model) => {
                     let (vertices, indices) = mesh_model(&model);
                     let n_index = indices.len() as u32;
-                    let vertex_buffer = factory.create_buffer(
-                        vertices.len(),
-                        gfx::buffer::Role::Vertex,
-                        gfx::memory::Usage::Dynamic,
-                        buffer_bind.clone(),
-                    ).expect("Failed to create chunk vertex buffer");
-                    gfx.encoder.update_buffer(&vertex_buffer, &vertices, 0).expect("Failed to update model vertex buffer");
-                    let index_buffer = factory.create_buffer(
-                        indices.len(),
-                        gfx::buffer::Role::Index,
-                        gfx::memory::Usage::Dynamic,
-                        buffer_bind.clone(),
-                    ).expect("Failed to create chunk index buffer");
-                    gfx.encoder.update_buffer(&index_buffer, &indices, 0).expect("Failed to update model index buffer");
+                    let vertex_buffer = factory
+                        .create_buffer(
+                            vertices.len(),
+                            gfx::buffer::Role::Vertex,
+                            gfx::memory::Usage::Dynamic,
+                            buffer_bind.clone(),
+                        )
+                        .expect("Failed to create chunk vertex buffer");
+                    gfx.encoder
+                        .update_buffer(&vertex_buffer, &vertices, 0)
+                        .expect("Failed to update model vertex buffer");
+                    let index_buffer = factory
+                        .create_buffer(
+                            indices.len(),
+                            gfx::buffer::Role::Index,
+                            gfx::memory::Usage::Dynamic,
+                            buffer_bind.clone(),
+                        )
+                        .expect("Failed to create chunk index buffer");
+                    gfx.encoder
+                        .update_buffer(&index_buffer, &indices, 0)
+                        .expect("Failed to update model index buffer");
 
-                    let buffer = ModelBuffer{
+                    let buffer = ModelBuffer {
                         vertex_buffer,
                         index_buffer,
                         n_index,
                     };
                     models_buffer.insert(i, buffer);
-                },
+                }
                 None => (),
             }
         }
@@ -275,7 +281,7 @@ impl WorldRenderer {
         frustum: &Frustum,
         enable_culling: bool,
         pointed_block: Option<(BlockPos, usize)>,
-        models : Vec<Model>,
+        models: Vec<Model>,
     ) -> Result<()> {
         let Gfx {
             ref mut encoder,
@@ -436,10 +442,10 @@ impl WorldRenderer {
             encoder.draw(&slice, &self.pso_target, &data);
         }
 
-        for model in models{
+        for model in models {
             let model_buffer = self.models_buffer.get(&model.model_mesh_id);
-            match model_buffer{
-                Some(m_buffer) =>{
+            match model_buffer {
+                Some(m_buffer) => {
                     // drawing the model
                     let transform = Transform {
                         view_proj,
@@ -448,12 +454,7 @@ impl WorldRenderer {
                             [model.scale, 0.0, 0.0, 0.0],
                             [0.0, model.scale, 0.0, 0.0],
                             [0.0, 0.0, model.scale, 0.0],
-                            [
-                                model.pos_x,
-                                model.pos_y,
-                                model.pos_z,
-                                1.0,
-                            ], // set model position
+                            [model.pos_x, model.pos_y, model.pos_z, 1.0], // set model position
                         ],
                     };
 
@@ -473,25 +474,40 @@ impl WorldRenderer {
                         buffer: IndexBuffer::Index32(m_buffer.index_buffer.clone()),
                     };
                     encoder.draw(&slice, &self.pso_model, &data);
-
-                },
-                None =>()
+                }
+                None => (),
             }
-
         }
 
         Ok(())
     }
 
     /// Add a new chunk mesh to the rendering or update one if already exists
-    pub fn update_chunk_mesh(&mut self, gfx: &mut Gfx, pos: ChunkPos, vertices: Vec<Vertex>, indices: Vec<u32>) {
+    pub fn update_chunk_mesh(
+        &mut self,
+        gfx: &mut Gfx,
+        pos: ChunkPos,
+        vertices: Vec<Vertex>,
+        indices: Vec<u32>,
+    ) {
         if let Some(mesh) = self.chunk_meshes.get_mut(&pos) {
             // Resize if necessary and update
-            let Mesh { ref mut vertex_buffer, ref mut index_buffer, ref mut index_len, .. } = mesh;
-            ensure_buffer_capacity(vertex_buffer, vertices.len(), &mut gfx.factory).expect("Failed to resize chunk vertex buffer");
-            gfx.encoder.update_buffer(vertex_buffer, &vertices, 0).expect("Failed to update chunk vertex buffer");
-            ensure_buffer_capacity(index_buffer, indices.len(), &mut gfx.factory).expect("Failed to resize chunk index buffer");
-            gfx.encoder.update_buffer(index_buffer, &indices, 0).expect("Failed to update chunk index buffer");
+            let Mesh {
+                ref mut vertex_buffer,
+                ref mut index_buffer,
+                ref mut index_len,
+                ..
+            } = mesh;
+            ensure_buffer_capacity(vertex_buffer, vertices.len(), &mut gfx.factory)
+                .expect("Failed to resize chunk vertex buffer");
+            gfx.encoder
+                .update_buffer(vertex_buffer, &vertices, 0)
+                .expect("Failed to update chunk vertex buffer");
+            ensure_buffer_capacity(index_buffer, indices.len(), &mut gfx.factory)
+                .expect("Failed to resize chunk index buffer");
+            gfx.encoder
+                .update_buffer(index_buffer, &indices, 0)
+                .expect("Failed to update chunk index buffer");
             *index_len = indices.len();
         } else {
             // Create new buffers
@@ -502,29 +518,42 @@ impl WorldRenderer {
                 bind.insert(Bind::TRANSFER_DST);
                 bind
             };
-            let vertex_buffer = gfx.factory.create_buffer(
-                vertices.len(),
-                gfx::buffer::Role::Vertex,
-                gfx::memory::Usage::Dynamic,
-                buffer_bind.clone(),
-            ).expect("Failed to create chunk vertex buffer");
-            gfx.encoder.update_buffer(&vertex_buffer, &vertices, 0).expect("Failed to update chunk vertex buffer");
-            let index_buffer = gfx.factory.create_buffer(
-                indices.len(),
-                gfx::buffer::Role::Index,
-                gfx::memory::Usage::Dynamic,
-                buffer_bind.clone(),
-            ).expect("Failed to create chunk index buffer");
-            gfx.encoder.update_buffer(&index_buffer, &indices, 0).expect("Failed to update chunk index buffer");
+            let vertex_buffer = gfx
+                .factory
+                .create_buffer(
+                    vertices.len(),
+                    gfx::buffer::Role::Vertex,
+                    gfx::memory::Usage::Dynamic,
+                    buffer_bind.clone(),
+                )
+                .expect("Failed to create chunk vertex buffer");
+            gfx.encoder
+                .update_buffer(&vertex_buffer, &vertices, 0)
+                .expect("Failed to update chunk vertex buffer");
+            let index_buffer = gfx
+                .factory
+                .create_buffer(
+                    indices.len(),
+                    gfx::buffer::Role::Index,
+                    gfx::memory::Usage::Dynamic,
+                    buffer_bind.clone(),
+                )
+                .expect("Failed to create chunk index buffer");
+            gfx.encoder
+                .update_buffer(&index_buffer, &indices, 0)
+                .expect("Failed to update chunk index buffer");
             // Add mesh to HashMap
-            self.chunk_meshes.insert(pos, Mesh {
-                pos_x: (pos.px * CHUNK_SIZE as i64) as f32,
-                pos_y: (pos.py * CHUNK_SIZE as i64) as f32,
-                pos_z: (pos.pz * CHUNK_SIZE as i64) as f32,
-                vertex_buffer,
-                index_buffer,
-                index_len: indices.len(),
-            });
+            self.chunk_meshes.insert(
+                pos,
+                Mesh {
+                    pos_x: (pos.px * CHUNK_SIZE as i64) as f32,
+                    pos_y: (pos.py * CHUNK_SIZE as i64) as f32,
+                    pos_z: (pos.pz * CHUNK_SIZE as i64) as f32,
+                    vertex_buffer,
+                    index_buffer,
+                    index_len: indices.len(),
+                },
+            );
         }
     }
 }

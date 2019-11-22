@@ -1,8 +1,11 @@
 use crate::worldgen::WorldGenerationWorker;
 use anyhow::Result;
 use log::info;
+use nalgebra::Vector3;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::Instant;
+use voxel_rs_common::physics::aabb::AABB;
+use voxel_rs_common::physics::player::PhysicsPlayer;
 use voxel_rs_common::{
     data::load_data,
     debug::send_debug_info,
@@ -19,9 +22,6 @@ use voxel_rs_common::{
     },
     worldgen::DefaultWorldGenerator,
 };
-use voxel_rs_common::physics::player::PhysicsPlayer;
-use voxel_rs_common::physics::aabb::AABB;
-use nalgebra::Vector3;
 
 mod worldgen;
 
@@ -101,7 +101,9 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
                         // TODO: don't hardcode max dist
                         println!("Received message");
-                        if let Some((block, _face)) = physics_player.get_pointed_at(dir, 10.0, &world) {
+                        if let Some((block, _face)) =
+                            physics_player.get_pointed_at(dir, 10.0, &world)
+                        {
                             println!("found block!");
                             let chunk_pos = block.containing_chunk_pos();
                             if world.has_chunk(chunk_pos) {
@@ -184,7 +186,12 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         update_lightning_chunks_vec.sort_unstable_by_key(|pos| {
             let mut min_distance = 1_000_000_000;
             for (player, _) in players.iter() {
-                if let Some(pl) = physics_simulation.get_state().physics_state.players.get(player) {
+                if let Some(pl) = physics_simulation
+                    .get_state()
+                    .physics_state
+                    .players
+                    .get(player)
+                {
                     min_distance = min_distance.min(pos.squared_euclidian_distance(
                         BlockPos::from(pl.aabb.pos).containing_chunk_pos(),
                     ));

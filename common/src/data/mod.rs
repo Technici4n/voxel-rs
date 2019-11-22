@@ -5,6 +5,7 @@ use crate::{
     registry::Registry,
 };
 
+use crate::data::vox::{load_voxel_model, VoxelModel};
 use anyhow::{Context, Result};
 use image::{ImageBuffer, Rgba};
 use log::info;
@@ -12,14 +13,13 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use texture_packer::{TexturePacker, TexturePackerConfig};
-use crate::data::vox::{load_voxel_model, VoxelModel};
 
 #[derive(Debug, Clone)]
 pub struct Data {
     pub blocks: Registry<Block>,
     pub meshes: Vec<BlockMesh>,
     pub texture_atlas: ImageBuffer<Rgba<u8>, Vec<u8>>,
-    pub models : Registry<VoxelModel>,
+    pub models: Registry<VoxelModel>,
 }
 
 // TODO: decent error handling
@@ -61,7 +61,7 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     //Load model
     let mut models = Registry::default();
 
-  /*  let mut full = vec![false; 5*5*5];
+    /*  let mut full = vec![false; 5*5*5];
     for i in 1..=3{
         for j in 1..=3{
             for k in 1..=3{

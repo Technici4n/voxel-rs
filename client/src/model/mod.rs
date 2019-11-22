@@ -12,7 +12,6 @@ const D: [[i32; 3]; 6] = [
     [0, 0, -1],
 ];
 
-
 #[derive(Clone, Copy, Default)]
 pub struct Quad {
     v1: u32,
@@ -23,7 +22,6 @@ pub struct Quad {
     // i = 1 j = 0 => (y, z) = (1, 0)
     v4: u32, // i = 1 j = 1 => (y, z) = (1, 1)
 }
-
 
 fn ambiant_occl(corners: u32, edge: u32) -> u32 {
     if edge == 2 {
@@ -36,7 +34,6 @@ fn ambiant_occl(corners: u32, edge: u32) -> u32 {
         return 3;
     }
 }
-
 
 const D_DELTA1: [[i32; 3]; 6] = [
     [0, 1, 0],
@@ -55,7 +52,7 @@ const D_DELTA2: [[i32; 3]; 6] = [
     [0, 1, 0],
 ];
 
-pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
+pub fn mesh_model(model: &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>) {
     let mut res_vertex: Vec<VertexRGB> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
@@ -73,7 +70,6 @@ pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
         (x * n_size_y * n_size_z + y * n_size_z + z) as usize
     };
 
-
     let ind_mesh = |s: usize, x: usize, y: usize, z: usize| -> usize {
         (s * size_x * size_y * size_z + x * size_y * size_z + y * size_z + z) as usize
     };
@@ -87,14 +83,14 @@ pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
         }
     }
 
-    let mut to_mesh = vec![false; 6*size_x * size_y * size_z];
+    let mut to_mesh = vec![false; 6 * size_x * size_y * size_z];
     let mut quads: Vec<Quad> = Vec::new();
-    for _i in 0..6*size_x * size_y * size_z{
-        quads.push(Quad{
-            v1:0,
-            v2:0,
-            v3:0,
-            v4:0,
+    for _i in 0..6 * size_x * size_y * size_z {
+        quads.push(Quad {
+            v1: 0,
+            v2: 0,
+            v3: 0,
+            v4: 0,
         });
     }
 
@@ -105,7 +101,11 @@ pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
                 for k in 0..size_z {
                     if occl[ind(i + 1, j + 1, k + 1)] {
                         //checking if not void
-                        if !occl[ind(i + (1 + D[s][0]) as usize, j + (1 + D[s][1]) as usize, k + (1 + D[s][2]) as usize)] {
+                        if !occl[ind(
+                            i + (1 + D[s][0]) as usize,
+                            j + (1 + D[s][1]) as usize,
+                            k + (1 + D[s][2]) as usize,
+                        )] {
                             let mut coins = [0; 4];
                             let mut edge = [0; 4];
 
@@ -164,11 +164,14 @@ pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
                                     + (ambiant_occl(coins[0], edge[0]) << 27)
                                     + c,
                                 v2: ((s as u32) << 24)
-                                    + (ambiant_occl(coins[1], edge[1]) << 27) + c,
+                                    + (ambiant_occl(coins[1], edge[1]) << 27)
+                                    + c,
                                 v3: ((s as u32) << 24)
-                                    + (ambiant_occl(coins[2], edge[2]) << 27) + c,
+                                    + (ambiant_occl(coins[2], edge[2]) << 27)
+                                    + c,
                                 v4: ((s as u32) << 24)
-                                    + (ambiant_occl(coins[3], edge[3]) << 27) + c,
+                                    + (ambiant_occl(coins[3], edge[3]) << 27)
+                                    + c,
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
                             to_mesh[ind_mesh(s, i, j, k)] = true;
@@ -198,40 +201,28 @@ pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
     ];
     let mut n_of_different_vertex = 0;
 
-    const DX : [[i32; 6]; 3] = [
-        [0, 0, 0, 0, 0, 0],
-        [0, 0, 1, 1, 1, 1],
-        [0, 0, 1, 1, 1, 1],
-    ];
+    const DX: [[i32; 6]; 3] = [[0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 1, 1], [0, 0, 1, 1, 1, 1]];
 
-    const DY : [[i32; 6]; 3] = [
-        [0, 0, 0, 0, 1, 1],
-        [1, 1, 0, 0, 0, 0],
-        [1, 1, 0, 0, 1, 1],
-    ];
+    const DY: [[i32; 6]; 3] = [[0, 0, 0, 0, 1, 1], [1, 1, 0, 0, 0, 0], [1, 1, 0, 0, 1, 1]];
 
-    const DZ : [[i32; 6]; 3] = [
-        [1, 1, 1, 1, 0, 0],
-        [0, 0, 0, 0, 0, 0],
-        [1, 1, 1, 1, 0, 0],
-    ];
+    const DZ: [[i32; 6]; 3] = [[1, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0], [1, 1, 1, 1, 0, 0]];
 
     for s in 0..6 {
         // each direction
 
         for i in 0..size_x {
             // x x y y z z
-            for j in 0..size_y  {
+            for j in 0..size_y {
                 // y y x x x x
-                for k in 0..size_z{
+                for k in 0..size_z {
                     // z z z z y y
-                    if to_mesh[ind_mesh(s, i,j,k)] {
-                        let current_quad = quads[ind_mesh(s, i,j,k)];
+                    if to_mesh[ind_mesh(s, i, j, k)] {
+                        let current_quad = quads[ind_mesh(s, i, j, k)];
 
-                        let (px, py, pz) =(i as i32,j as i32,k as i32);
-                        let (px2, py2, pz2) = (px +DX[0][s], py+DY[0][s], pz+DZ[0][s]);
-                        let (px3, py3, pz3) = (px +DX[1][s], py+DY[1][s], pz+DZ[1][s]);
-                        let (px4, py4, pz4) = (px +DX[2][s], py+DY[2][s], pz+DZ[2][s]);
+                        let (px, py, pz) = (i as i32, j as i32, k as i32);
+                        let (px2, py2, pz2) = (px + DX[0][s], py + DY[0][s], pz + DZ[0][s]);
+                        let (px3, py3, pz3) = (px + DX[1][s], py + DY[1][s], pz + DZ[1][s]);
+                        let (px4, py4, pz4) = (px + DX[2][s], py + DY[2][s], pz + DZ[2][s]);
 
                         let mut px_ = [px as f32, px2 as f32, px3 as f32, px4 as f32];
                         let mut py_ = [py as f32, py2 as f32, py3 as f32, py4 as f32];
@@ -279,7 +270,6 @@ pub fn mesh_model(model : &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>){
                             }
                         }
                         n_of_different_vertex += 4;
-
                     }
                 }
             }

@@ -37,13 +37,8 @@ impl MeshingWorker {
     }
 
     /// Enqueue a chunk
-    pub fn enqueue_chunk(
-        &mut self,
-        data: ChunkMeshData,
-    ) {
-        self.sender
-            .send(ToOtherThread::Enqueue(data))
-            .unwrap();
+    pub fn enqueue_chunk(&mut self, data: ChunkMeshData) {
+        self.sender.send(ToOtherThread::Enqueue(data)).unwrap();
     }
 
     /// Dequeue a chunk from processing if it's still in the queue.
@@ -103,11 +98,7 @@ fn launch_worker(
         // Mesh the first chunk that is in the queue
         while let Some(chunk_pos) = ordered_positions.pop_front() {
             if let Some(data) = queued_chunks.remove(&chunk_pos) {
-                let (vertices, indices, _, _) = greedy_meshing(
-                    data,
-                    &block_meshes,
-                    &mut quads,
-                );
+                let (vertices, indices, _, _) = greedy_meshing(data, &block_meshes, &mut quads);
                 sender.send((chunk_pos, vertices, indices)).unwrap();
                 break;
             }

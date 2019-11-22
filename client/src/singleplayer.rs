@@ -11,6 +11,7 @@ use voxel_rs_common::{
 };
 
 use crate::input::YawPitch;
+use crate::model::model::Model;
 use crate::world::meshing::ChunkMeshData;
 use crate::{
     fps::FpsCounter,
@@ -20,15 +21,14 @@ use crate::{
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
     world::{frustum::Frustum, renderer::WorldRenderer},
 };
+use glutin::{ElementState, MouseButton};
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
+use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
-use glutin::{ElementState, MouseButton};
-use crate::model::model::Model;
-use voxel_rs_common::data::vox::VoxelModel;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -39,7 +39,7 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
-    model_regitry : Registry<VoxelModel>,
+    model_regitry: Registry<VoxelModel>,
     client: Box<dyn Client>,
     render_distance: RenderDistance,
     // TODO: put this in the settigs
@@ -103,7 +103,7 @@ impl SinglePlayer {
             world: World::new(),
             world_renderer: world_renderer?,
             block_registry: data.blocks,
-            model_regitry : data.models,
+            model_regitry: data.models,
             client,
             render_distance,
             physics_simulation: ClientPhysicsSimulation::new(
@@ -228,9 +228,9 @@ impl State for SinglePlayer {
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.world_renderer.meshing_worker.enqueue_chunk(
-                    ChunkMeshData::create_from_world(&self.world, chunk_pos),
-                );
+                self.world_renderer
+                    .meshing_worker
+                    .enqueue_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
             }
         }
 
@@ -240,12 +240,13 @@ impl State for SinglePlayer {
             .meshing_worker
             .get_processed_chunks()
             .into_iter()
-            {
-                // Add the mesh if the chunk is still loaded
-                if self.world.has_chunk(chunk_pos) {
-                    self.world_renderer.update_chunk_mesh(gfx, chunk_pos, vertices, indices);
-                }
+        {
+            // Add the mesh if the chunk is still loaded
+            if self.world.has_chunk(chunk_pos) {
+                self.world_renderer
+                    .update_chunk_mesh(gfx, chunk_pos, vertices, indices);
             }
+        }
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
@@ -312,12 +313,15 @@ impl State for SinglePlayer {
         // Draw world
 
         let mut model_to_draw = Vec::new();
-        model_to_draw.push(Model{
-            model_mesh_id : self.model_regitry.get_id_by_name(&"knight".to_owned()).unwrap(),
+        model_to_draw.push(Model {
+            model_mesh_id: self
+                .model_regitry
+                .get_id_by_name(&"knight".to_owned())
+                .unwrap(),
             pos_x: 0.0,
             pos_y: 55.0,
             pos_z: 0.0,
-            scale: 0.3
+            scale: 0.3,
         });
         self.world_renderer.render(
             gfx,
@@ -366,7 +370,7 @@ impl State for SinglePlayer {
                         self.client.send(ToServer::BreakBlock(pp.aabb.pos, y, p));
                     }
                     _ => {}
-                }
+                },
                 _ => {}
             }
         }

@@ -1,3 +1,4 @@
+use crate::render::ensure_buffer_capacity;
 use crate::window::{Gfx, WindowData};
 use crate::world::renderer::load_shader;
 use anyhow::{Context, Result};
@@ -11,7 +12,6 @@ use log::info;
 use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
-use crate::render::ensure_buffer_capacity;
 
 gfx_defines! {
     vertex Vertex {

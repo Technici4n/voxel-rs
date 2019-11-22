@@ -42,12 +42,12 @@ impl<T> Registry<T> {
         self.name_to_id.get(name).cloned()
     }
 
-    pub fn get_number_of_ids(&self) -> u32{
+    pub fn get_number_of_ids(&self) -> u32 {
         return self.id_to_name.len() as u32;
     }
 
-    pub fn get_value_by_id(&self, id : u32) -> Option<&T>{
-        if id < self.id_to_value.len() as u32{
+    pub fn get_value_by_id(&self, id: u32) -> Option<&T> {
+        if id < self.id_to_value.len() as u32 {
             return Some(&self.id_to_value[id as usize]);
         }
         return None;

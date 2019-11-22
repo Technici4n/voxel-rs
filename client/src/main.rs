@@ -11,6 +11,7 @@ mod fps;
 mod input;
 //mod mainmenu; TODO: fix this
 mod mesh;
+mod model;
 mod render;
 mod settings;
 mod singleplayer;
@@ -18,7 +19,6 @@ mod texture;
 mod ui;
 mod window;
 mod world;
-mod model;
 
 fn main() -> Result<()> {
     env_logger::init();

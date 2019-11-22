@@ -73,10 +73,7 @@ impl LightChunk {
     pub fn new(pos: ChunkPos) -> Self {
         let mut light = Vec::new();
         light.resize((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize, 15);
-        Self {
-            light,
-            pos,
-        }
+        Self { light, pos }
     }
 
     /// Get light at some position

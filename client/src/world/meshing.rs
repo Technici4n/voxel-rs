@@ -1,4 +1,5 @@
 use super::renderer::Vertex;
+use std::sync::Arc;
 use voxel_rs_common::world::LightChunk;
 use voxel_rs_common::{
     block::BlockMesh,
@@ -6,7 +7,6 @@ use voxel_rs_common::{
     world::chunk::{Chunk, ChunkPos, CHUNK_SIZE},
     world::World,
 };
-use std::sync::Arc;
 
 #[derive(Clone, Copy, Default)]
 pub struct Quad {
@@ -63,15 +63,19 @@ pub struct ChunkMeshData {
 impl ChunkMeshData {
     /// Extract the data from the world. Panics if the world doesn't contain the current chunk and the current light chunk
     pub fn create_from_world(world: &World, pos: ChunkPos) -> Self {
-        let chunk = world.get_chunk(pos).expect("no chunk at current position to create ChunkMeshData");
-        let light_chunk = world.get_light_chunk(pos).expect("no light chunk at current position to create ChunkMeshData");
+        let chunk = world
+            .get_chunk(pos)
+            .expect("no chunk at current position to create ChunkMeshData");
+        let light_chunk = world
+            .get_light_chunk(pos)
+            .expect("no light chunk at current position to create ChunkMeshData");
         let mut all_chunks: [Option<Arc<Chunk>>; 27] = Default::default();
         let mut all_light_chunks: [Option<Arc<LightChunk>>; 27] = Default::default();
         for i in 0..3 {
             for j in 0..3 {
                 for k in 0..3 {
                     let np = pos.offset(i, j, k);
-                    let idx = (i*9 + j*3 + k) as usize;
+                    let idx = (i * 9 + j * 3 + k) as usize;
                     all_chunks[idx] = world.get_chunk(np);
                     all_light_chunks[idx] = world.get_light_chunk(np);
                 }
@@ -130,7 +134,7 @@ pub fn greedy_meshing(
                 1
             }
         }
-        9*f(x) + 3*f(y) + f(z)
+        9 * f(x) + 3 * f(y) + f(z)
     }
 
     #[inline(always)]
@@ -153,12 +157,23 @@ pub fn greedy_meshing(
         for j in 0..N_SIZE {
             for k in 0..N_SIZE {
                 let ci = chunk_index(i, j, k);
-                if ci == 13 { // 13 = 9 + 3 + 1 is the current chunk
-                    chunk_mask[uind(i, j, k)] = meshes[chunk_data.chunk.get_block_at((i as u32 - 1, j as u32 - 1, k as u32 - 1)) as usize].is_opaque();
-                    light_levels[uind(i, j, k)] = chunk_data.light_chunk.get_light_at((i as u32 - 1, j as u32 - 1, k as u32 - 1));
+                if ci == 13 {
+                    // 13 = 9 + 3 + 1 is the current chunk
+                    chunk_mask[uind(i, j, k)] = meshes[chunk_data.chunk.get_block_at((
+                        i as u32 - 1,
+                        j as u32 - 1,
+                        k as u32 - 1,
+                    )) as usize]
+                        .is_opaque();
+                    light_levels[uind(i, j, k)] = chunk_data.light_chunk.get_light_at((
+                        i as u32 - 1,
+                        j as u32 - 1,
+                        k as u32 - 1,
+                    ));
                 } else {
                     if let Some(c) = &chunk_data.all_chunks[ci] {
-                        chunk_mask[uind(i, j, k)] = meshes[c.get_block_at(outside_position(i, j, k)) as usize].is_opaque();
+                        chunk_mask[uind(i, j, k)] =
+                            meshes[c.get_block_at(outside_position(i, j, k)) as usize].is_opaque();
                     }
                     if let Some(lc) = &chunk_data.all_light_chunks[ci] {
                         light_levels[uind(i, j, k)] = lc.get_light_at(outside_position(i, j, k));
@@ -277,7 +292,9 @@ pub fn greedy_meshing(
                                 v4: (s as u32)
                                     + (ambiant_occl(coins[3], edge[3]) << 3)
                                     + ((light_level as u32) << 5),
-                                block_id: chunk_data.chunk.get_block_at((i as u32, j as u32, k as u32)),
+                                block_id: chunk_data
+                                    .chunk
+                                    .get_block_at((i as u32, j as u32, k as u32)),
                             };
                             quads[ind_mesh(s, i, j, k)] = quad;
                             to_mesh[ind_mesh(s, i, j, k)] = true;
