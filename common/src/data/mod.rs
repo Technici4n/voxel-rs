@@ -61,24 +61,36 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     //Load model
     let mut models = Registry::default();
 
-    let mut full = vec![false; 5*5*5];
-    for i in 1..3{
-        for j in 1..3{
-            for k in 1..3{
+  /*  let mut full = vec![false; 5*5*5];
+    for i in 1..=3{
+        for j in 1..=3{
+            for k in 1..=3{
                 full[i*5*5+j*5+k] = true;
             }
         }
     }
+
+    full[0*5*5+2*5+2] = true;
+    full[4*5*5+2*5+2] = true;
+    full[2*5*5+0*5+2] = true;
+    full[2*5*5+4*5+2] = true;
+    full[2*5*5+2*5+0] = true;
+    full[2*5*5+2*5+4] = true;
+
+
     let model_tree = VoxelModel{
         size_x: 5,
         size_y: 5,
         size_z: 5,
         voxels: vec![0x00FF0000; 5*5*5],
         full,
-    };
+    };*/
 
-    //let model_tree = load_voxel_model("data/model/tree.vox").unwrap();
+    // TODO : load every .vox in the model folder
+    let model_tree = load_voxel_model("data/model/tree.vox").unwrap();
     models.register("tree".to_owned(), model_tree)?;
+    let model_knight = load_voxel_model("data/model/chr_knight.vox").unwrap();
+    models.register("knight".to_owned(), model_knight)?;
 
     // Load blocks
     let mut block_datas: Vec<(String, BlockType)> = Vec::new();

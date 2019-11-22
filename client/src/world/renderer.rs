@@ -192,7 +192,7 @@ impl WorldRenderer {
         let pso_model = factory.create_pipeline_state(
             &shader_set_model,
             gfx::Primitive::TriangleList,
-            gfx::state::Rasterizer::new_fill(),
+            gfx::state::Rasterizer::new_fill().with_cull_back(),
             pipe_model::new(),
         )?;
 

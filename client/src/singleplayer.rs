@@ -321,7 +321,7 @@ impl State for SinglePlayer {
 
         let mut model_to_draw = Vec::new();
         model_to_draw.push(Model{
-            model_mesh_id : self.model_regitry.get_id_by_name(&"tree".to_owned()).unwrap(),
+            model_mesh_id : self.model_regitry.get_id_by_name(&"knight".to_owned()).unwrap(),
             pos_x: 0.0,
             pos_y: 55.0,
             pos_z: 0.0,

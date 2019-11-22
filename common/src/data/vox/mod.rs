@@ -63,8 +63,8 @@ pub fn load_voxel_model(path: &str) -> Option<VoxelModel> {
                                 assert_eq!(n_size, 12);
                                 assert_eq!(m_size, 0);
                                 size_x = four_bytes_to_u32(&data[12..16], big_endian);
-                                size_y = four_bytes_to_u32(&data[16..20], big_endian);
-                                size_z = four_bytes_to_u32(&data[20..24], big_endian);
+                                size_z = four_bytes_to_u32(&data[16..20], big_endian);
+                                size_y = four_bytes_to_u32(&data[20..24], big_endian);
                             }
 
                             data = &data[24..];
@@ -81,7 +81,7 @@ pub fn load_voxel_model(path: &str) -> Option<VoxelModel> {
                                 assert_eq!(n_size,n_voxels*4+4);
                                 for i in 0..(n_voxels as usize) {
                                     let (a, b, c, d) = (data[16 + 4 * i], data[16 + 4 * i + 1], data[16 + 4 * i + 2], data[16 + 4 * i + 3]);
-                                    voxel.push((a, b, c, d));
+                                    voxel.push((a, c, b, d));
                                 }
                             }
 
@@ -119,8 +119,8 @@ pub fn load_voxel_model(path: &str) -> Option<VoxelModel> {
                             }
 
                             for (x,y,z, i) in voxel.iter(){
-                                let s = ((*x as u32)*size_z*size_y + (*z as u32)*size_y+(*y as u32)) as usize;
-                                res.voxels[s] = palette[(*i as usize)+1];
+                                let s = ((*x as u32)*size_z*size_y + (*y as u32)*size_z+(*z as u32)) as usize;
+                                res.voxels[s] = palette[(*i as usize)];
                                 res.full[s] = true;
                             }
 
