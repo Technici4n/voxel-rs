@@ -1,5 +1,4 @@
 use anyhow::Result;
-use gfx::Device;
 use log::info;
 
 use voxel_rs_common::{
@@ -21,7 +20,7 @@ use crate::{
     window::{Gfx, State, StateTransition, WindowData, WindowFlags},
     world::{frustum::Frustum, renderer::WorldRenderer},
 };
-use glutin::{ElementState, MouseButton};
+use winit::{ElementState, MouseButton};
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
