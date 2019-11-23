@@ -1,4 +1,4 @@
-use glutin::{ElementState, KeyboardInput, ModifiersState, MouseButton};
+use winit::event::{ElementState, KeyboardInput, ModifiersState, MouseButton};
 use std::collections::HashMap;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::player::PlayerInput;

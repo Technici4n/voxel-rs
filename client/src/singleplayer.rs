@@ -10,17 +10,17 @@ use voxel_rs_common::{
 };
 
 use crate::input::YawPitch;
-use crate::model::model::Model;
-use crate::world::meshing::ChunkMeshData;
+//use crate::model::model::Model;
+//use crate::world::meshing::ChunkMeshData;
 use crate::{
     fps::FpsCounter,
     input::InputState,
     settings::Settings,
     ui::{renderer::UiRenderer, Ui},
-    window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{frustum::Frustum, renderer::WorldRenderer},
+    window::{State, StateTransition, WindowData, WindowFlags},
+    world::{frustum::Frustum, /*renderer::WorldRenderer*/},
 };
-use winit::{ElementState, MouseButton};
+use winit::event::{ElementState, MouseButton};
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -35,7 +35,7 @@ pub struct SinglePlayer {
     ui: Ui,
     ui_renderer: UiRenderer,
     world: World,
-    world_renderer: WorldRenderer,
+    //world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     model_regitry: Registry<VoxelModel>,
@@ -50,12 +50,12 @@ pub struct SinglePlayer {
 
 impl SinglePlayer {
     pub fn new_factory(client: Box<dyn Client>) -> crate::window::StateFactory {
-        Box::new(move |settings, gfx| Self::new(settings, gfx, client))
+        Box::new(move |settings, device| Self::new(settings, device, client))
     }
 
     pub fn new(
         settings: &mut Settings,
-        gfx: &mut Gfx,
+        device: &mut wgpu::Device,
         mut client: Box<dyn Client>,
     ) -> Result<Box<dyn State>> {
         info!("Launching singleplayer");
@@ -89,18 +89,20 @@ impl SinglePlayer {
             z_min: z2,
         };
         client.send(ToServer::SetRenderDistance(render_distance));
+        // Create the renderers
+        let ui_renderer = UiRenderer::new(device)?;
 
         // Load texture atlas
-        let texture_atlas = crate::texture::load_image(&mut gfx.factory, data.texture_atlas)?;
+        //let texture_atlas = crate::texture::load_image(&mut gfx.factory, data.texture_atlas)?;
 
-        let world_renderer = WorldRenderer::new(gfx, data.meshes, texture_atlas, &data.models);
+        //let world_renderer = WorldRenderer::new(gfx, data.meshes, texture_atlas, &data.models);
 
         Ok(Box::new(Self {
             fps_counter: FpsCounter::new(),
             ui: Ui::new(),
-            ui_renderer: UiRenderer::new(gfx)?,
+            ui_renderer,
             world: World::new(),
-            world_renderer: world_renderer?,
+            //world_renderer: world_renderer?,
             block_registry: data.blocks,
             model_regitry: data.models,
             client,
@@ -128,7 +130,7 @@ impl State for SinglePlayer {
         _data: &WindowData,
         flags: &mut WindowFlags,
         _seconds_delta: f64,
-        gfx: &mut Gfx,
+        _device: &mut wgpu::Device,
     ) -> Result<StateTransition> {
         // Handle server messages
         loop {
@@ -193,7 +195,7 @@ impl State for SinglePlayer {
         // damned borrow checker :(
         let Self {
             ref mut world,
-            ref mut world_renderer,
+            //ref mut world_renderer,
             ref render_distance,
             ..
         } = self;
@@ -206,8 +208,8 @@ impl State for SinglePlayer {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
-                world_renderer.chunk_meshes.remove(chunk_pos);
-                world_renderer.meshing_worker.dequeue_chunk(*chunk_pos);
+                //world_renderer.chunk_meshes.remove(chunk_pos);
+                //world_renderer.meshing_worker.dequeue_chunk(*chunk_pos);
                 light.remove(chunk_pos);
                 false
             }
@@ -227,14 +229,14 @@ impl State for SinglePlayer {
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.world_renderer
-                    .meshing_worker
-                    .enqueue_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
+                //self.world_renderer
+                //    .meshing_worker
+                //    .enqueue_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
             }
         }
 
         // Send new chunks to the GPU
-        for (chunk_pos, vertices, indices) in self
+        /*for (chunk_pos, vertices, indices) in self
             .world_renderer
             .meshing_worker
             .get_processed_chunks()
@@ -245,7 +247,7 @@ impl State for SinglePlayer {
                 self.world_renderer
                     .update_chunk_mesh(gfx, chunk_pos, vertices, indices);
             }
-        }
+        }*/
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
@@ -270,15 +272,16 @@ impl State for SinglePlayer {
     fn render(
         &mut self,
         _settings: &Settings,
-        gfx: &mut Gfx,
+        frame: &wgpu::SwapChainOutput,
+        device: &mut wgpu::Device,
         data: &WindowData,
-        input_state: &InputState,
-    ) -> Result<StateTransition> {
+        _input_state: &InputState,
+    ) -> Result<(StateTransition, wgpu::CommandBuffer)> {
         // Count fps
         self.fps_counter.add_frame();
         send_debug_info("Player", "fps", format!("fps = {}", self.fps_counter.fps()));
 
-        let frustum = Frustum::new(
+        let _frustum = Frustum::new(
             self.physics_simulation.get_camera_position(),
             self.yaw_pitch,
         );
@@ -304,14 +307,14 @@ impl State for SinglePlayer {
             send_debug_info("Player", "pointedat", "Pointed block: None");
         }
 
-        // Clear buffers
+        /*// Clear buffers
         gfx.encoder
             .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
         gfx.encoder
-            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
+            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);*/
         // Draw world
 
-        let mut model_to_draw = Vec::new();
+        /*let mut model_to_draw = Vec::new();
         model_to_draw.push(Model {
             model_mesh_id: self
                 .model_regitry
@@ -321,28 +324,24 @@ impl State for SinglePlayer {
             pos_y: 55.0,
             pos_z: 0.0,
             scale: 0.3,
-        });
-        self.world_renderer.render(
+        });*/
+        /*self.world_renderer.render(
             gfx,
             data,
             &frustum,
             input_state.enable_culling,
             pointed_block,
             model_to_draw,
-        )?;
+        )?;*/
         // Clear depth
-        gfx.encoder
-            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
+        //gfx.encoder
+        //    .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
-        self.ui_renderer
-            .render(gfx, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
-        // Flush and swap buffers
-        gfx.encoder.flush(&mut gfx.device);
-        gfx.context.swap_buffers()?;
-        gfx.device.cleanup();
+        let commands = self.ui_renderer
+            .render(&frame.view, device, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
 
-        Ok(StateTransition::KeepCurrent)
+        Ok((StateTransition::KeepCurrent, commands))
     }
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
@@ -351,13 +350,13 @@ impl State for SinglePlayer {
         }
     }
 
-    fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition) {
+    fn handle_cursor_movement(&mut self, logical_position: winit::dpi::LogicalPosition) {
         self.ui.cursor_moved(logical_position);
     }
 
     fn handle_mouse_state_changes(
         &mut self,
-        changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
+        changes: Vec<(winit::event::MouseButton, winit::event::ElementState)>,
     ) {
         for (button, state) in changes.iter() {
             match *button {
@@ -376,7 +375,7 @@ impl State for SinglePlayer {
         self.ui.handle_mouse_state_changes(changes);
     }
 
-    fn handle_key_state_changes(&mut self, changes: Vec<(u32, glutin::ElementState)>) {
+    fn handle_key_state_changes(&mut self, changes: Vec<(u32, winit::event::ElementState)>) {
         self.ui.handle_key_state_changes(changes);
     }
 }

@@ -1,5 +1,5 @@
 use crate::{input::InputState, settings::Settings};
-use anyhow::{Context, Result};
+use anyhow::Result;
 use log::info;
 use std::time::Instant;
 use wgpu::Device;
@@ -9,7 +9,7 @@ use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event_loop::ControlFlow;
 
 /// A closure that creates a new instance of `State`.
-pub type StateFactory = Box<dyn FnOnce(&mut Settings, &Device) -> Result<(Box<dyn State>, wgpu::CommandBuffer)> >;
+pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Device) -> Result<Box<dyn State>> >;
 
 /// A transition from one state to another.
 pub enum StateTransition {
@@ -54,8 +54,8 @@ pub trait State {
         data: &WindowData,
         flags: &mut WindowFlags,
         seconds_delta: f64,
-        device: &Device,
-    ) -> (Result<StateTransition>, Option<wgpu::CommandBuffer>);
+        device: &mut Device,
+    ) -> Result<StateTransition>;
     /// Render.
     ///
     /// Note: The state is responsible for swapping buffers.
@@ -63,10 +63,10 @@ pub trait State {
         &mut self,
         settings: &Settings,
         frame: &wgpu::SwapChainOutput,
-        device: &Device,
+        device: &mut Device,
         data: &WindowData,
         input_state: &InputState,
-    ) -> (Result<StateTransition>, wgpu::CommandBuffer);
+    ) -> Result<(StateTransition, wgpu::CommandBuffer)>;
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
     /// Cursor moved
@@ -78,17 +78,17 @@ pub trait State {
 }
 
 /// Color format of the window's color buffer
-pub type ColorFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
-/*/// Format of the window's depth buffer
-pub type DepthFormat = gfx::format::DepthStencil;*/ // TODO: depth buffer?
+pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8UnormSrgb;
+/// Format of the window's depth buffer
+pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 /// Open a new window with the given settings and the given initial state
-pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Result<()> {
+pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     info!("Opening new window...");
     // Create the window
     let window_title = "voxel-rs".to_owned();
-    let mut event_loop = winit::EventLoop::new();
-    let mut window = Window::new(&event_loop).expect("Failed to create window");
+    let event_loop = winit::event_loop::EventLoop::new();
+    let window = Window::new(&event_loop).expect("Failed to create window");
     window.set_title(&window_title);
     // Create the Surface, i.e. the render target of the program
     let hidpi_factor = window.hidpi_factor();
@@ -102,7 +102,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
             backends: wgpu::BackendBit::PRIMARY,
         },
     ).expect("Failed to create adapter");
-    let (device, mut queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+    // TODO: device should be immutable
+    let (mut device, mut queue) = adapter.request_device(&wgpu::DeviceDescriptor {
         extensions: wgpu::Extensions {
             anisotropic_filtering: false,
         },
@@ -119,11 +120,8 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
 
     let mut window_data = {
-        let logical_window_size = match gfx.context.window().get_inner_size() {
-            Some(logical_window_size) => logical_window_size,
-            None => return Err(WindowError::ClosedUnexpectedly)?,
-        };
-        let hidpi_factor = gfx.context.window().get_hidpi_factor();
+        let logical_window_size = window.inner_size();
+        let hidpi_factor = window.hidpi_factor();
         let physical_window_size = logical_window_size.to_physical(hidpi_factor);
         WindowData {
             logical_window_size,
@@ -143,7 +141,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
     info!("Done initializing the window. Moving on to the first state...");
 
     let mut state =
-        initial_state(settings, &device).expect("Failed to create initial window state");
+        initial_state(&mut settings, &mut device).expect("Failed to create initial window state");
 
     let mut previous_time = std::time::Instant::now();
 
@@ -187,7 +185,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                     }
                     // weird events
                     TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
-                    Refresh => (),
+                    ModifiersChanged { .. } | RedrawRequested => () // TODO: handle these
                 }
             }
             DeviceEvent { event, .. } => {
@@ -196,7 +194,7 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                 }
                 use winit::event::DeviceEvent::*;
                 match event {
-                    MouseMotion { delta } => state.handle_mouse_motion(settings, delta),
+                    MouseMotion { delta } => state.handle_mouse_motion(&settings, delta),
                     _ => (),
                 }
             }
@@ -215,53 +213,51 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                     sc_desc.height = phys.height.round() as u32;
                     swap_chain = device.create_swap_chain(&surface, &sc_desc);
                 }
+                window_resized = false;
 
                 // Update state
-                state.handle_mouse_state_changes(mouse_state_changes);
-                state.handle_key_state_changes(key_state_changes);
+                let (v1, v2) = (Vec::new(), Vec::new()); // TODO: clean up
+                state.handle_mouse_state_changes(std::mem::replace(&mut mouse_state_changes, v1));
+                state.handle_key_state_changes(std::mem::replace(&mut key_state_changes, v2));
                 let seconds_delta = {
                     let current_time = Instant::now();
                     let delta = current_time - previous_time;
                     previous_time = current_time;
                     delta.as_secs() as f64 + delta.subsec_nanos() as f64 / 1e9
                 };
-                let (state_transition, commands) = state
+                let state_transition = state
                     .update(
-                        settings,
+                        &mut settings,
                         &input_state,
                         &window_data,
                         &mut window_flags,
                         seconds_delta,
-                        &device,
+                        &mut device,
                     )
                     .expect("Failed to `update` the current window state"); // TODO: remove this
-                // Perform eventual render commands
-                if let Some(cmd) = commands {
-                    queue.submit(&[cmd]);
-                }
 
                 // Update window flags
                 window.set_title(&window_flags.window_title);
                 if window_flags.hide_and_center_cursor && window_data.focused {
-                    window.hide_cursor(true);
+                    window.set_cursor_visible(false);
                     let sz = window_data.logical_window_size;
                     window
-                        .set_cursor_position(glutin::dpi::LogicalPosition {
+                        .set_cursor_position(winit::dpi::LogicalPosition {
                             x: sz.width / 2.0,
                             y: sz.height / 2.0,
                         })
                         .expect("Failed to center cursor"); // TODO: warn instead of panic ?
                 } else {
-                    window.hide_cursor(false);
+                    window.set_cursor_visible(true);
                 }
 
                 // Transition if necessary
                 match state_transition {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
-                        log!("Transitioning to a new window state...");
+                        info!("Transitioning to a new window state...");
                         state =
-                            new_state(settings, &device).expect("Failed to create next window state")?;
+                            new_state(&mut settings, &mut device).expect("Failed to create next window state");
                         return;
                     }
                     StateTransition::CloseWindow => {
@@ -270,16 +266,17 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
                 }
 
                 // Render frame
-                let frame = swap_chain.get_next_texture().expect("Failed to get next swap chain texture");
-                let (state_transition, command_buffer) =
+                let frame = swap_chain.get_next_texture();
+                let (state_transition, commands) =
                     state
-                    .render(settings, &frame, &device, &window_data, &input_state)
+                    .render(&settings, &frame, &mut device, &window_data, &input_state)
                     .expect("Failed to `render` the current window state");
+                queue.submit(&[commands]);
                 match state_transition {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
                         state =
-                            new_state(settings, &mut gfx).expect("Failed to create next window state");
+                            new_state(&mut settings, &mut device).expect("Failed to create next window state");
                     }
                     StateTransition::CloseWindow => {
                         *control_flow = ControlFlow::Exit;
@@ -289,10 +286,9 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
             LoopDestroyed => {
                 // TODO: cleanup relevant stuff
             }
+            _ => ()
         }
     });
-
-    Ok(()) // ???
 }
 
 pub const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];

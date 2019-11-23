@@ -1,52 +1,12 @@
-use crate::render::ensure_buffer_capacity;
-use crate::window::{Gfx, WindowData};
-use crate::world::renderer::load_shader;
-use anyhow::{Context, Result};
-use gfx;
-use gfx::{
-    traits::{Factory, FactoryExt},
-    Slice,
-};
-use gfx_glyph::{FontId, GlyphBrush, GlyphBrushBuilder, Scale, SectionText, VariedSection};
+//use crate::render::ensure_buffer_capacity;
+use crate::window::WindowData;
+//use crate::render::load_shader;
+use anyhow::Result;
 use log::info;
 use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
-
-gfx_defines! {
-    vertex Vertex {
-        pos: [f32; 3] = "a_Pos",
-        color: [f32; 4] = "a_Color",
-    }
-
-    constant Transform {
-        transform: [[f32; 4]; 4] = "u_Transform",
-        debug: bool = "u_Debug",
-    }
-
-    pipeline pipe {
-        vbuf: gfx::VertexBuffer<Vertex> = (),
-        transform: gfx::ConstantBuffer<Transform> = "Transform",
-        color_buffer: gfx::BlendTarget<crate::window::ColorFormat> = ("ColorBuffer", gfx::state::ColorMask::all(), gfx::state::Blend {
-            color: gfx::state::BlendChannel {
-                equation: gfx::state::Equation::Add,
-                source: gfx::state::Factor::ZeroPlus(gfx::state::BlendValue::SourceAlpha),
-                destination: gfx::state::Factor::OneMinus(gfx::state::BlendValue::SourceAlpha),
-            },
-            alpha: gfx::state::BlendChannel {
-                equation: gfx::state::Equation::Add,
-                source: gfx::state::Factor::Zero,
-                destination: gfx::state::Factor::One,
-            },
-        }),
-        depth_buffer: gfx::DepthTarget<crate::window::DepthFormat> =
-            gfx::preset::depth::LESS_EQUAL_WRITE,
-    }
-}
-
-type R = gfx_device_gl::Resources;
-type PipeDataType = pipe::Data<R>;
-type PsoType = gfx::PipelineState<R, pipe::Meta>;
+use wgpu_glyph::FontId;
 
 #[derive(Debug, Clone)]
 struct RectanglePrimitive {
@@ -73,7 +33,7 @@ struct TrianglesPrimitive {
 #[derive(Debug, Clone)]
 pub struct TextPart {
     pub text: String,
-    pub font_size: Scale,
+    pub font_size: wgpu_glyph::Scale,
     pub color: [f32; 4],
     pub font: Option<String>,
 }
@@ -110,28 +70,21 @@ impl PrimitiveBuffer {
 
 pub struct UiRenderer {
     // Glyph rendering
-    glyph_brush: GlyphBrush<'static, R, gfx_device_gl::Factory>,
-    // Rectangle rendering
+    glyph_brush: wgpu_glyph::GlyphBrush<'static, ()>,
+    fonts: HashMap<String, FontId>,
+    /*// Rectangle rendering
     pso: PsoType,
     data: PipeDataType,
     rect_vertex_buffer: gfx::handle::Buffer<R, Vertex>,
-    rect_index_buffer: gfx::handle::Buffer<R, u32>,
-    fonts: HashMap<String, FontId>,
+    rect_index_buffer: gfx::handle::Buffer<R, u32>,*/
 }
 
 impl UiRenderer {
-    pub fn new(gfx: &mut Gfx) -> Result<Self> {
-        let Gfx {
-            ref mut factory,
-            ref color_buffer,
-            ref depth_buffer,
-            ..
-        } = gfx;
-
+    pub fn new(device: &mut wgpu::Device) -> Result<Self> {
         // Load fonts
         let default_font: &'static [u8] =
             include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
-        let mut glyph_brush_builder = GlyphBrushBuilder::using_font_bytes(default_font);
+        let mut glyph_brush_builder = wgpu_glyph::GlyphBrushBuilder::using_font_bytes(default_font);
         info!("Loading fonts from assets/fonts/list.toml");
         let mut fonts = HashMap::new();
         let font_list = std::fs::read_to_string("assets/fonts/list.toml")
@@ -147,9 +100,9 @@ impl UiRenderer {
             fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
         }
         info!("Fonts successfully loaded");
-        let glyph_brush = glyph_brush_builder.build(factory.clone());
+        let glyph_brush = glyph_brush_builder.build(device, crate::window::COLOR_FORMAT);
 
-        // Create rectangle drawing pipeline
+        /*// Create rectangle drawing pipeline
         let shader_set = factory.create_shader_set(
             load_shader("assets/shaders/gui-rect.vert").as_bytes(),
             load_shader("assets/shaders/gui-rect.frag").as_bytes(),
@@ -188,37 +141,30 @@ impl UiRenderer {
             transform: factory.create_constant_buffer(1),
             color_buffer: color_buffer.clone(),
             depth_buffer: depth_buffer.clone(),
-        };
+        };*/
 
         Ok(Self {
             glyph_brush,
-            pso,
+            fonts,
+            /*pso,
             data,
             rect_vertex_buffer,
-            rect_index_buffer,
-            fonts,
+            rect_index_buffer,*/
         })
     }
 
     pub fn render<Message>(
         &mut self,
-        gfx: &mut Gfx,
+        target: &wgpu::TextureView,
+        device: &mut wgpu::Device,
         data: &WindowData,
         ui: &quint::Ui<PrimitiveBuffer, Message>,
-        draw_crosshair: bool,
-    ) -> Result<()> {
-        let Gfx {
-            ref mut encoder,
-            ref mut factory,
-            ref color_buffer,
-            ref depth_buffer,
-            ..
-        } = gfx;
-
+        _draw_crosshair: bool,
+    ) -> Result<wgpu::CommandBuffer> {
         let mut primitive_buffer = PrimitiveBuffer::default();
         ui.render(&mut primitive_buffer);
 
-        // Render primitives
+        /*// Render primitives
         let mut rect_vertices: Vec<Vertex> = Vec::new();
         let mut rect_indices: Vec<u32> = Vec::new();
 
@@ -262,7 +208,7 @@ impl UiRenderer {
             let index_offset = rect_vertices.len() as u32;
             rect_vertices.extend(vertices.into_iter().map(|v| Vertex { pos: v, color }));
             rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
-        }
+        }*/
         // Text
         for TextPrimitive {
             layout: l,
@@ -271,7 +217,6 @@ impl UiRenderer {
             centered,
         } in primitive_buffer.text.into_iter()
         {
-            use gfx_glyph::{HorizontalAlign, Layout, VerticalAlign};
             let dpi = data.hidpi_factor as f32;
 
             for p in parts.iter_mut() {
@@ -281,7 +226,7 @@ impl UiRenderer {
             let Self { ref fonts, .. } = &self;
             let parts = parts
                 .iter()
-                .map(|part| SectionText {
+                .map(|part| wgpu_glyph::SectionText {
                     text: &part.text,
                     scale: part.font_size,
                     color: part.color,
@@ -293,19 +238,19 @@ impl UiRenderer {
                 })
                 .collect();
             let section = if centered {
-                VariedSection {
+                wgpu_glyph::VariedSection {
                     text: parts,
                     screen_position: ((l.x + l.width / 2.0) * dpi, (l.y + l.height / 2.0) * dpi),
                     bounds: (l.width * dpi, l.height * dpi),
                     z,
-                    layout: Layout::Wrap {
+                    layout: wgpu_glyph::Layout::Wrap {
                         line_breaker: Default::default(),
-                        v_align: VerticalAlign::Center,
-                        h_align: HorizontalAlign::Center,
+                        v_align: wgpu_glyph::VerticalAlign::Center,
+                        h_align: wgpu_glyph::HorizontalAlign::Center,
                     },
                 }
             } else {
-                VariedSection {
+                wgpu_glyph::VariedSection {
                     text: parts,
                     screen_position: (l.x * dpi, l.y * dpi),
                     bounds: (l.width * dpi, l.height * dpi),
@@ -315,7 +260,7 @@ impl UiRenderer {
             };
             self.glyph_brush.queue(section);
         }
-        // Crosshair
+        /*// Crosshair
         if draw_crosshair {
             let (cx, cy) = (
                 data.logical_window_size.width as f32 / 2.0,
@@ -409,13 +354,13 @@ impl UiRenderer {
             self.data.depth_buffer = depth_buffer.clone();
             // Draw the vertex buffer
             encoder.draw(&slice, &self.pso, &self.data);
-        }
+        }*/
 
         // Draw text
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.glyph_brush
-            .use_queue()
-            .draw(encoder, color_buffer)
+            .draw_queued(device, &mut encoder, target, data.physical_window_size.width.round() as u32, data.physical_window_size.height.round() as u32)
             .expect("couldn't draw queued glyphs");
-        Ok(())
+        Ok(encoder.finish())
     }
 }

@@ -1,8 +1,8 @@
-use crate::model::mesh_model;
-use crate::model::model::{Model, ModelBuffer};
-use crate::render::ensure_buffer_capacity;
+//use crate::model::mesh_model;
+//use crate::model::model::{Model, ModelBuffer};
+//use crate::render::ensure_buffer_capacity;
 use crate::{
-    mesh::Mesh,
+    //mesh::Mesh,
     window::{ColorFormat, DepthFormat, Gfx, WindowData},
     world::{frustum::Frustum, meshing_worker::MeshingWorker, skybox::Skybox},
 };
@@ -105,11 +105,6 @@ pub struct WorldRenderer {
     pub skybox: Skybox,
     pub models_buffer: HashMap<u32, ModelBuffer>,
     pub meshing_worker: MeshingWorker,
-}
-
-pub fn load_shader<P: AsRef<Path>>(path: P) -> String {
-    info!("Loading shader from {}", path.as_ref().display());
-    std::fs::read_to_string(path).expect("Couldn't read shader from file")
 }
 
 impl WorldRenderer {

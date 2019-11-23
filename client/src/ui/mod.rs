@@ -3,8 +3,8 @@ use crate::ui::renderer::TextPart;
 use crate::ui::widgets::Button;
 use crate::window::WindowData;
 use anyhow::Result;
-use gfx_glyph::Scale;
-use glutin::dpi::LogicalPosition;
+use wgpu_glyph::Scale;
+use winit::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
 use std::collections::HashMap;
 use voxel_rs_common::debug::DebugInfo;
@@ -167,7 +167,7 @@ impl Ui {
 
     pub fn handle_mouse_state_changes(
         &mut self,
-        changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
+        changes: Vec<(winit::event::MouseButton, winit::event::ElementState)>,
     ) {
         let changes = changes
             .into_iter()
@@ -179,11 +179,11 @@ impl Ui {
         self.messages.extend(self.ui.update(changes));
     }
 
-    pub fn handle_key_state_changes(&mut self, changes: Vec<(u32, glutin::ElementState)>) {
+    pub fn handle_key_state_changes(&mut self, changes: Vec<(u32, winit::event::ElementState)>) {
         for (key, state) in changes.into_iter() {
             // Escape key
             if key == 1 {
-                if let glutin::ElementState::Pressed = state {
+                if let winit::event::ElementState::Pressed = state {
                     self.show_menu = !self.show_menu;
                 }
             }
@@ -208,8 +208,8 @@ impl Ui {
     }
 }
 
-pub fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
-    use glutin::MouseButton::*;
+pub fn quint_mouse_button(button: winit::event::MouseButton) -> quint::MouseButton {
+    use winit::event::MouseButton::*;
     match button {
         Left => quint::MouseButton::Left,
         Right => quint::MouseButton::Right,
@@ -218,9 +218,9 @@ pub fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
     }
 }
 
-pub fn quint_element_state(state: glutin::ElementState) -> quint::ButtonState {
+pub fn quint_element_state(state: winit::event::ElementState) -> quint::ButtonState {
     match state {
-        glutin::ElementState::Pressed => quint::ButtonState::Pressed,
-        glutin::ElementState::Released => quint::ButtonState::Released,
+        winit::event::ElementState::Pressed => quint::ButtonState::Pressed,
+        winit::event::ElementState::Released => quint::ButtonState::Released,
     }
 }
