@@ -20,6 +20,7 @@ pub mod decorator;
 
 pub struct DefaultWorldGenerator {
     pregenerated_chunks: HashMap<ChunkPos, Chunk>,
+    pregenerated_chunks_decorator_count: HashMap<ChunkPos, u32>,
     tree_decorator: Decorator,
 }
 
@@ -38,6 +39,8 @@ impl BlockToPlace {
 }
 
 impl DefaultWorldGenerator {
+
+
     pub fn new(block_registry: &Registry<Block>) -> Self {
         let grass_block = block_registry.get_id_by_name(&"grass".to_owned()).unwrap() as u16;
         let leaves_block = block_registry.get_id_by_name(&"leaves".to_owned()).unwrap() as u16;
@@ -79,6 +82,7 @@ impl DefaultWorldGenerator {
         };
         Self {
             tree_decorator,
+            pregenerated_chunks_decorator_count : HashMap::new(),
             pregenerated_chunks: HashMap::new(),
         }
     }
@@ -291,24 +295,6 @@ impl DefaultWorldGenerator {
 impl WorldGenerator for DefaultWorldGenerator {
     fn generate_chunk(&mut self, pos: ChunkPos, block_registry: &Registry<Block>) -> Chunk {
         let mut chunks_vec = Vec::new();
-
-        let mut vec_to_drop: Vec<ChunkPos> = Vec::new();
-
-        for pos_to_drop in self.pregenerated_chunks.keys() {
-            let dx = (pos.px - pos_to_drop.px).abs();
-            let dy = (pos.py - pos_to_drop.py).abs();
-            let dz = (pos.pz - pos_to_drop.pz).abs();
-            if dx >= 16 || dy >= 8 || dz >= 16 {
-                // TODO : use render distance value
-                vec_to_drop.push(pos_to_drop.clone());
-                println!("Dropping pregenerate chunks ...");
-            }
-        }
-
-        for pos_to_drop in vec_to_drop.drain(..) {
-            self.pregenerated_chunks.remove(&pos_to_drop);
-        }
-
         for i in -1..=1 {
             for j in -1..=1 {
                 for k in -1..=1 {
@@ -330,11 +316,25 @@ impl WorldGenerator for DefaultWorldGenerator {
         }
 
         let decorator = &self.tree_decorator;
+        let chunk_center = chunks_vec[13].clone();
 
         DefaultWorldGenerator::decorate_chunk(&mut chunks_vec, decorator);
 
+        let chunk_res = std::mem::replace(&mut chunks_vec[13], chunk_center);
+
+
         for chunk in chunks_vec.drain(..) {
-            self.pregenerated_chunks.insert(chunk.pos, chunk);
+            let pos = chunk.pos.clone();
+
+            let u = self.pregenerated_chunks_decorator_count.get(&pos);
+            let k = match u {
+                None => 1,
+                Some(i) => *i + 1,
+            };
+            if k < 27 {
+                self.pregenerated_chunks.insert(chunk.pos, chunk);
+                self.pregenerated_chunks_decorator_count.insert(pos, k);
+            }
         }
 
         send_debug_info(
@@ -346,7 +346,7 @@ impl WorldGenerator for DefaultWorldGenerator {
             ),
         );
 
-        self.pregenerated_chunks.remove(&pos).unwrap()
+        chunk_res
     }
 }
 
