@@ -220,7 +220,7 @@ impl UiRenderer {
         encoder: &mut wgpu::CommandEncoder,
         data: &WindowData,
         ui: &quint::Ui<PrimitiveBuffer, Message>,
-        _draw_crosshair: bool,
+        draw_crosshair: bool,
     ) -> Result<()> {
         let mut primitive_buffer = PrimitiveBuffer::default();
         ui.render(&mut primitive_buffer);
@@ -321,7 +321,7 @@ impl UiRenderer {
             };
             self.glyph_brush.queue(section);
         }
-        /*// Crosshair
+        // Crosshair
         if draw_crosshair {
             let (cx, cy) = (
                 data.logical_window_size.width as f32 / 2.0,
@@ -330,46 +330,46 @@ impl UiRenderer {
             const HALF_HEIGHT: f32 = 15.0;
             const HALF_WIDTH: f32 = 2.0;
             const COLOR: [f32; 4] = [1.0, 1.0, 1.0, 0.5];
-            let v1 = Vertex {
-                pos: [cx - HALF_WIDTH, cy - HALF_HEIGHT, -1.0],
+            let v1 = UiVertex {
+                position: [cx - HALF_WIDTH, cy - HALF_HEIGHT, -1.0],
                 color: COLOR,
             };
-            let v2 = Vertex {
-                pos: [cx + HALF_WIDTH, cy - HALF_HEIGHT, -1.0],
+            let v2 = UiVertex {
+                position: [cx + HALF_WIDTH, cy - HALF_HEIGHT, -1.0],
                 color: COLOR,
             };
-            let v3 = Vertex {
-                pos: [cx - HALF_WIDTH, cy + HALF_HEIGHT, -1.0],
+            let v3 = UiVertex {
+                position: [cx - HALF_WIDTH, cy + HALF_HEIGHT, -1.0],
                 color: COLOR,
             };
-            let v4 = Vertex {
-                pos: [cx + HALF_WIDTH, cy + HALF_HEIGHT, -1.0],
+            let v4 = UiVertex {
+                position: [cx + HALF_WIDTH, cy + HALF_HEIGHT, -1.0],
                 color: COLOR,
             };
-            let v5 = Vertex {
-                pos: [cx - HALF_HEIGHT, cy - HALF_WIDTH, -1.0],
+            let v5 = UiVertex {
+                position: [cx - HALF_HEIGHT, cy - HALF_WIDTH, -1.0],
                 color: COLOR,
             };
-            let v6 = Vertex {
-                pos: [cx + HALF_HEIGHT, cy - HALF_WIDTH, -1.0],
+            let v6 = UiVertex {
+                position: [cx + HALF_HEIGHT, cy - HALF_WIDTH, -1.0],
                 color: COLOR,
             };
-            let v7 = Vertex {
-                pos: [cx - HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
+            let v7 = UiVertex {
+                position: [cx - HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
                 color: COLOR,
             };
-            let v8 = Vertex {
-                pos: [cx + HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
+            let v8 = UiVertex {
+                position: [cx + HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
                 color: COLOR,
             };
-            let voffset = rect_vertices.len() as u32;
+            let voffset = rect_vertices.len() as u16;
             rect_vertices.extend([v1, v2, v3, v4, v5, v6, v7, v8].into_iter());
             rect_indices.extend(
                 [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]
                     .into_iter()
                     .map(|id| id + voffset),
             );
-        }*/
+        }
 
         // Draw rectangles
         {
@@ -381,8 +381,8 @@ impl UiRenderer {
             let transformation_matrix = [
                 2.0 / win_w as f32, 0.0, 0.0, 0.0,
                 0.0, 2.0 / win_h as f32, 0.0, 0.0,
-                0.0, 0.0, 1.0, 0.0,
-                -1.0, -1.0, 0.0, 1.0,
+                0.0, 0.0, 0.5, 0.0,
+                -1.0, -1.0, 0.5, 1.0,
             ];
             let src_buffer = device
                 .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
