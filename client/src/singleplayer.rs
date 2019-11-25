@@ -352,7 +352,7 @@ impl State for SinglePlayer {
                 }),
             };
             // This starts the pass, renders nothing and ends the pass, thus clearing then storing the color and the depth
-            let rpass = encoder.begin_render_pass(&rpass_descriptor);
+            let _rpass = encoder.begin_render_pass(&rpass_descriptor);
         }
         // Draw world
 
@@ -381,7 +381,7 @@ impl State for SinglePlayer {
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer
-            .render(&frame.view, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
+            .render(&frame.view, depth_buffer_view, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
 
         Ok((StateTransition::KeepCurrent, encoder.finish()))
     }

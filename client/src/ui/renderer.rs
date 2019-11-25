@@ -7,6 +7,7 @@ use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use wgpu_glyph::FontId;
+use crate::render::load_glsl_shader;
 
 #[derive(Debug, Clone)]
 struct RectanglePrimitive {
@@ -26,7 +27,7 @@ struct TextPrimitive {
 #[derive(Debug, Clone)]
 struct TrianglesPrimitive {
     pub vertices: Vec<[f32; 3]>,
-    pub indices: Vec<u32>,
+    pub indices: Vec<u16>,
     pub color: [f32; 4],
 }
 
@@ -59,7 +60,7 @@ impl PrimitiveBuffer {
         })
     }
 
-    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
+    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u16>, color: [f32; 4]) {
         self.triangles.push(TrianglesPrimitive {
             vertices,
             indices,
@@ -72,11 +73,13 @@ pub struct UiRenderer {
     // Glyph rendering
     glyph_brush: wgpu_glyph::GlyphBrush<'static, ()>,
     fonts: HashMap<String, FontId>,
-    /*// Rectangle rendering
-    pso: PsoType,
-    data: PipeDataType,
-    rect_vertex_buffer: gfx::handle::Buffer<R, Vertex>,
-    rect_index_buffer: gfx::handle::Buffer<R, u32>,*/
+    // Rectangle rendering
+    transform_buffer: wgpu::Buffer,
+    uniform_layout: wgpu::BindGroupLayout,
+    uniforms_bind_group: wgpu::BindGroup,
+    pipeline: wgpu::RenderPipeline,
+    vertex_buffer: DynamicBuffer<UiVertex>,
+    index_buffer: DynamicBuffer<u16>,
 }
 
 impl UiRenderer {
@@ -102,60 +105,117 @@ impl UiRenderer {
         info!("Fonts successfully loaded");
         let glyph_brush = glyph_brush_builder.build(device, crate::window::COLOR_FORMAT);
 
-        /*// Create rectangle drawing pipeline
-        let shader_set = factory.create_shader_set(
-            load_shader("assets/shaders/gui-rect.vert").as_bytes(),
-            load_shader("assets/shaders/gui-rect.frag").as_bytes(),
-        )?;
-        let pso = factory.create_pipeline_state(
-            &shader_set,
-            gfx::Primitive::TriangleList,
-            {
-                let mut r = gfx::state::Rasterizer::new_fill();
-                r.samples = Some(gfx::state::MultiSample);
-                r
+        // Create uniform buffer
+        let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor { size: 16, usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST) });
+
+        // Create bind group layout
+        let uniform_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                bindings: &[
+                    wgpu::BindGroupLayoutBinding {
+                        binding: 0,
+                        visibility: wgpu::ShaderStage::VERTEX,
+                        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                    },
+                ],
+            });
+
+        // Create bind group
+        let uniforms_bind_group =
+            device.create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &uniform_layout,
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &transform_buffer,
+                            range: 0..16,
+                        },
+                    },
+                ],
+            });
+
+        // Create shader modules
+        let mut compiler = shaderc::Compiler::new().expect("Failed to create shader compiler");
+        let vertex_shader =
+            load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/gui-rect.vert");
+        let vertex_shader_module = device.create_shader_module(vertex_shader.as_binary());
+        let fragment_shader =
+            load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/gui-rect.frag");
+        let fragment_shader_module = device.create_shader_module(fragment_shader.as_binary());
+
+        // Create pipeline (!)
+        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            bind_group_layouts: &[&uniform_layout],
+        });
+        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            layout: &pipeline_layout,
+            vertex_stage: wgpu::ProgrammableStageDescriptor {
+                module: &vertex_shader_module,
+                entry_point: "main",
             },
-            pipe::new(),
-        )?;
-        let buffer_bind = {
-            use gfx::memory::Bind;
-            let mut bind = Bind::empty();
-            bind.insert(Bind::SHADER_RESOURCE);
-            bind.insert(Bind::TRANSFER_DST);
-            bind
-        };
-        let rect_vertex_buffer = factory.create_buffer(
-            1,
-            gfx::buffer::Role::Vertex,
-            gfx::memory::Usage::Dynamic,
-            buffer_bind.clone(),
-        )?;
-        let rect_index_buffer = factory.create_buffer(
-            1,
-            gfx::buffer::Role::Index,
-            gfx::memory::Usage::Dynamic,
-            buffer_bind.clone(),
-        )?;
-        let data = pipe::Data {
-            vbuf: rect_vertex_buffer.clone(),
-            transform: factory.create_constant_buffer(1),
-            color_buffer: color_buffer.clone(),
-            depth_buffer: depth_buffer.clone(),
-        };*/
+            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
+                module: &fragment_shader_module,
+                entry_point: "main",
+            }),
+            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: wgpu::CullMode::None,
+                depth_bias: 0,
+                depth_bias_slope_scale: 0.0,
+                depth_bias_clamp: 0.0,
+            }),
+            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
+            color_states: &[wgpu::ColorStateDescriptor {
+                format: crate::window::COLOR_FORMAT,
+                color_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                alpha_blend: wgpu::BlendDescriptor {
+                    src_factor: wgpu::BlendFactor::One,
+                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                    operation: wgpu::BlendOperation::Add,
+                },
+                write_mask: wgpu::ColorWrite::ALL,
+            }],
+            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
+                format: crate::window::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil_front: Default::default(),
+                stencil_back: Default::default(),
+                stencil_read_mask: Default::default(),
+                stencil_write_mask: Default::default(),
+            }),
+            index_format: wgpu::IndexFormat::Uint16,
+            vertex_buffers: &[wgpu::VertexBufferDescriptor {
+                stride: std::mem::size_of::<UiVertex>() as u64,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &UI_VERTEX_ATTRIBUTES,
+            }],
+            sample_count: 1,
+            sample_mask: !0,
+            alpha_to_coverage_enabled: false,
+        });
 
         Ok(Self {
             glyph_brush,
             fonts,
-            /*pso,
-            data,
-            rect_vertex_buffer,
-            rect_index_buffer,*/
+            transform_buffer,
+            uniform_layout,
+            uniforms_bind_group,
+            pipeline,
+            vertex_buffer: DynamicBuffer::with_capacity(device, 64, wgpu::BufferUsage::VERTEX),
+            index_buffer: DynamicBuffer::with_capacity(device, 64, wgpu::BufferUsage::INDEX),
         })
     }
 
     pub fn render<Message>(
         &mut self,
         target: &wgpu::TextureView,
+        depth_buffer_view: &wgpu::TextureView,
         device: &mut wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         data: &WindowData,
@@ -165,9 +225,9 @@ impl UiRenderer {
         let mut primitive_buffer = PrimitiveBuffer::default();
         ui.render(&mut primitive_buffer);
 
-        /*// Render primitives
-        let mut rect_vertices: Vec<Vertex> = Vec::new();
-        let mut rect_indices: Vec<u32> = Vec::new();
+        // Render primitives
+        let mut rect_vertices: Vec<UiVertex> = Vec::new();
+        let mut rect_indices: Vec<u16> = Vec::new();
 
         // Rectangles
         for RectanglePrimitive {
@@ -176,23 +236,23 @@ impl UiRenderer {
             z,
         } in primitive_buffer.rectangle.into_iter()
         {
-            let a = Vertex {
-                pos: [l.x, l.y, z],
+            let a = UiVertex {
+                position: [l.x, l.y, z],
                 color: color.clone(),
             };
-            let b = Vertex {
-                pos: [l.x + l.width, l.y, z],
+            let b = UiVertex {
+                position: [l.x + l.width, l.y, z],
                 color: color.clone(),
             };
-            let c = Vertex {
-                pos: [l.x, l.y + l.height, z],
+            let c = UiVertex {
+                position: [l.x, l.y + l.height, z],
                 color: color.clone(),
             };
-            let d = Vertex {
-                pos: [l.x + l.width, l.y + l.height, z],
+            let d = UiVertex {
+                position: [l.x + l.width, l.y + l.height, z],
                 color: color.clone(),
             };
-            let a_index = rect_vertices.len() as u32;
+            let a_index = rect_vertices.len() as u16;
             let b_index = a_index + 1;
             let c_index = b_index + 1;
             let d_index = c_index + 1;
@@ -206,10 +266,10 @@ impl UiRenderer {
             color,
         } in primitive_buffer.triangles.into_iter()
         {
-            let index_offset = rect_vertices.len() as u32;
-            rect_vertices.extend(vertices.into_iter().map(|v| Vertex { pos: v, color }));
+            let index_offset = rect_vertices.len() as u16;
+            rect_vertices.extend(vertices.into_iter().map(|v| UiVertex { position: v, color }));
             rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
-        }*/
+        }
         // Text
         for TextPrimitive {
             layout: l,
@@ -309,7 +369,7 @@ impl UiRenderer {
                     .into_iter()
                     .map(|id| id + voffset),
             );
-        }
+        }*/
 
         // Draw rectangles
         {
@@ -319,43 +379,46 @@ impl UiRenderer {
             );
             // Update the uniform buffer to map (w, h) coordinates to [-1, 1]
             let transformation_matrix = [
-                [2.0 / win_w as f32, 0.0, 0.0, 0.0],
-                [0.0, -2.0 / win_h as f32, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [-1.0, 1.0, 0.0, 1.0],
+                2.0 / win_w as f32, 0.0, 0.0, 0.0,
+                0.0, 2.0 / win_h as f32, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                -1.0, -1.0, 0.0, 1.0,
             ];
-            encoder.update_constant_buffer(
-                &self.data.transform,
-                &Transform {
-                    transform: transformation_matrix,
-                    debug: false,
-                },
-            );
+            let src_buffer = device
+                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&transformation_matrix[..]);
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.transform_buffer, 0, 16 * 4);
             // Update vertex buffer
-            ensure_buffer_capacity(&mut self.rect_vertex_buffer, rect_vertices.len(), factory)?;
-            encoder
-                .update_buffer(&self.rect_vertex_buffer, &rect_vertices, 0)
-                .context("Updating rectangle vertex buffer in UiRenderer")?;
+            self.vertex_buffer.upload(device, encoder, &rect_vertices);
             // Update index buffer
-            ensure_buffer_capacity(&mut self.rect_index_buffer, rect_indices.len(), factory)?;
-            encoder
-                .update_buffer(&self.rect_index_buffer, &rect_indices, 0)
-                .context("Updating rectangle index buffer in UiRenderer")?;
-            // Create the Slice that dictates how to render the vertex buffer
-            let slice = Slice {
-                start: 0,                       // start at 0 in the index buffer
-                end: rect_indices.len() as u32, // end at last element in the index buffer
-                base_vertex: 0,                 // start at 0 in the vertex buffer
-                instances: None,                // don't use instancing
-                buffer: gfx::IndexBuffer::Index32(self.rect_index_buffer.clone()), // index buffer to use
-            };
-            // Update the vertex buffer in the pipeline data
-            self.data.vbuf = self.rect_vertex_buffer.clone();
-            self.data.color_buffer = color_buffer.clone();
-            self.data.depth_buffer = depth_buffer.clone();
-            // Draw the vertex buffer
-            encoder.draw(&slice, &self.pso, &self.data);
-        }*/
+            self.index_buffer.upload(device, encoder, &rect_indices);
+            // Draw
+            {
+                let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                        attachment: target,
+                        resolve_target: None,
+                        load_op: wgpu::LoadOp::Load,
+                        store_op: wgpu::StoreOp::Store,
+                        clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
+                    }],
+                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                        attachment: depth_buffer_view,
+                        depth_load_op: wgpu::LoadOp::Load,
+                        depth_store_op: wgpu::StoreOp::Store,
+                        clear_depth: 0.0, // TODO: use debugging depth ?
+                        stencil_load_op: wgpu::LoadOp::Clear,
+                        stencil_store_op: wgpu::StoreOp::Clear,
+                        clear_stencil: 0,
+                    }),
+                });
+                rpass.set_pipeline(&self.pipeline);
+                rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
+                rpass.set_vertex_buffers(0, &[(&self.vertex_buffer.buffer, 0)]);
+                rpass.set_index_buffer(&self.index_buffer.buffer, 0);
+                rpass.draw_indexed(0..(self.index_buffer.len as u32), 0, 0..1);
+            }
+        }
 
         // Draw text
         self.glyph_brush
@@ -364,3 +427,74 @@ impl UiRenderer {
         Ok(())
     }
 }
+
+struct DynamicBuffer<T: Copy> {
+    pub buffer: wgpu::Buffer,
+    usage: wgpu::BufferUsage,
+    capacity: usize,
+    pub len: usize,
+    phantom: std::marker::PhantomData<T>,
+}
+
+impl<T: Copy + 'static> DynamicBuffer<T> {
+    pub fn with_capacity(device: &wgpu::Device, initial_capacity: usize, mut usage: wgpu::BufferUsage) -> Self {
+        usage |= wgpu::BufferUsage::COPY_DST;
+        Self {
+            buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                size: (initial_capacity * std::mem::size_of::<T>()) as u64,
+                usage,
+            }),
+            usage,
+            capacity: initial_capacity,
+            len: 0,
+            phantom: std::marker::PhantomData,
+        }
+    }
+
+    pub fn upload(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, data: &[T]) {
+        if data.is_empty() {
+            self.len = 0;
+            return;
+        }
+
+        if data.len() > self.len {
+            self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                size: (data.len() * std::mem::size_of::<T>()) as u64,
+                usage: self.usage,
+            });
+            self.len = data.len();
+        }
+
+        let src_buffer = device
+            .create_buffer_mapped(data.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(data);
+
+        encoder.copy_buffer_to_buffer(
+            &src_buffer,
+            0,
+            &self.buffer,
+            0,
+            (data.len() * std::mem::size_of::<T>()) as u64,
+        );
+        self.len = data.len();
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UiVertex {
+    position: [f32; 3],
+    color: [f32; 4],
+}
+
+const UI_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 2] = [
+    wgpu::VertexAttributeDescriptor {
+        shader_location: 0,
+        format: wgpu::VertexFormat::Float3,
+        offset: 0,
+    },
+    wgpu::VertexAttributeDescriptor {
+        shader_location: 1,
+        format: wgpu::VertexFormat::Float4,
+        offset: 12,
+    },
+];
