@@ -157,10 +157,11 @@ impl UiRenderer {
         &mut self,
         target: &wgpu::TextureView,
         device: &mut wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
         data: &WindowData,
         ui: &quint::Ui<PrimitiveBuffer, Message>,
         _draw_crosshair: bool,
-    ) -> Result<wgpu::CommandBuffer> {
+    ) -> Result<()> {
         let mut primitive_buffer = PrimitiveBuffer::default();
         ui.render(&mut primitive_buffer);
 
@@ -357,10 +358,9 @@ impl UiRenderer {
         }*/
 
         // Draw text
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
         self.glyph_brush
-            .draw_queued(device, &mut encoder, target, data.physical_window_size.width.round() as u32, data.physical_window_size.height.round() as u32)
+            .draw_queued(device, encoder, target, data.physical_window_size.width.round() as u32, data.physical_window_size.height.round() as u32)
             .expect("couldn't draw queued glyphs");
-        Ok(encoder.finish())
+        Ok(())
     }
 }

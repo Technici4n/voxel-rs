@@ -273,11 +273,12 @@ impl State for SinglePlayer {
         &mut self,
         _settings: &Settings,
         frame: &wgpu::SwapChainOutput,
+        depth_buffer_view: &wgpu::TextureView,
         device: &mut wgpu::Device,
         data: &WindowData,
         _input_state: &InputState,
     ) -> Result<(StateTransition, wgpu::CommandBuffer)> {
-        // Count fps
+        // Count fps TODO: move this to update
         self.fps_counter.add_frame();
         send_debug_info("Player", "fps", format!("fps = {}", self.fps_counter.fps()));
 
@@ -286,7 +287,7 @@ impl State for SinglePlayer {
             self.yaw_pitch,
         );
 
-        // Try raytracing
+        // Try raytracing TODO: move this to update
         let pp = self.physics_simulation.get_player();
         let pointed_block = {
             let y = self.yaw_pitch.yaw.to_radians();
@@ -307,11 +308,52 @@ impl State for SinglePlayer {
             send_debug_info("Player", "pointedat", "Pointed block: None");
         }
 
-        /*// Clear buffers
-        gfx.encoder
-            .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
-        gfx.encoder
-            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);*/
+        // Begin rendering
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+
+        // Clear color and depth buffers
+        {
+            // We want this render pass to access the color and depth buffers, so we have to attach them
+            let rpass_descriptor = wgpu::RenderPassDescriptor {
+                color_attachments: &[
+                    // This is the color buffer attachment
+                    wgpu::RenderPassColorAttachmentDescriptor {
+                        // The color buffer
+                        attachment: &frame.view,
+                        // TODO: what is this?
+                        resolve_target: None,
+                        // We want to clear the color at the start of the pass
+                        load_op: wgpu::LoadOp::Clear,
+                        // We want to store the color at the end of the pass
+                        store_op: wgpu::StoreOp::Store,
+                        // The clear color
+                        clear_color: wgpu::Color {
+                            r: crate::window::CLEAR_COLOR[0] as f64,
+                            g: crate::window::CLEAR_COLOR[1] as f64,
+                            b: crate::window::CLEAR_COLOR[2] as f64,
+                            a: crate::window::CLEAR_COLOR[3] as f64,
+                        },
+                    }
+                ],
+                // This is the depth buffer attachment
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    // The depth buffer
+                    attachment: &depth_buffer_view,
+                    // We want to clear the depth buffer at the start of the pass
+                    depth_load_op: wgpu::LoadOp::Clear,
+                    // We want to store the depth at the end of the pass
+                    depth_store_op: wgpu::StoreOp::Store,
+                    // The clear depth
+                    clear_depth: crate::window::CLEAR_DEPTH,
+                    // We don't care about these because we don't use the stencil buffer
+                    stencil_load_op: wgpu::LoadOp::Clear,
+                    stencil_store_op: wgpu::StoreOp::Clear,
+                    clear_stencil: 0,
+                }),
+            };
+            // This starts the pass, renders nothing and ends the pass, thus clearing then storing the color and the depth
+            let rpass = encoder.begin_render_pass(&rpass_descriptor);
+        }
         // Draw world
 
         /*let mut model_to_draw = Vec::new();
@@ -338,10 +380,10 @@ impl State for SinglePlayer {
         //    .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
-        let commands = self.ui_renderer
-            .render(&frame.view, device, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
+        self.ui_renderer
+            .render(&frame.view, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
 
-        Ok((StateTransition::KeepCurrent, commands))
+        Ok((StateTransition::KeepCurrent, encoder.finish()))
     }
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {

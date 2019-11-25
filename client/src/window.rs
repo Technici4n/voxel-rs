@@ -63,6 +63,7 @@ pub trait State {
         &mut self,
         settings: &Settings,
         frame: &wgpu::SwapChainOutput,
+        depth_buffer_view: &wgpu::TextureView,
         device: &mut Device,
         data: &WindowData,
         input_state: &InputState,
@@ -93,7 +94,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     // Create the Surface, i.e. the render target of the program
     let hidpi_factor = window.hidpi_factor();
     let physical_window_size = window.inner_size().to_physical(hidpi_factor);
-    info!("Creating the rendering surface");
+    info!("Creating the swap chain");
     let surface = wgpu::Surface::create(&window);
     // Get the Device and the render Queue
     let adapter = wgpu::Adapter::request(
@@ -118,6 +119,22 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
         present_mode: wgpu::PresentMode::NoVsync,
     };
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+    info!("Creating the depth buffer");
+    let mut depth_texture_descriptor = wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width: sc_desc.width,
+            height: sc_desc.height,
+            depth: 1,
+        },
+        array_layer_count: 1,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: self::DEPTH_FORMAT,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+    };
+    let mut depth_texture = device.create_texture(&depth_texture_descriptor);
+    let mut depth_texture_view = depth_texture.create_default_view();
 
     let mut window_data = {
         let logical_window_size = window.inner_size();
@@ -203,15 +220,22 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 // If the window was resized, update the SwapChain and the window data
                 if window_resized {
                     info!("The window was resized, adjusting buffers...");
+                    // Update window data
                     window_data.logical_window_size = window.inner_size();
                     window_data.hidpi_factor = window.hidpi_factor();
                     let phys = window_data
                         .logical_window_size
                         .to_physical(window_data.hidpi_factor);
                     window_data.physical_window_size = phys;
+                    // Update SwapChain
                     sc_desc.width = phys.width.round() as u32;
                     sc_desc.height = phys.height.round() as u32;
                     swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                    // Update depth buffer
+                    depth_texture_descriptor.size.width = sc_desc.width;
+                    depth_texture_descriptor.size.height = sc_desc.height;
+                    depth_texture = device.create_texture(&depth_texture_descriptor);
+                    depth_texture_view = depth_texture.create_default_view();
                 }
                 window_resized = false;
 
@@ -269,7 +293,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 let frame = swap_chain.get_next_texture();
                 let (state_transition, commands) =
                     state
-                    .render(&settings, &frame, &mut device, &window_data, &input_state)
+                    .render(&settings, &frame, &depth_texture_view, &mut device, &window_data, &input_state)
                     .expect("Failed to `render` the current window state");
                 queue.submit(&[commands]);
                 match state_transition {
