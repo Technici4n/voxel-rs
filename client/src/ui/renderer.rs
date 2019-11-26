@@ -1,13 +1,18 @@
-//use crate::render::ensure_buffer_capacity;
-use crate::window::WindowData;
-//use crate::render::load_shader;
+use crate::{
+    window::WindowData,
+    render::{
+        load_glsl_shader,
+        DynamicBuffer,
+        create_default_pipeline,
+        create_default_render_pass,
+    },
+};
 use anyhow::Result;
 use log::info;
 use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use wgpu_glyph::FontId;
-use crate::render::load_glsl_shader;
 
 #[derive(Debug, Clone)]
 struct RectanglePrimitive {
@@ -139,66 +144,21 @@ impl UiRenderer {
         let mut compiler = shaderc::Compiler::new().expect("Failed to create shader compiler");
         let vertex_shader =
             load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/gui-rect.vert");
-        let vertex_shader_module = device.create_shader_module(vertex_shader.as_binary());
         let fragment_shader =
             load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/gui-rect.frag");
-        let fragment_shader_module = device.create_shader_module(fragment_shader.as_binary());
 
-        // Create pipeline (!)
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            bind_group_layouts: &[&uniform_layout],
-        });
-        let pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &pipeline_layout,
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
-                module: &vertex_shader_module,
-                entry_point: "main",
-            },
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: &fragment_shader_module,
-                entry_point: "main",
-            }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::None,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-            }),
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: crate::window::COLOR_FORMAT,
-                color_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::SrcAlpha,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                alpha_blend: wgpu::BlendDescriptor {
-                    src_factor: wgpu::BlendFactor::One,
-                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                    operation: wgpu::BlendOperation::Add,
-                },
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
-            depth_stencil_state: Some(wgpu::DepthStencilStateDescriptor {
-                format: crate::window::DEPTH_FORMAT,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil_front: Default::default(),
-                stencil_back: Default::default(),
-                stencil_read_mask: Default::default(),
-                stencil_write_mask: Default::default(),
-            }),
-            index_format: wgpu::IndexFormat::Uint16,
-            vertex_buffers: &[wgpu::VertexBufferDescriptor {
+        let pipeline = create_default_pipeline(
+            device,
+            &uniform_layout,
+            vertex_shader.as_binary(),
+            fragment_shader.as_binary(),
+            wgpu::PrimitiveTopology::TriangleList,
+            wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<UiVertex>() as u64,
                 step_mode: wgpu::InputStepMode::Vertex,
                 attributes: &UI_VERTEX_ATTRIBUTES,
-            }],
-            sample_count: 1,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
-        });
+            },
+        );
 
         Ok(Self {
             glyph_brush,
@@ -234,8 +194,7 @@ impl UiRenderer {
             layout: l,
             color,
             z,
-        } in primitive_buffer.rectangle.into_iter()
-        {
+        } in primitive_buffer.rectangle.into_iter() {
             let a = UiVertex {
                 position: [l.x, l.y, z],
                 color: color.clone(),
@@ -264,8 +223,7 @@ impl UiRenderer {
             vertices,
             indices,
             color,
-        } in primitive_buffer.triangles.into_iter()
-        {
+        } in primitive_buffer.triangles.into_iter() {
             let index_offset = rect_vertices.len() as u16;
             rect_vertices.extend(vertices.into_iter().map(|v| UiVertex { position: v, color }));
             rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
@@ -276,8 +234,7 @@ impl UiRenderer {
             mut parts,
             z,
             centered,
-        } in primitive_buffer.text.into_iter()
-        {
+        } in primitive_buffer.text.into_iter() {
             let dpi = data.hidpi_factor as f32;
 
             for p in parts.iter_mut() {
@@ -394,24 +351,11 @@ impl UiRenderer {
             self.index_buffer.upload(device, encoder, &rect_indices);
             // Draw
             {
-                let mut rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                    color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: target,
-                        resolve_target: None,
-                        load_op: wgpu::LoadOp::Load,
-                        store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
-                    }],
-                    depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                        attachment: depth_buffer_view,
-                        depth_load_op: wgpu::LoadOp::Load,
-                        depth_store_op: wgpu::StoreOp::Store,
-                        clear_depth: 0.0, // TODO: use debugging depth ?
-                        stencil_load_op: wgpu::LoadOp::Clear,
-                        stencil_store_op: wgpu::StoreOp::Clear,
-                        clear_stencil: 0,
-                    }),
-                });
+                let mut rpass = create_default_render_pass(
+                    encoder,
+                    target,
+                    depth_buffer_view,
+                );
                 rpass.set_pipeline(&self.pipeline);
                 rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
                 rpass.set_vertex_buffers(0, &[(&self.vertex_buffer.buffer, 0)]);
@@ -425,58 +369,6 @@ impl UiRenderer {
             .draw_queued(device, encoder, target, data.physical_window_size.width.round() as u32, data.physical_window_size.height.round() as u32)
             .expect("couldn't draw queued glyphs");
         Ok(())
-    }
-}
-
-struct DynamicBuffer<T: Copy> {
-    pub buffer: wgpu::Buffer,
-    usage: wgpu::BufferUsage,
-    capacity: usize,
-    pub len: usize,
-    phantom: std::marker::PhantomData<T>,
-}
-
-impl<T: Copy + 'static> DynamicBuffer<T> {
-    pub fn with_capacity(device: &wgpu::Device, initial_capacity: usize, mut usage: wgpu::BufferUsage) -> Self {
-        usage |= wgpu::BufferUsage::COPY_DST;
-        Self {
-            buffer: device.create_buffer(&wgpu::BufferDescriptor {
-                size: (initial_capacity * std::mem::size_of::<T>()) as u64,
-                usage,
-            }),
-            usage,
-            capacity: initial_capacity,
-            len: 0,
-            phantom: std::marker::PhantomData,
-        }
-    }
-
-    pub fn upload(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, data: &[T]) {
-        if data.is_empty() {
-            self.len = 0;
-            return;
-        }
-
-        if data.len() > self.len {
-            self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
-                size: (data.len() * std::mem::size_of::<T>()) as u64,
-                usage: self.usage,
-            });
-            self.len = data.len();
-        }
-
-        let src_buffer = device
-            .create_buffer_mapped(data.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(data);
-
-        encoder.copy_buffer_to_buffer(
-            &src_buffer,
-            0,
-            &self.buffer,
-            0,
-            (data.len() * std::mem::size_of::<T>()) as u64,
-        );
-        self.len = data.len();
     }
 }
 
