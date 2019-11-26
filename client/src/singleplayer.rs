@@ -28,6 +28,7 @@ use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
+use crate::window::WindowBuffers;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -269,11 +270,10 @@ impl State for SinglePlayer {
         }
     }
 
-    fn render(
+    fn render<'a>(
         &mut self,
         _settings: &Settings,
-        frame: &wgpu::SwapChainOutput,
-        depth_buffer_view: &wgpu::TextureView,
+        buffers: WindowBuffers<'a>,
         device: &mut wgpu::Device,
         data: &WindowData,
         _input_state: &InputState,
@@ -319,9 +319,9 @@ impl State for SinglePlayer {
                     // This is the color buffer attachment
                     wgpu::RenderPassColorAttachmentDescriptor {
                         // The color buffer
-                        attachment: &frame.view,
-                        // TODO: what is this?
-                        resolve_target: None,
+                        attachment: buffers.multisampled_texture_buffer,
+                        // The final color buffer (after multisampling)
+                        resolve_target: Some(buffers.texture_buffer),
                         // We want to clear the color at the start of the pass
                         load_op: wgpu::LoadOp::Clear,
                         // We want to store the color at the end of the pass
@@ -338,7 +338,7 @@ impl State for SinglePlayer {
                 // This is the depth buffer attachment
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
                     // The depth buffer
-                    attachment: &depth_buffer_view,
+                    attachment: buffers.depth_buffer,
                     // We want to clear the depth buffer at the start of the pass
                     depth_load_op: wgpu::LoadOp::Clear,
                     // We want to store the depth at the end of the pass
@@ -381,7 +381,7 @@ impl State for SinglePlayer {
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer
-            .render(&frame.view, depth_buffer_view, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
+            .render(buffers, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
 
         Ok((StateTransition::KeepCurrent, encoder.finish()))
     }

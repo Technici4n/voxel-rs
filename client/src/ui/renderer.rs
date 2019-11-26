@@ -13,6 +13,7 @@ use quint::Layout;
 use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use wgpu_glyph::FontId;
+use crate::window::WindowBuffers;
 
 #[derive(Debug, Clone)]
 struct RectanglePrimitive {
@@ -87,7 +88,7 @@ pub struct UiRenderer {
     index_buffer: DynamicBuffer<u16>,
 }
 
-impl UiRenderer {
+impl<'a> UiRenderer {
     pub fn new(device: &mut wgpu::Device) -> Result<Self> {
         // Load fonts
         let default_font: &'static [u8] =
@@ -108,7 +109,10 @@ impl UiRenderer {
             fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
         }
         info!("Fonts successfully loaded");
-        let glyph_brush = glyph_brush_builder.build(device, crate::window::COLOR_FORMAT);
+        let glyph_brush =
+            glyph_brush_builder
+                //.depth_stencil_state(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR)
+                .build(device, crate::window::COLOR_FORMAT);
 
         // Create uniform buffer
         let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor { size: 16, usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST) });
@@ -174,8 +178,7 @@ impl UiRenderer {
 
     pub fn render<Message>(
         &mut self,
-        target: &wgpu::TextureView,
-        depth_buffer_view: &wgpu::TextureView,
+        buffers: WindowBuffers<'a>,
         device: &mut wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         data: &WindowData,
@@ -353,8 +356,7 @@ impl UiRenderer {
             {
                 let mut rpass = create_default_render_pass(
                     encoder,
-                    target,
-                    depth_buffer_view,
+                    buffers,
                 );
                 rpass.set_pipeline(&self.pipeline);
                 rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
@@ -365,8 +367,16 @@ impl UiRenderer {
         }
 
         // Draw text
+        // TODO: use depth buffer
         self.glyph_brush
-            .draw_queued(device, encoder, target, data.physical_window_size.width.round() as u32, data.physical_window_size.height.round() as u32)
+            .draw_queued(
+                device,
+                encoder,
+                buffers.texture_buffer,
+                //create_default_depth_stencil_attachment(buffers.depth_buffer),
+                data.physical_window_size.width.round() as u32,
+                data.physical_window_size.height.round() as u32,
+            )
             .expect("couldn't draw queued glyphs");
         Ok(())
     }

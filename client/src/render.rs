@@ -4,6 +4,7 @@ use log::info;
 use std::path::Path;
 use std::hash::Hash;
 use std::collections::HashMap;
+use crate::window::WindowBuffers;
 
 /// Load a GLSL shader from a file and compile it to SPIR-V
 pub fn load_glsl_shader<P: AsRef<Path>>(compiler: &mut shaderc::Compiler, shader_kind: shaderc::ShaderKind, path: P) -> shaderc::CompilationArtifact {
@@ -89,31 +90,35 @@ pub fn create_default_pipeline(
         depth_stencil_state: Some(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR),
         index_format: wgpu::IndexFormat::Uint16,
         vertex_buffers: &[vertex_buffer_descriptor],
-        sample_count: 1,
+        sample_count: crate::window::SAMPLE_COUNT,
         sample_mask: !0,
         alpha_to_coverage_enabled: false,
     })
 }
 
+pub fn create_default_depth_stencil_attachment(depth_buffer: &wgpu::TextureView) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
+    wgpu::RenderPassDepthStencilAttachmentDescriptor {
+        attachment: depth_buffer,
+        depth_load_op: wgpu::LoadOp::Load,
+        depth_store_op: wgpu::StoreOp::Store,
+        clear_depth: 0.0, // TODO: use debugging depth ?
+        stencil_load_op: wgpu::LoadOp::Clear,
+        stencil_store_op: wgpu::StoreOp::Clear,
+        clear_stencil: 0,
+    }
+}
+
 /// Create the default render pass
-pub fn create_default_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder, color_target: &wgpu::TextureView, depth_target: &wgpu::TextureView) -> wgpu::RenderPass<'a> {
+pub fn create_default_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder, buffers: WindowBuffers<'a>) -> wgpu::RenderPass<'a> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-            attachment: color_target,
-            resolve_target: None,
+            attachment: buffers.multisampled_texture_buffer,
+            resolve_target: Some(buffers.texture_buffer),
             load_op: wgpu::LoadOp::Load,
             store_op: wgpu::StoreOp::Store,
             clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
         }],
-        depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-            attachment: depth_target,
-            depth_load_op: wgpu::LoadOp::Load,
-            depth_store_op: wgpu::StoreOp::Store,
-            clear_depth: 0.0, // TODO: use debugging depth ?
-            stencil_load_op: wgpu::LoadOp::Clear,
-            stencil_store_op: wgpu::StoreOp::Clear,
-            clear_stencil: 0,
-        }),
+        depth_stencil_attachment: Some(create_default_depth_stencil_attachment(buffers.depth_buffer)),
     })
 }
 

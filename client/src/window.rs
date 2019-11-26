@@ -59,11 +59,10 @@ pub trait State {
     /// Render.
     ///
     /// Note: The state is responsible for swapping buffers.
-    fn render(
+    fn render<'a>(
         &mut self,
         settings: &Settings,
-        frame: &wgpu::SwapChainOutput,
-        depth_buffer_view: &wgpu::TextureView,
+        buffers: WindowBuffers<'a>,
         device: &mut Device,
         data: &WindowData,
         input_state: &InputState,
@@ -113,12 +112,28 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     // Create the SwapChain
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        format: wgpu::TextureFormat::Bgra8UnormSrgb,
+        format: COLOR_FORMAT,
         width: physical_window_size.width.round() as u32,
         height: physical_window_size.height.round() as u32,
         present_mode: wgpu::PresentMode::NoVsync,
     };
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+    info!("Creating the multisampled texture buffer");
+    let mut msaa_texture_descriptor = wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width: sc_desc.width,
+            height: sc_desc.height,
+            depth: 1,
+        },
+        array_layer_count: 1,
+        mip_level_count: 1,
+        sample_count: SAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: sc_desc.format,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+    };
+    let mut msaa_texture = device.create_texture(&msaa_texture_descriptor);
+    let mut msaa_texture_view = msaa_texture.create_default_view();
     info!("Creating the depth buffer");
     let mut depth_texture_descriptor = wgpu::TextureDescriptor {
         size: wgpu::Extent3d {
@@ -128,9 +143,9 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
         },
         array_layer_count: 1,
         mip_level_count: 1,
-        sample_count: 1,
+        sample_count: SAMPLE_COUNT,
         dimension: wgpu::TextureDimension::D2,
-        format: self::DEPTH_FORMAT,
+        format: DEPTH_FORMAT,
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
     };
     let mut depth_texture = device.create_texture(&depth_texture_descriptor);
@@ -231,11 +246,17 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     sc_desc.width = phys.width.round() as u32;
                     sc_desc.height = phys.height.round() as u32;
                     swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                    // TODO: remove copy/paste
                     // Update depth buffer
                     depth_texture_descriptor.size.width = sc_desc.width;
                     depth_texture_descriptor.size.height = sc_desc.height;
                     depth_texture = device.create_texture(&depth_texture_descriptor);
                     depth_texture_view = depth_texture.create_default_view();
+                    // Udate MSAA frame buffer
+                    msaa_texture_descriptor.size.width = sc_desc.width;
+                    msaa_texture_descriptor.size.height = sc_desc.height;
+                    msaa_texture = device.create_texture(&msaa_texture_descriptor);
+                    msaa_texture_view = msaa_texture.create_default_view();
                 }
                 window_resized = false;
 
@@ -293,7 +314,11 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 let frame = swap_chain.get_next_texture();
                 let (state_transition, commands) =
                     state
-                    .render(&settings, &frame, &depth_texture_view, &mut device, &window_data, &input_state)
+                    .render(&settings, WindowBuffers {
+                        texture_buffer: &frame.view,
+                        multisampled_texture_buffer: &msaa_texture_view,
+                        depth_buffer: &depth_texture_view,
+                    }, &mut device, &window_data, &input_state)
                     .expect("Failed to `render` the current window state");
                 queue.submit(&[commands]);
                 match state_transition {
@@ -317,3 +342,11 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
 
 pub const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
 pub const CLEAR_DEPTH: f32 = 1.0;
+pub const SAMPLE_COUNT: u32 = 4;
+
+#[derive(Debug, Clone, Copy)]
+pub struct WindowBuffers<'a> {
+    pub texture_buffer: &'a wgpu::TextureView,
+    pub multisampled_texture_buffer: &'a wgpu::TextureView,
+    pub depth_buffer: &'a wgpu::TextureView,
+}
