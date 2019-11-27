@@ -182,8 +182,35 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             }
         }
 
+        let mut lightning_prob_pass = HashMap::new(); // probable number of re-update of light
+        for c_pos in update_lightning_chunks.iter(){
+
+            for i in -1..=1{
+                for j in -1..=1{
+                    for k in -1..=1{
+                        let pos_adj = c_pos.offset(i,j, k);
+                        if generating_chunks.contains(&pos_adj){
+                            let u = match lightning_prob_pass.remove(&pos_adj){
+                                None => 0,
+                                Some(value) => value+1,
+                            };
+                            lightning_prob_pass.insert(pos_adj, u);
+                        }
+                    }
+                }
+            }
+
+        }
+
+
+
         // Update light of one chunk at the time
         update_lightning_chunks_vec.sort_unstable_by_key(|pos| {
+            let u = match lightning_prob_pass.get(&pos){
+                None => 0,
+                Some(i) => *i,
+            };
+
             let mut min_distance = 1_000_000_000;
             for (player, _) in players.iter() {
                 if let Some(pl) = physics_simulation
@@ -197,21 +224,27 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                     ));
                 }
             }
-            -(min_distance as i64)
+            (u, -pos.py, -(min_distance as i64))
         });
-        if let Some(pos) = update_lightning_chunks_vec.pop() {
-            let t1 = Instant::now();
-            world.update_light(&pos, &mut light_bfs_queue);
-            update_lightning_chunks.remove(&pos);
-            let t2 = Instant::now();
-            total_light_time += (t2 - t1).subsec_millis();
-            light_count += 1;
-            println!(
-                "Average time to compute light : {} ms",
-                total_light_time / light_count
-            );
-            for (_, data) in players.iter_mut() {
-                data.loaded_chunks.remove(&pos);
+
+        let t0 = Instant::now();
+        while (Instant::now() - t0).subsec_millis() < 10 {
+            if let Some(pos) = update_lightning_chunks_vec.pop() {
+                let t1 = Instant::now();
+                world.update_light(&pos, &mut light_bfs_queue);
+                update_lightning_chunks.remove(&pos);
+                let t2 = Instant::now();
+                total_light_time += (t2 - t1).subsec_millis();
+                light_count += 1;
+                println!(
+                    "Average time to compute light : {} ms",
+                    total_light_time / light_count
+                );
+                for (_, data) in players.iter_mut() {
+                    data.loaded_chunks.remove(&pos);
+                }
+            }else{
+                break;
             }
         }
 

@@ -154,6 +154,7 @@ pub fn compute_light(
                 && MIN_VAL <= nz
                 && nz < MAX_VAL
                 && light_data[s as usize] < ll - 1
+                && !opaque[s as usize]
             {
                 light_data[s as usize] = ll - 1;
                 if ll > 1 {
