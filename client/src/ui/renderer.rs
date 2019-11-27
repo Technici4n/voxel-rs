@@ -33,7 +33,7 @@ struct TextPrimitive {
 #[derive(Debug, Clone)]
 struct TrianglesPrimitive {
     pub vertices: Vec<[f32; 3]>,
-    pub indices: Vec<u16>,
+    pub indices: Vec<u32>,
     pub color: [f32; 4],
 }
 
@@ -66,7 +66,7 @@ impl PrimitiveBuffer {
         })
     }
 
-    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u16>, color: [f32; 4]) {
+    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
         self.triangles.push(TrianglesPrimitive {
             vertices,
             indices,
@@ -85,7 +85,7 @@ pub struct UiRenderer {
     uniforms_bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: DynamicBuffer<UiVertex>,
-    index_buffer: DynamicBuffer<u16>,
+    index_buffer: DynamicBuffer<u32>,
 }
 
 impl<'a> UiRenderer {
@@ -162,6 +162,7 @@ impl<'a> UiRenderer {
                 step_mode: wgpu::InputStepMode::Vertex,
                 attributes: &UI_VERTEX_ATTRIBUTES,
             },
+            false,
         );
 
         Ok(Self {
@@ -190,7 +191,7 @@ impl<'a> UiRenderer {
 
         // Render primitives
         let mut rect_vertices: Vec<UiVertex> = Vec::new();
-        let mut rect_indices: Vec<u16> = Vec::new();
+        let mut rect_indices: Vec<u32> = Vec::new();
 
         // Rectangles
         for RectanglePrimitive {
@@ -214,7 +215,7 @@ impl<'a> UiRenderer {
                 position: [l.x + l.width, l.y + l.height, z],
                 color: color.clone(),
             };
-            let a_index = rect_vertices.len() as u16;
+            let a_index = rect_vertices.len() as u32;
             let b_index = a_index + 1;
             let c_index = b_index + 1;
             let d_index = c_index + 1;
@@ -227,7 +228,7 @@ impl<'a> UiRenderer {
             indices,
             color,
         } in primitive_buffer.triangles.into_iter() {
-            let index_offset = rect_vertices.len() as u16;
+            let index_offset = rect_vertices.len() as u32;
             rect_vertices.extend(vertices.into_iter().map(|v| UiVertex { position: v, color }));
             rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
         }
@@ -322,7 +323,7 @@ impl<'a> UiRenderer {
                 position: [cx + HALF_HEIGHT, cy + HALF_WIDTH, -1.0],
                 color: COLOR,
             };
-            let voffset = rect_vertices.len() as u16;
+            let voffset = rect_vertices.len() as u32;
             rect_vertices.extend([v1, v2, v3, v4, v5, v6, v7, v8].into_iter());
             rect_indices.extend(
                 [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]

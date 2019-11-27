@@ -29,6 +29,8 @@ use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
 use crate::window::WindowBuffers;
+use crate::world::renderer::WorldRenderer;
+use crate::world::meshing::ChunkMeshData;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -36,7 +38,7 @@ pub struct SinglePlayer {
     ui: Ui,
     ui_renderer: UiRenderer,
     world: World,
-    //world_renderer: WorldRenderer,
+    world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     model_regitry: Registry<VoxelModel>,
@@ -58,7 +60,7 @@ impl SinglePlayer {
         settings: &mut Settings,
         device: &mut wgpu::Device,
         mut client: Box<dyn Client>,
-    ) -> Result<Box<dyn State>> {
+    ) -> Result<(Box<dyn State>, wgpu::CommandBuffer)> {
         info!("Launching singleplayer");
         // Wait for data and player_id from the server
         let (data, player_id) = {
@@ -93,17 +95,21 @@ impl SinglePlayer {
         // Create the renderers
         let ui_renderer = UiRenderer::new(device)?;
 
-        // Load texture atlas
-        //let texture_atlas = crate::texture::load_image(&mut gfx.factory, data.texture_atlas)?;
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        //let world_renderer = WorldRenderer::new(gfx, data.meshes, texture_atlas, &data.models);
+        let world_renderer = WorldRenderer::new(
+            device,
+            &mut encoder,
+            data.texture_atlas,
+            data.meshes,
+        );
 
-        Ok(Box::new(Self {
+        Ok((Box::new(Self {
             fps_counter: FpsCounter::new(),
             ui: Ui::new(),
             ui_renderer,
             world: World::new(),
-            //world_renderer: world_renderer?,
+            world_renderer,
             block_registry: data.blocks,
             model_regitry: data.models,
             client,
@@ -119,7 +125,7 @@ impl SinglePlayer {
             yaw_pitch: Default::default(),
             debug_info: DebugInfo::new_current(),
             chunks_to_mesh: Default::default(),
-        }))
+        }), encoder.finish()))
     }
 }
 
@@ -196,7 +202,7 @@ impl State for SinglePlayer {
         // damned borrow checker :(
         let Self {
             ref mut world,
-            //ref mut world_renderer,
+            ref mut world_renderer,
             ref render_distance,
             ..
         } = self;
@@ -209,8 +215,7 @@ impl State for SinglePlayer {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
-                //world_renderer.chunk_meshes.remove(chunk_pos);
-                //world_renderer.meshing_worker.dequeue_chunk(*chunk_pos);
+                world_renderer.remove_chunk(*chunk_pos);
                 light.remove(chunk_pos);
                 false
             }
@@ -230,25 +235,10 @@ impl State for SinglePlayer {
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                //self.world_renderer
-                //    .meshing_worker
-                //    .enqueue_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
+                self.world_renderer
+                    .update_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
             }
         }
-
-        // Send new chunks to the GPU
-        /*for (chunk_pos, vertices, indices) in self
-            .world_renderer
-            .meshing_worker
-            .get_processed_chunks()
-            .into_iter()
-        {
-            // Add the mesh if the chunk is still loaded
-            if self.world.has_chunk(chunk_pos) {
-                self.world_renderer
-                    .update_chunk_mesh(gfx, chunk_pos, vertices, indices);
-            }
-        }*/
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
@@ -276,13 +266,13 @@ impl State for SinglePlayer {
         buffers: WindowBuffers<'a>,
         device: &mut wgpu::Device,
         data: &WindowData,
-        _input_state: &InputState,
+        input_state: &InputState,
     ) -> Result<(StateTransition, wgpu::CommandBuffer)> {
         // Count fps TODO: move this to update
         self.fps_counter.add_frame();
         send_debug_info("Player", "fps", format!("fps = {}", self.fps_counter.fps()));
 
-        let _frustum = Frustum::new(
+        let frustum = Frustum::new(
             self.physics_simulation.get_camera_position(),
             self.yaw_pitch,
         );
@@ -354,7 +344,6 @@ impl State for SinglePlayer {
             // This starts the pass, renders nothing and ends the pass, thus clearing then storing the color and the depth
             let _rpass = encoder.begin_render_pass(&rpass_descriptor);
         }
-        // Draw world
 
         /*let mut model_to_draw = Vec::new();
         model_to_draw.push(Model {
@@ -367,17 +356,33 @@ impl State for SinglePlayer {
             pos_z: 0.0,
             scale: 0.3,
         });*/
-        /*self.world_renderer.render(
-            gfx,
+        // Draw world
+        self.world_renderer.render(
+            device,
+            &mut encoder,
+            buffers,
             data,
             &frustum,
             input_state.enable_culling,
-            pointed_block,
-            model_to_draw,
-        )?;*/
+        );
         // Clear depth
-        //gfx.encoder
-        //    .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
+        {
+            // TODO: don't copy paste this
+            let rpass_descriptor = wgpu::RenderPassDescriptor {
+                color_attachments: &[],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                    attachment: buffers.depth_buffer,
+                    depth_load_op: wgpu::LoadOp::Clear,
+                    depth_store_op: wgpu::StoreOp::Store,
+                    clear_depth: crate::window::CLEAR_DEPTH,
+                    stencil_load_op: wgpu::LoadOp::Clear,
+                    stencil_store_op: wgpu::StoreOp::Clear,
+                    clear_stencil: 0,
+                }),
+            };
+            // This starts the pass, renders nothing and ends the pass, thus clearing then storing the depth
+            let _rpass = encoder.begin_render_pass(&rpass_descriptor);
+        }
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer

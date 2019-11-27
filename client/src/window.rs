@@ -9,7 +9,7 @@ use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event_loop::ControlFlow;
 
 /// A closure that creates a new instance of `State`.
-pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Device) -> Result<Box<dyn State>> >;
+pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Device) -> Result<(Box<dyn State>, wgpu::CommandBuffer)>>;
 
 /// A transition from one state to another.
 pub enum StateTransition {
@@ -99,7 +99,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let adapter = wgpu::Adapter::request(
         &wgpu::RequestAdapterOptions {
             power_preference: wgpu::PowerPreference::HighPerformance, // TODO: configure this?
-            backends: wgpu::BackendBit::PRIMARY,
+            backends: wgpu::BackendBit::DX12,
         },
     ).expect("Failed to create adapter");
     // TODO: device should be immutable
@@ -172,8 +172,9 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
 
     info!("Done initializing the window. Moving on to the first state...");
 
-    let mut state =
+    let (mut state, cmd) =
         initial_state(&mut settings, &mut device).expect("Failed to create initial window state");
+    queue.submit(&[cmd]);
 
     let mut previous_time = std::time::Instant::now();
 
@@ -301,8 +302,10 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
                         info!("Transitioning to a new window state...");
-                        state =
+                        let (new_state, cmd) =
                             new_state(&mut settings, &mut device).expect("Failed to create next window state");
+                        state = new_state;
+                        queue.submit(&[cmd]);
                         return;
                     }
                     StateTransition::CloseWindow => {
@@ -324,8 +327,10 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 match state_transition {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
-                        state =
+                        let (new_state, cmd) =
                             new_state(&mut settings, &mut device).expect("Failed to create next window state");
+                        state = new_state;
+                        queue.submit(&[cmd]);
                     }
                     StateTransition::CloseWindow => {
                         *control_flow = ControlFlow::Exit;

@@ -1,4 +1,4 @@
-use super::renderer::Vertex;
+use super::renderer::ChunkVertex;
 use std::sync::Arc;
 use voxel_rs_common::world::LightChunk;
 use voxel_rs_common::{
@@ -98,8 +98,13 @@ pub fn greedy_meshing(
     chunk_data: ChunkMeshData,
     meshes: &Vec<BlockMesh>,
     quads: &mut Vec<Quad>,
-) -> (Vec<Vertex>, Vec<u32>, u32, u32) {
-    let mut res_vertex: Vec<Vertex> = Vec::new();
+) -> (Vec<ChunkVertex>, Vec<u32>, u32, u32) {
+    let chunk_pos = chunk_data.chunk.pos;
+    let offset_x = chunk_pos.px as f32 * CHUNK_SIZE as f32;
+    let offset_y = chunk_pos.py as f32 * CHUNK_SIZE as f32;
+    let offset_z = chunk_pos.pz as f32 * CHUNK_SIZE as f32;
+
+    let mut res_vertex: Vec<ChunkVertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
     let mut tot_quad = 0;
@@ -469,8 +474,8 @@ pub fn greedy_meshing(
                             BlockMesh::FullCube { textures } => textures[s],
                         };
 
-                        let uv_pos = [uv.x, uv.y];
-                        let uv_size = [uv.width, uv.height];
+                        let texture_top_left = [uv.x, uv.y];
+                        let texture_size = [uv.width, uv.height];
                         let uv_factors = [(j_end - j) as f32, (k_end - k) as f32];
                         let uv_factors = [
                             uv_factors[uv_directions[s][0]],
@@ -496,19 +501,19 @@ pub fn greedy_meshing(
                         ];
 
                         for kk in 0..4 {
-                            res_vertex.push(Vertex {
-                                pos: [px_[kk], py_[kk], pz_[kk]],
-                                uv_pos,
-                                uv_offset: uvs[kk],
-                                uv_size,
-                                normal: v[kk],
+                            res_vertex.push(ChunkVertex {
+                                pos: [px_[kk] + offset_x, py_[kk] + offset_y, pz_[kk] + offset_z],
+                                texture_top_left,
+                                texture_uv: uvs[kk],
+                                texture_size,
+                                occl_and_face: v[kk],
                             });
                         }
 
-                        let a00 = v[0] >> 3;
-                        let a11 = v[3] >> 3;
-                        let a01 = v[1] >> 3;
-                        let a10 = v[2] >> 3;
+                        let a00 = (v[0] >> 3) & 0x3;
+                        let a11 = (v[3] >> 3) & 0x3;
+                        let a01 = (v[1] >> 3) & 0x3;
+                        let a10 = (v[2] >> 3) & 0x3;
 
                         for kk in 0..6 {
                             if a00 + a11 < a01 + a10 {

@@ -1,24 +1,28 @@
-#version 330
+#version 450
 
-in vec3 v_Norm;
-in vec2 v_UvPos;
-in vec2 v_UvSize;
-in vec2 v_UvOffset;
-in float occl;
-in float v_LightLevel;
+layout(location = 0) flat in vec3 i_norm;
+layout(location = 1) in float i_occl;
+layout(location = 2) flat in vec2 i_texture_top_left;
+layout(location = 3) flat in vec2 i_texture_size;
+layout(location = 4) in vec2 i_texture_uv;
+layout(location = 5) flat in float i_light_level;
 
-out vec4 ColorBuffer;
+layout(location = 0) out vec4 o_color;
 
-uniform sampler2D TextureAtlas;
+layout(set = 0, binding = 1) uniform sampler u_sampler;
+layout(set = 0, binding = 2) uniform texture2D u_texture_atlas;
 
 const vec3 SUN_DIRECTION = normalize(vec3(0, 1, 0.5));
 const float SUN_FRACTION = 0.3;
 
 void main() {
-    float lightFactor = pow(0.8, 15.0 - v_LightLevel);
-    vec2 actualPosition = v_UvPos + mod(v_UvOffset, v_UvSize);
+    float light_factor = pow(0.8, 15.0 - i_light_level);
+    vec2 actual_uv = i_texture_top_left + mod(i_texture_uv, i_texture_size);
+    actual_uv = vec2(actual_uv.x, 1.0 - actual_uv.y);
+    float texture_component_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(i_norm, SUN_DIRECTION));
 
-    ColorBuffer = lightFactor * texture(TextureAtlas, actualPosition) * occl * vec4(1.0, 1.0, 1.0, 1.0) * (1.0 - SUN_FRACTION + SUN_FRACTION * abs(dot(v_Norm, SUN_DIRECTION)));
-    ColorBuffer.a = 1.0;
-
+    float total_factor = light_factor * i_occl * texture_component_factor;
+    vec4 tex_color = texture(sampler2D(u_texture_atlas, u_sampler), actual_uv);
+    tex_color.a = 1.0;
+    o_color = vec4(total_factor, total_factor, total_factor, 1.0) * tex_color;
 }

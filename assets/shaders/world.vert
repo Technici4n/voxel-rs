@@ -1,26 +1,25 @@
-#version 330
+#version 450
 
-in vec3 a_Pos;
-in vec2 a_UvPos;
-in vec2 a_UvOffset;
-in vec2 a_UvSize;
-in uint a_Norm;
+layout(location = 0) in vec3 i_position;
+layout(location = 1) in vec2 i_texture_top_left;
+layout(location = 2) in vec2 i_texture_size;
+layout(location = 3) in vec2 i_texture_uv;
+// occl at end, then face then light
+layout(location = 4) in uint i_occl_and_face;
+// light: 4 bits
+// occl: 2 bits
+// face: 3 bits
 
-uniform Transform {
-    mat4 u_ViewProj;
-    mat4 u_Model;
+layout(set = 0, binding = 0) uniform Transform {
+    mat4 u_view_proj;
 };
 
-out vec3 v_Norm;
-out float occl;
-out vec2 v_UvPos;
-out vec2 v_UvOffset;
-out vec2 v_UvSize;
-out float v_LightLevel;
-
-uint get_light_level(uint norm) {
-    return norm >> 5;
-}
+layout(location = 0) flat out vec3 o_norm;
+layout(location = 1) out float o_occl;
+layout(location = 2) flat out vec2 o_texture_top_left;
+layout(location = 3) flat out vec2 o_texture_size;
+layout(location = 4) out vec2 o_texture_uv;
+layout(location = 5) flat out float o_light_level;
 
 vec3 get_normal(uint id) {
     if(id == 0u) {
@@ -38,31 +37,30 @@ vec3 get_normal(uint id) {
     }
 }
 
-void main() {
-    gl_Position = u_ViewProj * u_Model * vec4(a_Pos, 1.0);
-
-    uint norm = a_Norm;
-
-    uint light_level = norm >> 5;
-    norm -= light_level << 5;
-    uint code_occl = norm >> 3;
-    norm -= code_occl << 3;
-    uint code_normal = norm;
-
-    v_Norm = get_normal(code_normal);
-
-    if(code_occl == 3u){
-      occl = 1.0;
-    }else if(code_occl == 2u){
-      occl = 0.65;
-    }else if(code_occl == 1u){
-      occl = 0.4;
-    }else{
-      occl = 0.3;
+float get_occl(uint code_occl) {
+    if (code_occl == 3u) {
+        return 1.0;
+    } else if (code_occl == 2u) {
+        return 0.65;
+    } else if (code_occl == 1u) {
+        return 0.4;
+    } else {
+        return 0.3;
     }
+}
 
-    v_UvPos = a_UvPos;
-    v_UvOffset = a_UvOffset;
-    v_UvSize = a_UvSize;
-    v_LightLevel = float(light_level);
+void main() {
+
+    uint light_level = (i_occl_and_face & 0x000001E0u) >> 5;
+    uint occl_code = (i_occl_and_face & 0x00000018u) >> 3;
+    uint face_index = (i_occl_and_face & 0x00000007u) >> 0;
+
+    o_norm = get_normal(face_index);
+    o_occl = get_occl(occl_code);
+    o_texture_top_left = i_texture_top_left;
+    o_texture_size = i_texture_size;
+    o_texture_uv = i_texture_uv;
+    o_light_level = float(light_level);
+
+    gl_Position = u_view_proj * vec4(i_position, 1.0);
 }

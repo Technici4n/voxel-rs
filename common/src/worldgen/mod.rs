@@ -134,10 +134,10 @@ impl DefaultWorldGenerator {
             }
         }
         let t2 = Instant::now();
-        println!(
+        /*println!(
             "Time to generate chunk : {} micros",
             (t2 - t1).subsec_micros()
-        );
+        );*/
     }
 
     fn decorate_chunk(chunks: &mut Vec<Chunk>, decorator: &Decorator) {

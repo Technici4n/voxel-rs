@@ -12,7 +12,7 @@ mod input;
 mod render;
 mod settings;
 mod singleplayer;
-//mod texture;
+mod texture;
 mod ui;
 mod window;
 mod world;

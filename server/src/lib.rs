@@ -206,10 +206,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             let t2 = Instant::now();
             total_light_time += (t2 - t1).subsec_millis();
             light_count += 1;
-            println!(
+            /*println!(
                 "Average time to compute light : {} ms",
                 total_light_time / light_count
-            );
+            );*/
             for (_, data) in players.iter_mut() {
                 data.loaded_chunks.remove(&pos);
             }
