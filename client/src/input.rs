@@ -4,7 +4,7 @@ use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::player::PlayerInput;
 
 /// A helper struct to keep track of the yaw and pitch of a player
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct YawPitch {
     pub yaw: f64,
     pub pitch: f64,
@@ -36,6 +36,15 @@ impl YawPitch {
     }
 }
 
+impl Default for YawPitch {
+    fn default() -> Self {
+        Self {
+            yaw: -127.0,
+            pitch: -17.0,
+        }
+    }
+}
+
 /// The state of the keyboard and mouse buttons.
 pub struct InputState {
     keys: HashMap<u32, ElementState>,
@@ -51,7 +60,7 @@ impl InputState {
             keys: HashMap::new(),
             mouse_buttons: HashMap::new(),
             modifiers_state: ModifiersState::default(),
-            flying: false,
+            flying: true,
             enable_culling: true,
         }
     }

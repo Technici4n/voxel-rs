@@ -22,7 +22,12 @@ void main() {
     float texture_component_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(i_norm, SUN_DIRECTION));
 
     float total_factor = light_factor * i_occl * texture_component_factor;
+    /* with texture
     vec4 tex_color = texture(sampler2D(u_texture_atlas, u_sampler), actual_uv);
     tex_color.a = 1.0;
     o_color = vec4(total_factor, total_factor, total_factor, 1.0) * tex_color;
+    */
+
+    /* without texture */
+    o_color = vec4(total_factor, total_factor, total_factor, 1.0);
 }

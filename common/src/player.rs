@@ -27,7 +27,7 @@ impl Default for PlayerInput {
             key_move_down: false,
             yaw: 0.0,
             pitch: 0.0,
-            flying: false,
+            flying: true,
         }
     }
 }

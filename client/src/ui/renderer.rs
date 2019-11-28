@@ -115,7 +115,7 @@ impl<'a> UiRenderer {
                 .build(device, crate::window::COLOR_FORMAT);
 
         // Create uniform buffer
-        let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor { size: 16, usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST) });
+        let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor { size: 64, usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST) });
 
         // Create bind group layout
         let uniform_layout =

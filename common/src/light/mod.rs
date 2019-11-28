@@ -146,18 +146,19 @@ pub fn compute_light(
 
         for i in 0..6 {
             let (nx, ny, nz) = (x as isize + DX[i], y as isize + DY[i], z as isize + DZ[i]);
-            let s = (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
             if MIN_VAL <= nx
                 && nx < MAX_VAL
                 && MIN_VAL <= ny
                 && ny < MAX_VAL
                 && MIN_VAL <= nz
                 && nz < MAX_VAL
-                && light_data[s as usize] < ll - 1
             {
-                light_data[s as usize] = ll - 1;
-                if ll > 1 {
-                    bfs_queue.push_back((nx as usize, ny as usize, nz as usize, ll - 1));
+                let s = (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
+                if light_data[s as usize] < ll - 1 {
+                    light_data[s as usize] = ll - 1;
+                    if ll > 1 {
+                        bfs_queue.push_back((nx as usize, ny as usize, nz as usize, ll - 1));
+                    }
                 }
             }
         }
