@@ -17,9 +17,6 @@ pub fn load_image(
     // Generate mipmaps
     let mut mipmaps = Vec::new();
     mipmaps.push(Vec::from(&*image));
-    for i in 0..(dbg!(mipmaps[0].len())) {
-        mipmaps[0][i] = 255;
-    }
     for level in 1..MIPMAP_LEVELS {
         // 5 mip maps only
         let current_size = (image_size >> level) as usize;
@@ -62,7 +59,7 @@ pub fn load_image(
         mip_level_count: MIPMAP_LEVELS,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Uint,
+        format: wgpu::TextureFormat::Rgba8Unorm,
         usage: wgpu::TextureUsage::COPY_DST | wgpu::TextureUsage::SAMPLED,
     };
     let texture = device.create_texture(&texture_descriptor);
