@@ -77,7 +77,7 @@ impl Default for Settings {
         Self {
             window_size: (1600, 900),
             invert_mouse: false,
-            render_distance: (4, 4, 3, 3, 4, 4),
+            render_distance: (0, 0, 0, 0, 0, 0),
         }
     }
 }
