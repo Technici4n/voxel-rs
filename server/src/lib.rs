@@ -234,10 +234,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 world.update_light(&pos, &mut light_bfs_queue);
                 update_lightning_chunks.remove(&pos);
                 let t2 = Instant::now();
-                total_light_time += (t2 - t1).subsec_millis();
+                total_light_time += (t2 - t1).subsec_micros();
                 light_count += 1;
                 println!(
-                    "Average time to compute light : {} ms",
+                    "Average time to compute light : {} micros",
                     total_light_time / light_count
                 );
                 for (_, data) in players.iter_mut() {
