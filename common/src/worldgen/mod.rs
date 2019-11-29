@@ -97,41 +97,43 @@ impl DefaultWorldGenerator {
         let pz = (chunk.pos.pz * CHUNK_SIZE as i64) as f32;
         let freq = 1.0 / 64.0;
 
-        if py > 100.0 {
-            return;
-        } else if py + CHUNK_SIZE as f32 + 13.0 < 0.0 {
+        unsafe {
+            if py > 100.0 {
+                return;
+            } else if py + CHUNK_SIZE as f32 + 13.0 < 0.0 {
+                for i in 0..CHUNK_SIZE {
+                    for j in 0..CHUNK_SIZE {
+                        for k in 0..CHUNK_SIZE {
+                            chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), stone_block);
+                        }
+                    }
+                }
+                return;
+            }
+
+            let s = CHUNK_SIZE + 3;
+            let noise = perlin::perlin(px, py, pz, s as usize, freq, freq * 2.0, freq, 5, 0.4, 42);
+
             for i in 0..CHUNK_SIZE {
                 for j in 0..CHUNK_SIZE {
                     for k in 0..CHUNK_SIZE {
-                        chunk.set_block_at((i as u32, j as u32, k as u32), stone_block);
-                    }
-                }
-            }
-            return;
-        }
-
-        let s = CHUNK_SIZE + 3;
-        let noise = perlin::perlin(px, py, pz, s as usize, freq, freq * 2.0, freq, 5, 0.4, 42);
-
-        for i in 0..CHUNK_SIZE {
-            for j in 0..CHUNK_SIZE {
-                for k in 0..CHUNK_SIZE {
-                    // warning : indexing order
-                    if noise[(i * s * s + j * s + k) as usize] > (py + j as f32 + 10.0) / 110.0 {
-                        if noise[(i * s * s + (j + 1) * s + k) as usize]
-                            > (py + j as f32 + 11.0) / 110.0
-                        {
-                            if noise[(i * s * s + (j + 2) * s + k) as usize]
-                                > (py + j as f32 + 12.0) / 110.0
-                                && noise[(i * s * s + (j + 3) * s + k) as usize]
-                                    > (py + j as f32 + 13.0) / 110.0
+                        // warning : indexing order
+                        if noise[(i * s * s + j * s + k) as usize] > (py + j as f32 + 10.0) / 110.0 {
+                            if noise[(i * s * s + (j + 1) * s + k) as usize]
+                                > (py + j as f32 + 11.0) / 110.0
                             {
-                                chunk.set_block_at((i as u32, j as u32, k as u32), stone_block);
+                                if noise[(i * s * s + (j + 2) * s + k) as usize]
+                                    > (py + j as f32 + 12.0) / 110.0
+                                    && noise[(i * s * s + (j + 3) * s + k) as usize]
+                                    > (py + j as f32 + 13.0) / 110.0
+                                {
+                                    chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), stone_block);
+                                } else {
+                                    chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), dirt_block);
+                                }
                             } else {
-                                chunk.set_block_at((i as u32, j as u32, k as u32), dirt_block);
+                                chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), grass_block);
                             }
-                        } else {
-                            chunk.set_block_at((i as u32, j as u32, k as u32), grass_block);
                         }
                     }
                 }

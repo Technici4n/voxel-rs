@@ -22,6 +22,7 @@ use voxel_rs_common::{
     },
     worldgen::DefaultWorldGenerator,
 };
+use voxel_rs_common::world::chunk::CHUNK_SIZE;
 
 mod worldgen;
 
@@ -54,6 +55,8 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut update_lightning_chunks_vec = Vec::new();
     // Light update BFS queue
     let mut light_bfs_queue = VecDeque::new();
+    let mut ligth_data_reuse = [0; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
+    let mut opaque_reuse = [false; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
     let mut total_light_time = 0;
     let mut light_count = 0;
 
@@ -228,10 +231,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         });
 
         let t0 = Instant::now();
-        while (Instant::now() - t0).subsec_millis() < 10 {
+        while (Instant::now() - t0).subsec_millis() < 25 {
             if let Some(pos) = update_lightning_chunks_vec.pop() {
                 let t1 = Instant::now();
-                world.update_light(&pos, &mut light_bfs_queue);
+                world.update_light(&pos, &mut light_bfs_queue, &mut ligth_data_reuse, &mut opaque_reuse);
                 update_lightning_chunks.remove(&pos);
                 let t2 = Instant::now();
                 total_light_time += (t2 - t1).subsec_micros();

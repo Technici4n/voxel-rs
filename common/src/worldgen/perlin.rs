@@ -106,32 +106,38 @@ pub fn value_noise(
     }
 
     for i in 0..size_x {
+        let x_cc = x_c[i];
         for j in 0..size_y {
+            let y_cc = y_c[j];
             for k in 0..size_z {
-                // plz vectorize this for me
-                let a_a_a = values[(x_c[i] * ny + y_c[j]) * nz + z_c[k]];
-                let a_a_b = values[(x_c[i] * ny + y_c[j]) * nz + z_c[k] + 1];
 
-                let a_a = a_a_a + (a_a_b - a_a_a) * fz[k];
+                unsafe {
+                    let z_cc = z_c[k];
+                    // plz vectorize this for me
+                    let a_a_a = *values.get_unchecked((x_cc * ny + y_cc) * nz + z_cc);
+                    let a_a_b = *values.get_unchecked((x_cc * ny + y_cc) * nz + z_cc + 1);
 
-                let a_b_a = values[(x_c[i] * ny + y_c[j] + 1) * nz + z_c[k]];
-                let a_b_b = values[(x_c[i] * ny + y_c[j] + 1) * nz + z_c[k] + 1];
+                    let a_a = a_a_a + (a_a_b - a_a_a) * fz[k];
 
-                let a_b = a_b_a + (a_b_b - a_b_a) * fz[k];
+                    let a_b_a = *values.get_unchecked((x_cc * ny + y_cc + 1) * nz + z_cc);
+                    let a_b_b = *values.get_unchecked((x_cc * ny + y_cc + 1) * nz + z_cc + 1);
 
-                let b_a_a = values[(x_c[i] * ny + y_c[j] + ny) * nz + z_c[k]];
-                let b_a_b = values[(x_c[i] * ny + y_c[j] + ny) * nz + z_c[k] + 1];
+                    let a_b = a_b_a + (a_b_b - a_b_a) * fz[k];
 
-                let b_a = b_a_a + (b_a_b - b_a_a) * fz[k];
+                    let b_a_a = *values.get_unchecked((x_cc * ny + y_cc + ny) * nz + z_cc);
+                    let b_a_b =*values.get_unchecked((x_cc * ny + y_cc + ny) * nz + z_cc + 1);
 
-                let b_b_a = values[(x_c[i] * ny + y_c[j] + 1 + ny) * nz + z_c[k]];
-                let b_b_b = values[(x_c[i] * ny + y_c[j] + 1 + ny) * nz + z_c[k] + 1];
+                    let b_a = b_a_a + (b_a_b - b_a_a) * fz[k];
 
-                let b_b = b_b_a + (b_b_b - b_b_a) * fz[k];
+                    let b_b_a = *values.get_unchecked((x_cc * ny + y_cc + 1 + ny) * nz + z_cc);
+                    let b_b_b = *values.get_unchecked((x_cc * ny + y_cc + 1 + ny) * nz + z_cc + 1);
 
-                let a = (a_a) + (a_b - a_a) * fy[j];
-                let b = (b_a) + (b_b - b_a) * fy[j];
-                to_add[(i * size_y + j) * size_z + k] += p * (a + (b - a) * fx[i]);
+                    let b_b = b_b_a + (b_b_b - b_b_a) * fz[k];
+
+                    let a = (a_a) + (a_b - a_a) * fy[j];
+                    let b = (b_a) + (b_b - b_a) * fy[j];
+                    to_add[(i * size_y + j) * size_z + k] += p * (a + (b - a) * fx[i]);
+                }
             }
         }
     }
