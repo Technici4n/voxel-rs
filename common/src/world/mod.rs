@@ -77,7 +77,7 @@ impl LightChunk {
     }
 
     /// Get light at some position
-    #[inline]
+    #[inline(always)]
     pub fn get_light_at(&self, (px, py, pz): (u32, u32, u32)) -> u8 {
         self.light[(px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize]
     }

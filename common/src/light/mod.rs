@@ -210,6 +210,7 @@ impl FastBFSQueue {
         self.pop_index == self.push_index
     }
 
+    #[inline(always)]
     pub unsafe fn pop(&mut self) -> &(usize, usize, usize, u8) {
         let res = self.data.get_unchecked(self.pop_index);
         self.pop_index = (self.pop_index + 1) % (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize;
@@ -217,6 +218,7 @@ impl FastBFSQueue {
         return res;
     }
 
+    #[inline(always)]
     pub unsafe fn push(&mut self, to_push: (usize, usize, usize, u8)) {
         *self.data.get_unchecked_mut(self.push_index) = to_push;
         self.push_index = (self.push_index + 1) % (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize;

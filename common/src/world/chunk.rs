@@ -159,24 +159,24 @@ impl Chunk {
     }
 
     /// Get block at some position
-    #[inline]
+    #[inline(always)]
     pub fn get_block_at(&self, (px, py, pz): (u32, u32, u32)) -> BlockId {
         self.data[(px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize]
     }
 
     /// Set block at some position
-    #[inline]
+    #[inline(always)]
     pub fn set_block_at(&mut self, (px, py, pz): (u32, u32, u32), block: BlockId) {
         self.data[(px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize] = block;
     }
 
-    #[inline]
+    #[inline(always)]
     pub unsafe fn get_block_at_unsafe(&self, (px, py, pz): (u32, u32, u32)) -> BlockId {
         *self.data.get_unchecked((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize)
     }
 
     /// Set block at some position
-    #[inline]
+    #[inline(always)]
     pub unsafe fn set_block_at_unsafe(&mut self, (px, py, pz): (u32, u32, u32), block: BlockId) {
         *self.data.get_unchecked_mut((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize) = block;
     }
