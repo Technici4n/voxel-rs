@@ -1,5 +1,5 @@
 use self::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
-use crate::light::compute_light;
+use crate::light::{compute_light, FastBFSQueue};
 use crate::world::chunk::ChunkPosXZ;
 use crate::{
     block::{Block, BlockId},
@@ -319,7 +319,7 @@ impl World {
     pub fn update_light(
         &mut self,
         pos: &ChunkPos,
-        bfs_queue: &mut VecDeque<(usize, usize, usize, u8)>,
+        bfs_queue: &mut FastBFSQueue,
         light_data: &mut [u8; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
         opaque: &mut [bool; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize]
     ) -> bool {

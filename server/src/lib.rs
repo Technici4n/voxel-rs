@@ -23,6 +23,7 @@ use voxel_rs_common::{
     worldgen::DefaultWorldGenerator,
 };
 use voxel_rs_common::world::chunk::CHUNK_SIZE;
+use voxel_rs_common::light::FastBFSQueue;
 
 mod worldgen;
 
@@ -54,7 +55,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut update_lightning_chunks = HashSet::new();
     let mut update_lightning_chunks_vec = Vec::new();
     // Light update BFS queue
-    let mut light_bfs_queue = VecDeque::new();
+    let mut light_bfs_queue = FastBFSQueue::new();
     let mut ligth_data_reuse = [0; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
     let mut opaque_reuse = [false; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
     let mut total_light_time = 0;
