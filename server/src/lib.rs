@@ -2,7 +2,7 @@ use crate::worldgen::WorldGenerationWorker;
 use anyhow::Result;
 use log::info;
 use nalgebra::Vector3;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use voxel_rs_common::physics::aabb::AABB;
 use voxel_rs_common::physics::player::PhysicsPlayer;

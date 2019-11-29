@@ -1,6 +1,5 @@
 use crate::world::chunk::{Chunk, CHUNK_SIZE};
 use crate::world::HighestOpaqueBlock;
-use std::collections::VecDeque;
 use std::sync::Arc;
 
 // TODO : Add block that are source of light

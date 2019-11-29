@@ -6,7 +6,7 @@ use crate::{
     registry::Registry,
 };
 use nalgebra::Vector3;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 pub mod chunk;
