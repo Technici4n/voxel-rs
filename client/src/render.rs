@@ -266,7 +266,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
             &src_buffer,
             0,
             &self.buffer,
-            self.segments[insert_position].pos as u64,
+            (self.segments[insert_position].pos * std::mem::size_of::<T>()) as u64,
             (data.len() * std::mem::size_of::<T>()) as u64,
         );
         // Update current segment
@@ -370,4 +370,61 @@ struct MultiBufferSegment {
     pub free: bool,
     pub pos: usize,
     pub len: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: test on all backends
+    #[test]
+    fn test_multi_buffer() {
+        use wgpu::*;
+
+        let adapter = Adapter::request(&RequestAdapterOptions {
+            power_preference: PowerPreference::HighPerformance,
+            backends: BackendBit::PRIMARY,
+        }).unwrap();
+        let (device, mut queue) = adapter.request_device(&DeviceDescriptor {
+            extensions: Extensions {
+                anisotropic_filtering: false,
+            },
+            limits: Limits::default(),
+        });
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
+
+        // Create initial buffer
+        let mut multi_buffer = MultiBuffer::with_capacity(&device, 10, BufferUsage::NONE);
+
+        let seg1 = [2u16, 3u16, 4u16];
+        let seg2 = [5u16, 6u16, 7u16, 8u16];
+        let seg3 = [9u16];
+
+        // Single insert
+        multi_buffer.update(&device, &mut encoder, 0u16, &seg1);
+        multi_buffer.remove(&0u16);
+        assert_eq!(multi_buffer.get_pos_len(&0), None);
+
+        // Double insert
+        multi_buffer.update(&device, &mut encoder, 1u16, &seg2);
+        assert_eq!(multi_buffer.get_pos_len(&1), Some((0, 4)));
+        multi_buffer.update(&device, &mut encoder, 2u16, &seg2);
+        assert_eq!(multi_buffer.get_pos_len(&2), Some((4, 4)));
+        multi_buffer.remove(&1u16);
+        assert_eq!(multi_buffer.get_pos_len(&1), None);
+        assert_eq!(multi_buffer.get_pos_len(&2), Some((4, 4)));
+
+        // Triple insert
+        multi_buffer.update(&device, &mut encoder, 0u16, &seg1);
+        assert_eq!(multi_buffer.get_pos_len(&0), Some((0, 3)));
+        multi_buffer.update(&device, &mut encoder, 1u16, &seg3);
+        assert_eq!(multi_buffer.get_pos_len(&1), Some((3, 1)));
+        // Now we have 8 items
+
+        // Reallocate
+        multi_buffer.update(&device, &mut encoder, 3u16, &seg2);
+        assert_eq!(multi_buffer.get_pos_len(&3), Some((8, 4)));
+
+
+    }
 }
