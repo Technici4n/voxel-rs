@@ -237,11 +237,12 @@ pub struct ChunkVertex {
     pub pos: [f32; 3],
     pub texture_top_left: [f32; 2],
     pub texture_size: [f32; 2],
+    pub texture_max_uv: [f32; 2],
     pub texture_uv: [f32; 2],
     pub occl_and_face: u32,
 }
 
-const CHUNK_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 5] = [
+const CHUNK_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 6] = [
     wgpu::VertexAttributeDescriptor {
         shader_location: 0,
         format: wgpu::VertexFormat::Float3,
@@ -264,7 +265,12 @@ const CHUNK_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 5] = [
     },
     wgpu::VertexAttributeDescriptor {
         shader_location: 4,
-        format: wgpu::VertexFormat::Uint,
+        format: wgpu::VertexFormat::Float2,
         offset: 4 * (3 + 2 + 2 + 2),
+    },
+    wgpu::VertexAttributeDescriptor {
+        shader_location: 5,
+        format: wgpu::VertexFormat::Uint,
+        offset: 4 * (3 + 2 + 2 + 2 + 2),
     },
 ];

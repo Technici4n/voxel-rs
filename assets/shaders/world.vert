@@ -3,9 +3,10 @@
 layout(location = 0) in vec3 i_position;
 layout(location = 1) in vec2 i_texture_top_left;
 layout(location = 2) in vec2 i_texture_size;
-layout(location = 3) in vec2 i_texture_uv;
+layout(location = 3) in vec2 i_texture_max_uv;
+layout(location = 4) in vec2 i_texture_uv;
 // occl at end, then face then light
-layout(location = 4) in uint i_occl_and_face;
+layout(location = 5) in uint i_occl_and_face;
 // light: 4 bits
 // occl: 2 bits
 // face: 3 bits
@@ -18,8 +19,9 @@ layout(location = 0) flat out vec3 o_norm;
 layout(location = 1) out float o_occl;
 layout(location = 2) flat out vec2 o_texture_top_left;
 layout(location = 3) flat out vec2 o_texture_size;
-layout(location = 4) out vec2 o_texture_uv;
-layout(location = 5) flat out float o_light_level;
+layout(location = 4) flat out vec2 o_texture_max_uv;
+layout(location = 5) out vec2 o_texture_uv;
+layout(location = 6) flat out float o_light_level;
 
 vec3 get_normal(uint id) {
     if(id == 0u) {
@@ -59,6 +61,7 @@ void main() {
     o_occl = get_occl(occl_code);
     o_texture_top_left = i_texture_top_left;
     o_texture_size = i_texture_size;
+    o_texture_max_uv = i_texture_max_uv;
     o_texture_uv = i_texture_uv;
     o_light_level = float(light_level);
 

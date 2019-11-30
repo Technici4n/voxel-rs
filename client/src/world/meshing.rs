@@ -499,12 +499,14 @@ pub fn greedy_meshing(
                                 uvs[s][3][1] * uv.height * uv_factors[1],
                             ],
                         ];
+                        let texture_max_uv = [uv.width * uv_factors[0], uv.height * uv_factors[1]];
 
                         for kk in 0..4 {
                             res_vertex.push(ChunkVertex {
                                 pos: [px_[kk] + offset_x, py_[kk] + offset_y, pz_[kk] + offset_z],
                                 texture_top_left,
                                 texture_uv: uvs[kk],
+                                texture_max_uv,
                                 texture_size,
                                 occl_and_face: v[kk],
                             });
