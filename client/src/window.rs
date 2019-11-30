@@ -345,7 +345,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     });
 }
 
-pub const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
+pub const CLEAR_COLOR: wgpu::Color = wgpu::Color { r: 0.2, g: 0.2, b: 0.2, a: 1.0 };
 pub const CLEAR_DEPTH: f32 = 1.0;
 pub const SAMPLE_COUNT: u32 = 4;
 

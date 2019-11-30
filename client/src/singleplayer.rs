@@ -31,6 +31,7 @@ use voxel_rs_common::world::chunk::ChunkPos;
 use crate::window::WindowBuffers;
 use crate::world::renderer::WorldRenderer;
 use crate::world::meshing::ChunkMeshData;
+use crate::render::{clear_depth, clear_color_and_depth};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -301,49 +302,7 @@ impl State for SinglePlayer {
         // Begin rendering
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        // Clear color and depth buffers
-        {
-            // We want this render pass to access the color and depth buffers, so we have to attach them
-            let rpass_descriptor = wgpu::RenderPassDescriptor {
-                color_attachments: &[
-                    // This is the color buffer attachment
-                    wgpu::RenderPassColorAttachmentDescriptor {
-                        // The color buffer
-                        attachment: buffers.multisampled_texture_buffer,
-                        // The final color buffer (after multisampling)
-                        resolve_target: Some(buffers.texture_buffer),
-                        // We want to clear the color at the start of the pass
-                        load_op: wgpu::LoadOp::Clear,
-                        // We want to store the color at the end of the pass
-                        store_op: wgpu::StoreOp::Store,
-                        // The clear color
-                        clear_color: wgpu::Color {
-                            r: crate::window::CLEAR_COLOR[0] as f64,
-                            g: crate::window::CLEAR_COLOR[1] as f64,
-                            b: crate::window::CLEAR_COLOR[2] as f64,
-                            a: crate::window::CLEAR_COLOR[3] as f64,
-                        },
-                    }
-                ],
-                // This is the depth buffer attachment
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                    // The depth buffer
-                    attachment: buffers.depth_buffer,
-                    // We want to clear the depth buffer at the start of the pass
-                    depth_load_op: wgpu::LoadOp::Clear,
-                    // We want to store the depth at the end of the pass
-                    depth_store_op: wgpu::StoreOp::Store,
-                    // The clear depth
-                    clear_depth: crate::window::CLEAR_DEPTH,
-                    // We don't care about these because we don't use the stencil buffer
-                    stencil_load_op: wgpu::LoadOp::Clear,
-                    stencil_store_op: wgpu::StoreOp::Clear,
-                    clear_stencil: 0,
-                }),
-            };
-            // This starts the pass, renders nothing and ends the pass, thus clearing then storing the color and the depth
-            let _rpass = encoder.begin_render_pass(&rpass_descriptor);
-        }
+        clear_color_and_depth(&mut encoder, buffers);
 
         /*let mut model_to_draw = Vec::new();
         model_to_draw.push(Model {
@@ -365,24 +324,9 @@ impl State for SinglePlayer {
             &frustum,
             input_state.enable_culling,
         );
-        // Clear depth
-        {
-            // TODO: don't copy paste this
-            let rpass_descriptor = wgpu::RenderPassDescriptor {
-                color_attachments: &[],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                    attachment: buffers.depth_buffer,
-                    depth_load_op: wgpu::LoadOp::Clear,
-                    depth_store_op: wgpu::StoreOp::Store,
-                    clear_depth: crate::window::CLEAR_DEPTH,
-                    stencil_load_op: wgpu::LoadOp::Clear,
-                    stencil_store_op: wgpu::StoreOp::Clear,
-                    clear_stencil: 0,
-                }),
-            };
-            // This starts the pass, renders nothing and ends the pass, thus clearing then storing the depth
-            let _rpass = encoder.begin_render_pass(&rpass_descriptor);
-        }
+
+        clear_depth(&mut encoder, buffers);
+
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer

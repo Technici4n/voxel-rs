@@ -5,6 +5,7 @@ use crate::{
         DynamicBuffer,
         create_default_pipeline,
         create_default_render_pass,
+        encode_resolve_render_pass,
     },
 };
 use anyhow::Result;
@@ -366,6 +367,9 @@ impl<'a> UiRenderer {
                 rpass.draw_indexed(0..(self.index_buffer.len as u32), 0, 0..1);
             }
         }
+
+        // Resolve !
+        encode_resolve_render_pass(encoder, buffers);
 
         // Draw text
         // TODO: use depth buffer
