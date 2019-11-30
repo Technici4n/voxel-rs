@@ -53,7 +53,7 @@ impl WorldRenderer {
             min_filter: wgpu::FilterMode::Nearest,
             mipmap_filter: wgpu::FilterMode::Nearest,
             lod_min_clamp: 0.0,
-            lod_max_clamp: 0.0,
+            lod_max_clamp: 5.0,
             compare_function: wgpu::CompareFunction::Always,
         });
 

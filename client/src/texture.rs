@@ -1,7 +1,7 @@
 use image::{ImageBuffer, Rgba};
 use log::info;
 
-const MIPMAP_LEVELS: u32 = 1;
+const MIPMAP_LEVELS: u32 = 5;
 
 /// Load an image into a texture
 pub fn load_image(
