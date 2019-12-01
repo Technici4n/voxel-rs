@@ -15,20 +15,25 @@ layout(set = 0, binding = 2) uniform texture2D u_texture_atlas;
 
 const vec3 SUN_DIRECTION = normalize(vec3(0, 1, 0.5));
 const float SUN_FRACTION = 0.3;
+const vec2 EPSILON = vec2(1e-7, 1e-7);
 
 void main() {
-    float light_factor = pow(0.8, 15.0 - i_light_level);
+    /* TEXTURE ACCESS */
     // avoid going out of bounds when multisampling is enabled
-    vec2 corrected_uv = clamp(i_texture_uv, vec2(0.0, 0.0), i_texture_max_uv - vec2(1e-7, 1e-7));
+    vec2 corrected_uv = clamp(i_texture_uv, EPSILON, i_texture_max_uv - EPSILON);
+    // compute the texture gradients before texture wrapping
+    vec2 x_derivative = dFdx(corrected_uv);
+    vec2 y_derivative = dFdy(corrected_uv);
+    // wrap texture
     vec2 actual_uv = i_texture_top_left + mod(corrected_uv, i_texture_size);
-    float texture_component_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(i_norm, SUN_DIRECTION));
+    // get texture value
+    vec4 tex_color = textureGrad(sampler2D(u_texture_atlas, u_sampler), actual_uv, x_derivative, y_derivative);
 
-    float total_factor = light_factor * i_occl * texture_component_factor;
-    /* with texture */
-    vec4 tex_color = texture(sampler2D(u_texture_atlas, u_sampler), actual_uv);
-    tex_color.a = 1.0;
+    /* VARIOUS BRIGHTNESS FACTORS */
+    float light_factor = pow(0.8, 15.0 - i_light_level);
+    float normal_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(i_norm, SUN_DIRECTION));
+    float total_factor = light_factor * i_occl * normal_factor;
+
+    /* OUTPUT */
     o_color = vec4(total_factor, total_factor, total_factor, 1.0) * tex_color;
-
-    /* without texture */
-    //o_color = vec4(total_factor, total_factor, total_factor, 1.0);
 }
