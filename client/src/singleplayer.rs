@@ -16,9 +16,8 @@ use crate::{
     fps::FpsCounter,
     input::InputState,
     settings::Settings,
-    ui::{renderer::UiRenderer, Ui},
+    ui::Ui,
     window::{State, StateTransition, WindowData, WindowFlags},
-    world::{frustum::Frustum, /*renderer::WorldRenderer*/},
 };
 use winit::event::{ElementState, MouseButton};
 use nalgebra::Vector3;
@@ -29,9 +28,7 @@ use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
 use crate::window::WindowBuffers;
-use crate::world::renderer::WorldRenderer;
-use crate::world::meshing::ChunkMeshData;
-use crate::render::{clear_depth, clear_color_and_depth};
+use crate::render::{ChunkRenderer, UiRenderer, Frustum};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -39,7 +36,7 @@ pub struct SinglePlayer {
     ui: Ui,
     ui_renderer: UiRenderer,
     world: World,
-    world_renderer: WorldRenderer,
+    chunk_renderer: ChunkRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     model_regitry: Registry<VoxelModel>,
@@ -94,11 +91,11 @@ impl SinglePlayer {
         };
         client.send(ToServer::SetRenderDistance(render_distance));
         // Create the renderers
-        let ui_renderer = UiRenderer::new(device)?;
+        let ui_renderer = UiRenderer::new(device);
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let world_renderer = WorldRenderer::new(
+        let chunk_renderer = ChunkRenderer::new(
             device,
             &mut encoder,
             data.texture_atlas,
@@ -110,7 +107,7 @@ impl SinglePlayer {
             ui: Ui::new(),
             ui_renderer,
             world: World::new(),
-            world_renderer,
+            chunk_renderer,
             block_registry: data.blocks,
             model_regitry: data.models,
             client,
@@ -203,7 +200,7 @@ impl State for SinglePlayer {
         // damned borrow checker :(
         let Self {
             ref mut world,
-            ref mut world_renderer,
+            ref mut chunk_renderer,
             ref render_distance,
             ..
         } = self;
@@ -216,7 +213,7 @@ impl State for SinglePlayer {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
-                world_renderer.remove_chunk(*chunk_pos);
+                chunk_renderer.remove_chunk(*chunk_pos);
                 light.remove(chunk_pos);
                 false
             }
@@ -236,8 +233,8 @@ impl State for SinglePlayer {
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.world_renderer
-                    .update_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
+                self.chunk_renderer
+                    .update_chunk(&self.world, chunk_pos);
             }
         }
 
@@ -302,7 +299,7 @@ impl State for SinglePlayer {
         // Begin rendering
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        clear_color_and_depth(&mut encoder, buffers);
+        crate::render::clear_color_and_depth(&mut encoder, buffers);
 
         /*let mut model_to_draw = Vec::new();
         model_to_draw.push(Model {
@@ -315,8 +312,8 @@ impl State for SinglePlayer {
             pos_z: 0.0,
             scale: 0.3,
         });*/
-        // Draw world
-        self.world_renderer.render(
+        // Draw chunks
+        self.chunk_renderer.render(
             device,
             &mut encoder,
             buffers,
@@ -325,12 +322,12 @@ impl State for SinglePlayer {
             input_state.enable_culling,
         );
 
-        clear_depth(&mut encoder, buffers);
+        crate::render::clear_depth(&mut encoder, buffers);
 
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer
-            .render(buffers, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
+            .render(buffers, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse());
 
         Ok((StateTransition::KeepCurrent, encoder.finish()))
     }

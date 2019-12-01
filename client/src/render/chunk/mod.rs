@@ -1,28 +1,33 @@
+//! Chunk rendering
+
+use super::buffers::MultiBuffer;
 use voxel_rs_common::world::chunk::ChunkPos;
 use image::{ImageBuffer, Rgba};
-use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::block::BlockMesh;
-use crate::{
-    world::meshing::ChunkMeshData,
-    world::meshing_worker::MeshingWorker,
-    world::frustum::Frustum,
-    window::WindowBuffers,
-    render::{MultiBuffer, load_glsl_shader, create_default_pipeline, create_default_render_pass},
-    texture::load_image,
-};
+use super::init::{load_glsl_shader, create_default_pipeline};
+use crate::window::WindowBuffers;
+use super::chunk::meshing_worker::MeshingWorker;
+use crate::texture::load_image;
+use super::frustum::Frustum;
+use voxel_rs_common::debug::send_debug_info;
+use voxel_rs_common::world::World;
 
-pub struct WorldRenderer {
+mod meshing;
+mod meshing_worker;
+
+pub struct ChunkRenderer {
     // Chunk meshing
     meshing_worker: MeshingWorker,
-    // Chunk rendering
+    // Chunk meshes
+    index_buffers: MultiBuffer<ChunkPos, u32>,
+    vertex_buffers: MultiBuffer<ChunkPos, ChunkVertex>,
+    // Default rendering pipeline
     transform_buffer: wgpu::Buffer,
     uniforms_bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
-    index_buffers: MultiBuffer<ChunkPos, u32>,
-    vertex_buffers: MultiBuffer<ChunkPos, ChunkVertex>,
 }
 
-impl WorldRenderer {
+impl ChunkRenderer {
     pub fn new(
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
@@ -157,6 +162,7 @@ impl WorldRenderer {
         }
 
         //============= RENDER =============//
+        // TODO: what if win_h is 0 ?
         let aspect_ratio = {
             let winit::dpi::PhysicalSize {
                 width: win_w,
@@ -183,7 +189,7 @@ impl WorldRenderer {
             .fill_from_slice(&view_proj);
         encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.transform_buffer, 0, 64);
 
-        let mut rpass = create_default_render_pass(encoder, buffers);
+        let mut rpass = super::render::create_default_render_pass(encoder, buffers);
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
         rpass.set_vertex_buffers(0, &[(&self.vertex_buffers.get_buffer(), 0)]);
@@ -211,9 +217,10 @@ impl WorldRenderer {
 
     pub fn update_chunk(
         &mut self,
-        data: ChunkMeshData,
+        world: &World,
+        pos: ChunkPos,
     ) {
-        self.meshing_worker.enqueue_chunk(data);
+        self.meshing_worker.enqueue_chunk(self::meshing::ChunkMeshData::create_from_world(world, pos));
     }
 
     pub fn remove_chunk(&mut self, pos: ChunkPos) {

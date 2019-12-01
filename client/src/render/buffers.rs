@@ -1,196 +1,19 @@
-// TODO: refactor this into separate submodules
-//! Various rendering utilities
-use log::info;
-use std::path::Path;
+//! Wrappers around the `wgpu::Buffer` struct.
+
 use std::hash::Hash;
 use std::collections::HashMap;
-use crate::window::WindowBuffers;
-
-/// Load a GLSL shader from a file and compile it to SPIR-V
-pub fn load_glsl_shader<P: AsRef<Path>>(compiler: &mut shaderc::Compiler, shader_kind: shaderc::ShaderKind, path: P) -> shaderc::CompilationArtifact {
-    let path_display = path.as_ref().display().to_string();
-    info!("Loading GLSL shader from {}", path_display);
-    let glsl_source = std::fs::read_to_string(path).expect("Couldn't read shader from file");
-
-    // TODO: handle warnings
-    compiler.compile_into_spirv(
-        &glsl_source,
-        shader_kind,
-        &path_display,
-        &"main",
-        None,
-    ).expect("Failed to compile GLSL shader into SPIR-V shader")
-}
-
-/// Default `RasterizationStateDescriptor` with no backface culling
-pub const RASTERIZER_NO_CULLING: wgpu::RasterizationStateDescriptor = wgpu::RasterizationStateDescriptor {
-    front_face: wgpu::FrontFace::Ccw,
-    cull_mode: wgpu::CullMode::None,
-    depth_bias: 0,
-    depth_bias_slope_scale: 0.0,
-    depth_bias_clamp: 0.0,
-};
-
-/// Default `RasterizationStateDescriptor` with backface culling
-pub const RASTERIZER_WITH_CULLING: wgpu::RasterizationStateDescriptor = wgpu::RasterizationStateDescriptor {
-    cull_mode: wgpu::CullMode::Back,
-    ..RASTERIZER_NO_CULLING
-};
-
-/// Default `ColorStateDescriptor`
-pub const DEFAULT_COLOR_STATE_DESCRIPTOR: [wgpu::ColorStateDescriptor; 1] = [wgpu::ColorStateDescriptor {
-    format: crate::window::COLOR_FORMAT,
-    color_blend: wgpu::BlendDescriptor {
-        src_factor: wgpu::BlendFactor::SrcAlpha,
-        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-        operation: wgpu::BlendOperation::Add,
-    },
-    alpha_blend: wgpu::BlendDescriptor {
-        src_factor: wgpu::BlendFactor::One,
-        dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-        operation: wgpu::BlendOperation::Add,
-    },
-    write_mask: wgpu::ColorWrite::ALL,
-}];
-
-/// Default `DepthStencilStateDescriptor`
-pub const DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR: wgpu::DepthStencilStateDescriptor = wgpu::DepthStencilStateDescriptor {
-    format: crate::window::DEPTH_FORMAT,
-    depth_write_enabled: true,
-    depth_compare: wgpu::CompareFunction::Less,
-    stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
-    stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
-    stencil_read_mask: 0,
-    stencil_write_mask: 0,
-};
-
-/// Create a default pipeline, comprised of
-pub fn create_default_pipeline(
-    device: &wgpu::Device,
-    uniform_layout: &wgpu::BindGroupLayout,
-    vertex_shader: &[u32],
-    fragment_shader: &[u32],
-    primitive_topology: wgpu::PrimitiveTopology,
-    vertex_buffer_descriptor: wgpu::VertexBufferDescriptor,
-    cull_back_faces: bool,
-) -> wgpu::RenderPipeline {
-    // Shaders
-    let vertex_shader_module = device.create_shader_module(vertex_shader);
-    let fragment_shader_module = device.create_shader_module(fragment_shader);
-    // Pipeline
-    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        bind_group_layouts: &[uniform_layout],
-    });
-    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        layout: &pipeline_layout,
-        vertex_stage: wgpu::ProgrammableStageDescriptor {
-            module: &vertex_shader_module,
-            entry_point: "main",
-        },
-        fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-            module: &fragment_shader_module,
-            entry_point: "main",
-        }),
-        rasterization_state: Some(if cull_back_faces {RASTERIZER_WITH_CULLING} else {RASTERIZER_NO_CULLING}),
-        primitive_topology,
-        color_states: &DEFAULT_COLOR_STATE_DESCRIPTOR,
-        depth_stencil_state: Some(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR),
-        index_format: wgpu::IndexFormat::Uint32,
-        vertex_buffers: &[vertex_buffer_descriptor],
-        sample_count: crate::window::SAMPLE_COUNT,
-        sample_mask: 0xFFFFFFFF,
-        alpha_to_coverage_enabled: false,
-    })
-}
-
-pub fn create_default_depth_stencil_attachment(depth_buffer: &wgpu::TextureView) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
-    wgpu::RenderPassDepthStencilAttachmentDescriptor {
-        attachment: depth_buffer,
-        depth_load_op: wgpu::LoadOp::Load,
-        depth_store_op: wgpu::StoreOp::Store,
-        clear_depth: 0.0, // TODO: use debugging depth ?
-        stencil_load_op: wgpu::LoadOp::Clear,
-        stencil_store_op: wgpu::StoreOp::Clear,
-        clear_stencil: 0,
-    }
-}
-
-/// Create the default render pass
-pub fn create_default_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder, buffers: WindowBuffers<'a>) -> wgpu::RenderPass<'a> {
-    encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-            attachment: buffers.multisampled_texture_buffer,
-            resolve_target: None,
-            load_op: wgpu::LoadOp::Load,
-            store_op: wgpu::StoreOp::Store,
-            clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
-        }],
-        depth_stencil_attachment: Some(create_default_depth_stencil_attachment(buffers.depth_buffer)),
-    })
-}
-
-/// Encode a render pass to resolve
-pub fn encode_resolve_render_pass<'a>(encoder: &mut wgpu::CommandEncoder, buffers: WindowBuffers) {
-    let _rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-            attachment: buffers.multisampled_texture_buffer,
-            resolve_target: Some(buffers.texture_buffer),
-            load_op: wgpu::LoadOp::Load,
-            store_op: wgpu::StoreOp::Store,
-            clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
-        }],
-        depth_stencil_attachment: None,
-    });
-}
-
-fn create_clear_color_attachment(buffers: WindowBuffers) -> [wgpu::RenderPassColorAttachmentDescriptor; 1] {
-    [wgpu::RenderPassColorAttachmentDescriptor {
-        attachment: buffers.multisampled_texture_buffer,
-        resolve_target: None,
-        load_op: wgpu::LoadOp::Clear,
-        store_op: wgpu::StoreOp::Store,
-        clear_color: crate::window::CLEAR_COLOR,
-    }]
-}
-
-fn create_clear_depth_attachment(buffers: WindowBuffers) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
-    wgpu::RenderPassDepthStencilAttachmentDescriptor {
-        attachment: buffers.depth_buffer,
-        depth_load_op: wgpu::LoadOp::Clear,
-        depth_store_op: wgpu::StoreOp::Store,
-        clear_depth: crate::window::CLEAR_DEPTH,
-        stencil_load_op: wgpu::LoadOp::Load,
-        stencil_store_op: wgpu::StoreOp::Store,
-        clear_stencil: 0,
-    }
-}
-
-/// Clear the color and the depth
-pub fn clear_color_and_depth(encoder: &mut wgpu::CommandEncoder, buffers: WindowBuffers) {
-    let _rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &create_clear_color_attachment(buffers),
-        depth_stencil_attachment: Some(create_clear_depth_attachment(buffers)),
-    });
-}
-
-/// Clear the depth
-pub fn clear_depth(encoder: &mut wgpu::CommandEncoder, buffers: WindowBuffers) {
-    let _rpass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-        color_attachments: &[],
-        depth_stencil_attachment: Some(create_clear_depth_attachment(buffers)),
-    });
-}
 
 /// A buffer that will automatically resize itself when necessary
 pub struct DynamicBuffer<T: Copy> {
-    pub buffer: wgpu::Buffer,
+    buffer: wgpu::Buffer,
     usage: wgpu::BufferUsage,
     capacity: usize,
-    pub len: usize,
+    len: usize,
     phantom: std::marker::PhantomData<T>,
 }
 
 impl<T: Copy + 'static> DynamicBuffer<T> {
+    /// Create a new `DynamicBuffer` with enough capacity for `initial_capacity` elements of type `T`
     pub fn with_capacity(device: &wgpu::Device, initial_capacity: usize, mut usage: wgpu::BufferUsage) -> Self {
         usage |= wgpu::BufferUsage::COPY_DST;
         Self {
@@ -205,6 +28,7 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
         }
     }
 
+    /// Update the data of the buffer, resizing if needed
     pub fn upload(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, data: &[T]) {
         if data.is_empty() {
             self.len = 0;
@@ -232,9 +56,19 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
         );
         self.len = data.len();
     }
+
+    /// Get the underlying buffer
+    pub fn get_buffer(&self) -> &wgpu::Buffer {
+        &self.buffer
+    }
+
+    /// Get the number of stored elements
+    pub fn len(&self) -> usize {
+        self.len
+    }
 }
 
-/// A buffer that can contain multiple objects
+/// A buffer that can contain multiple objects. Every object is of type `T` and can be accessed by a key of type `K`.
 pub struct MultiBuffer<K: Hash + Eq + Clone, T: Copy + 'static> {
     buffer: wgpu::Buffer,
     usage: wgpu::BufferUsage,
@@ -408,7 +242,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         &self.buffer
     }
 
-    /// Get the keys
+    /// Get all the keys, in no particular order
     pub fn keys(&self) -> impl Iterator<Item = K> {
         self.objects.keys().cloned().collect::<Vec<K>>().into_iter()
     }

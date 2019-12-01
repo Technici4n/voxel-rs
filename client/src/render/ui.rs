@@ -1,80 +1,10 @@
-use crate::{
-    window::WindowData,
-    render::{
-        load_glsl_shader,
-        DynamicBuffer,
-        create_default_pipeline,
-        create_default_render_pass,
-        encode_resolve_render_pass,
-    },
-};
-use anyhow::Result;
-use log::info;
-use quint::Layout;
-use std::collections::{BTreeMap, HashMap};
-use std::io::Read;
+//! Ui rendering
+
+use std::collections::{HashMap, BTreeMap};
 use wgpu_glyph::FontId;
-use crate::window::WindowBuffers;
-
-#[derive(Debug, Clone)]
-struct RectanglePrimitive {
-    pub layout: Layout,
-    pub color: [f32; 4],
-    pub z: f32,
-}
-
-#[derive(Debug, Clone)]
-struct TextPrimitive {
-    pub layout: Layout,
-    pub parts: Vec<TextPart>,
-    pub z: f32,
-    pub centered: bool,
-}
-
-#[derive(Debug, Clone)]
-struct TrianglesPrimitive {
-    pub vertices: Vec<[f32; 3]>,
-    pub indices: Vec<u32>,
-    pub color: [f32; 4],
-}
-
-#[derive(Debug, Clone)]
-pub struct TextPart {
-    pub text: String,
-    pub font_size: wgpu_glyph::Scale,
-    pub color: [f32; 4],
-    pub font: Option<String>,
-}
-
-#[derive(Default, Debug)]
-pub struct PrimitiveBuffer {
-    pub(self) rectangle: Vec<RectanglePrimitive>,
-    pub(self) text: Vec<TextPrimitive>,
-    pub(self) triangles: Vec<TrianglesPrimitive>,
-}
-
-impl PrimitiveBuffer {
-    pub fn draw_rectangle(&mut self, color: [f32; 4], layout: Layout, z: f32) {
-        self.rectangle.push(RectanglePrimitive { color, layout, z });
-    }
-
-    pub fn draw_text(&mut self, parts: Vec<TextPart>, layout: Layout, z: f32, centered: bool) {
-        self.text.push(TextPrimitive {
-            layout,
-            parts,
-            z,
-            centered,
-        })
-    }
-
-    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
-        self.triangles.push(TrianglesPrimitive {
-            vertices,
-            indices,
-            color,
-        });
-    }
-}
+use super::buffers::DynamicBuffer;
+use crate::ui::PrimitiveBuffer;
+use crate::window::{WindowBuffers, WindowData};
 
 pub struct UiRenderer {
     // Glyph rendering
@@ -89,26 +19,27 @@ pub struct UiRenderer {
 }
 
 impl<'a> UiRenderer {
-    pub fn new(device: &mut wgpu::Device) -> Result<Self> {
+    pub fn new(device: &mut wgpu::Device) -> Self {
         // Load fonts
         let default_font: &'static [u8] =
             include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
         let mut glyph_brush_builder = wgpu_glyph::GlyphBrushBuilder::using_font_bytes(default_font);
-        info!("Loading fonts from assets/fonts/list.toml");
+        log::info!("Loading fonts from assets/fonts/list.toml");
         let mut fonts = HashMap::new();
         let font_list = std::fs::read_to_string("assets/fonts/list.toml")
             .expect("Couldn't read font list file");
         let font_files: BTreeMap<String, String> =
             toml::de::from_str(&font_list).expect("Couldn't parse font list file");
         for (font_name, font_file) in font_files.into_iter() {
-            info!("Loading font {} from file {}", font_name, font_file);
+            use std::io::Read;
+            log::info!("Loading font {} from file {}", font_name, font_file);
             let mut font_bytes = Vec::new();
             let mut file = std::fs::File::open(font_file).expect("Couldn't open font file");
             file.read_to_end(&mut font_bytes)
                 .expect("Couldn't read font file");
             fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
         }
-        info!("Fonts successfully loaded");
+        log::info!("Fonts successfully loaded");
         let glyph_brush =
             glyph_brush_builder
                 //.depth_stencil_state(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR)
@@ -147,11 +78,11 @@ impl<'a> UiRenderer {
         // Create shader modules
         let mut compiler = shaderc::Compiler::new().expect("Failed to create shader compiler");
         let vertex_shader =
-            load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/gui-rect.vert");
+            super::init::load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/gui-rect.vert");
         let fragment_shader =
-            load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/gui-rect.frag");
+            super::init::load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/gui-rect.frag");
 
-        let pipeline = create_default_pipeline(
+        let pipeline = super::init::create_default_pipeline(
             device,
             &uniform_layout,
             vertex_shader.as_binary(),
@@ -165,7 +96,7 @@ impl<'a> UiRenderer {
             false,
         );
 
-        Ok(Self {
+        Self {
             glyph_brush,
             fonts,
             transform_buffer,
@@ -173,7 +104,7 @@ impl<'a> UiRenderer {
             pipeline,
             vertex_buffer: DynamicBuffer::with_capacity(device, 64, wgpu::BufferUsage::VERTEX),
             index_buffer: DynamicBuffer::with_capacity(device, 64, wgpu::BufferUsage::INDEX),
-        })
+        }
     }
 
     pub fn render<Message>(
@@ -184,13 +115,15 @@ impl<'a> UiRenderer {
         data: &WindowData,
         ui: &quint::Ui<PrimitiveBuffer, Message>,
         draw_crosshair: bool,
-    ) -> Result<()> {
+    ) {
         let mut primitive_buffer = PrimitiveBuffer::default();
         ui.render(&mut primitive_buffer);
 
         // Render primitives
         let mut rect_vertices: Vec<UiVertex> = Vec::new();
         let mut rect_indices: Vec<u32> = Vec::new();
+
+        use crate::ui::{RectanglePrimitive, TrianglesPrimitive, TextPrimitive};
 
         // Rectangles
         for RectanglePrimitive {
@@ -354,20 +287,20 @@ impl<'a> UiRenderer {
             self.index_buffer.upload(device, encoder, &rect_indices);
             // Draw
             {
-                let mut rpass = create_default_render_pass(
+                let mut rpass = super::render::create_default_render_pass(
                     encoder,
                     buffers,
                 );
                 rpass.set_pipeline(&self.pipeline);
                 rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
-                rpass.set_vertex_buffers(0, &[(&self.vertex_buffer.buffer, 0)]);
-                rpass.set_index_buffer(&self.index_buffer.buffer, 0);
-                rpass.draw_indexed(0..(self.index_buffer.len as u32), 0, 0..1);
+                rpass.set_vertex_buffers(0, &[(&self.vertex_buffer.get_buffer(), 0)]);
+                rpass.set_index_buffer(&self.index_buffer.get_buffer(), 0);
+                rpass.draw_indexed(0..(self.index_buffer.len() as u32), 0, 0..1);
             }
         }
 
         // Resolve !
-        encode_resolve_render_pass(encoder, buffers);
+        super::render::encode_resolve_render_pass(encoder, buffers);
 
         // Draw text
         // TODO: use depth buffer
@@ -381,7 +314,6 @@ impl<'a> UiRenderer {
                 data.physical_window_size.height.round() as u32,
             )
             .expect("couldn't draw queued glyphs");
-        Ok(())
     }
 }
 

@@ -15,7 +15,6 @@ mod singleplayer;
 mod texture;
 mod ui;
 mod window;
-mod world;
 
 fn main() -> Result<()> {
     env_logger::init();

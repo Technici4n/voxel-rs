@@ -1,4 +1,5 @@
-use super::renderer::ChunkVertex;
+//! Meshing code
+use super::ChunkVertex;
 use std::sync::Arc;
 use voxel_rs_common::world::LightChunk;
 use voxel_rs_common::{
