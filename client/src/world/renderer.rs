@@ -16,10 +16,6 @@ pub struct WorldRenderer {
     meshing_worker: MeshingWorker,
     // Chunk rendering
     transform_buffer: wgpu::Buffer,
-    sampler: wgpu::Sampler,
-    texture: wgpu::Texture,
-    texture_view: wgpu::TextureView,
-    uniform_layout: wgpu::BindGroupLayout,
     uniforms_bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
     index_buffers: MultiBuffer<ChunkPos, u32>,
@@ -51,7 +47,7 @@ impl WorldRenderer {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Linear,
             lod_min_clamp: 0.0,
             lod_max_clamp: 5.0,
             compare_function: wgpu::CompareFunction::Always,
@@ -126,10 +122,6 @@ impl WorldRenderer {
         Self {
             meshing_worker: MeshingWorker::new(block_meshes),
             transform_buffer,
-            sampler,
-            texture,
-            texture_view,
-            uniform_layout,
             uniforms_bind_group: uniforms,
             pipeline,
             index_buffers: MultiBuffer::with_capacity(device, 1000, wgpu::BufferUsage::INDEX),
@@ -146,7 +138,6 @@ impl WorldRenderer {
         frustum: &Frustum,
         enable_culling: bool,
     ) {
-        log::info!("Frame");
         //============= RECEIVE CHUNK MESHES =============//
         for (pos, vertices, indices) in self.meshing_worker.get_processed_chunks() {
             if vertices.len() > 0 && indices.len() > 0 {

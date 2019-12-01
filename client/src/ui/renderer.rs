@@ -82,7 +82,6 @@ pub struct UiRenderer {
     fonts: HashMap<String, FontId>,
     // Rectangle rendering
     transform_buffer: wgpu::Buffer,
-    uniform_layout: wgpu::BindGroupLayout,
     uniforms_bind_group: wgpu::BindGroup,
     pipeline: wgpu::RenderPipeline,
     vertex_buffer: DynamicBuffer<UiVertex>,
@@ -170,7 +169,6 @@ impl<'a> UiRenderer {
             glyph_brush,
             fonts,
             transform_buffer,
-            uniform_layout,
             uniforms_bind_group,
             pipeline,
             vertex_buffer: DynamicBuffer::with_capacity(device, 64, wgpu::BufferUsage::VERTEX),

@@ -254,21 +254,18 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         });
         let segments = vec![MultiBufferSegment { free: true, pos: 0, len: initial_capacity }];
 
-        let res = Self {
+        Self {
             buffer,
             usage,
             objects: HashMap::new(),
             segments,
             len: initial_capacity,
             phantom: std::marker::PhantomData,
-        };
-        res.assert_invariants();
-        res
+        }
     }
 
     /// Remove object `object` from the buffer
     pub fn remove(&mut self, object: &K) {
-        self.assert_invariants();
         if let Some(start_position) = self.objects.remove(object) {
             let mut segment_position = self.segments.iter_mut().position(|seg| seg.pos == start_position).expect("logic error!");
             assert_eq!(false, self.segments[segment_position].free, "logic error!");
@@ -289,7 +286,6 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
                 }
             }
         }
-        self.assert_invariants();
     }
 
     /// Update the data for object `object` in the buffer
@@ -299,7 +295,6 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
     // TODO: handle memory fragmentation
     pub fn update(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, object: K, data: &[T]) {
         assert!(data.len() > 0, "cannot add an empty slice to a MultiBuffer");
-        self.assert_invariants();
         // Remove the object if it's already in the buffer
         self.remove(&object);
         // Try to find the position to insert
@@ -340,10 +335,16 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         }
         // Update the map
         self.objects.insert(object.clone(), self.segments[insert_position].pos);
-        self.assert_invariants();
     }
 
     fn reallocate(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, new_len: usize) {
+        log::debug!(
+            "Reallocating MultiBuffer<{}, {}> from length {} to length {}",
+            std::any::type_name::<K>(),
+            std::any::type_name::<T>(),
+            self.len,
+            new_len
+        );
         // Create new buffer and copy data
         let new_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             size: (new_len * std::mem::size_of::<T>()) as u64,
@@ -363,10 +364,9 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
             });
         }
         self.len = new_len;
-        self.assert_invariants();
     }
 
-    fn assert_invariants(&self) {
+    fn _assert_invariants(&self) {
         assert_eq!(self.segments.first().unwrap().pos, 0);
         assert_eq!(self.segments.last().unwrap().pos + self.segments.last().unwrap().len, self.len);
         for i in 0..(self.segments.len()-1) {
@@ -374,7 +374,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
             assert!(!(self.segments[i].free && self.segments[i+1].free));
         }
         for v in self.objects.values() {
-            let mut segment_position = self.segments.iter().enumerate().find(|(_, seg)| seg.pos == *v).expect("logic error!").0;
+            let segment_position = self.segments.iter().enumerate().find(|(_, seg)| seg.pos == *v).expect("logic error!").0;
             assert_eq!(false, self.segments[segment_position].free, "logic error!");
         }
         for s in self.segments.iter() {
@@ -389,7 +389,6 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
 
     /// Get the position and the length of object `object` in the buffer
     pub fn get_pos_len(&self, object: &K) -> Option<(usize, usize)> {
-        self.assert_invariants();
         let pos = self.objects.get(object);
         match pos {
             None => None,
@@ -406,13 +405,11 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
 
     /// Get the buffer. Please don't modify it.
     pub fn get_buffer(&self) -> &wgpu::Buffer {
-        self.assert_invariants();
         &self.buffer
     }
 
     /// Get the keys
     pub fn keys(&self) -> impl Iterator<Item = K> {
-        self.assert_invariants();
         self.objects.keys().cloned().collect::<Vec<K>>().into_iter()
     }
 }
