@@ -320,6 +320,7 @@ impl State for SinglePlayer {
             data,
             &frustum,
             input_state.enable_culling,
+            pointed_block,
         );
 
         crate::render::clear_depth(&mut encoder, buffers);

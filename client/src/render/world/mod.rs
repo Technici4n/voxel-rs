@@ -10,10 +10,11 @@ use super::world::meshing_worker::MeshingWorker;
 use crate::texture::load_image;
 use super::frustum::Frustum;
 use voxel_rs_common::debug::send_debug_info;
-use voxel_rs_common::world::World;
+use voxel_rs_common::world::{World, BlockPos};
 
 mod meshing;
 mod meshing_worker;
+mod skybox;
 
 /// All the state necessary to render the world.
 pub struct WorldRenderer {
@@ -21,11 +22,22 @@ pub struct WorldRenderer {
     meshing_worker: MeshingWorker,
     // View-projection matrix
     uniform_view_proj: wgpu::Buffer,
+    // Model matrix
+    uniform_model: wgpu::Buffer,
     // Chunk rendering
     chunk_index_buffers: MultiBuffer<ChunkPos, u32>,
     chunk_vertex_buffers: MultiBuffer<ChunkPos, ChunkVertex>,
     chunk_pipeline: wgpu::RenderPipeline,
     chunk_bind_group: wgpu::BindGroup,
+    // Skybox rendering
+    skybox_index_buffer: wgpu::Buffer,
+    skybox_vertex_buffer: wgpu::Buffer,
+    skybox_pipeline: wgpu::RenderPipeline,
+    // View-proj and model bind group
+    vpm_bind_group: wgpu::BindGroup,
+    // Targeted block rendering
+    target_vertex_buffer: wgpu::Buffer,
+    target_pipeline: wgpu::RenderPipeline,
 }
 
 impl WorldRenderer {
@@ -41,9 +53,13 @@ impl WorldRenderer {
         let texture_atlas = load_image(device, encoder, texture_atlas);
         let texture_atlas_view = texture_atlas.create_default_view();
 
-        // Create view projection buffer
+        // Create uniform buffers
         let uniform_view_proj = device.create_buffer(&wgpu::BufferDescriptor {
             size: 64,
+            usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
+        });
+        let uniform_model = device.create_buffer(&wgpu::BufferDescriptor {
+            size: 12,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
 
@@ -78,13 +94,75 @@ impl WorldRenderer {
             )
         };
 
+        // Create skybox vertex and index buffers
+        let (skybox_vertex_buffer, skybox_index_buffer) = self::skybox::create_skybox(device);
+
+        // Create skybox bind group
+        let vpm_bind_group_layout = device.create_bind_group_layout(&SKYBOX_BIND_GROUP_LAYOUT);
+        let vpm_bind_group = create_vpm_bind_group(device, &vpm_bind_group_layout, &uniform_view_proj, &uniform_model);
+
+        // Create skybox pipeline
+        let skybox_pipeline = {
+            let vertex_shader =
+                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/skybox.vert");
+            let fragment_shader =
+                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/skybox.frag");
+
+            create_default_pipeline(
+                device,
+                &vpm_bind_group_layout,
+                vertex_shader.as_binary(),
+                fragment_shader.as_binary(),
+                wgpu::PrimitiveTopology::TriangleList,
+                wgpu::VertexBufferDescriptor {
+                    stride: std::mem::size_of::<SkyboxVertex>() as u64,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &SKYBOX_VERTEX_ATTRIBUTES,
+                },
+                false,
+            )
+        };
+
+        // Create target buffer and pipeline
+        let target_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            size: 8 * std::mem::size_of::<SkyboxVertex>() as u64,
+            usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
+        });
+        let target_pipeline = {
+            let vertex_shader =
+                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/target.vert");
+            let fragment_shader =
+                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/target.frag");
+
+            create_default_pipeline(
+                device,
+                &vpm_bind_group_layout,
+                vertex_shader.as_binary(),
+                fragment_shader.as_binary(),
+                wgpu::PrimitiveTopology::LineList,
+                wgpu::VertexBufferDescriptor {
+                    stride: std::mem::size_of::<SkyboxVertex>() as u64,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &SKYBOX_VERTEX_ATTRIBUTES,
+                },
+                false,
+            )
+        };
+
         Self {
             meshing_worker: MeshingWorker::new(block_meshes),
             uniform_view_proj,
+            uniform_model,
             chunk_index_buffers: MultiBuffer::with_capacity(device, 1000, wgpu::BufferUsage::INDEX),
             chunk_vertex_buffers: MultiBuffer::with_capacity(device, 1000, wgpu::BufferUsage::VERTEX),
             chunk_pipeline,
             chunk_bind_group,
+            skybox_vertex_buffer,
+            skybox_index_buffer,
+            skybox_pipeline,
+            vpm_bind_group,
+            target_vertex_buffer,
+            target_pipeline,
         }
     }
 
@@ -96,6 +174,7 @@ impl WorldRenderer {
         data: &crate::window::WindowData,
         frustum: &Frustum,
         enable_culling: bool,
+        pointed_block: Option<(BlockPos, usize)>,
     ) {
         //============= RECEIVE CHUNK MESHES =============//
         for (pos, vertices, indices) in self.meshing_worker.get_processed_chunks() {
@@ -167,6 +246,41 @@ impl WorldRenderer {
                 "renderedchunks",
                 format!("{} chunks were rendered", count),
             );
+        }
+
+        // Draw the skybox
+        {
+            // Update model buffer
+            let src_buffer = device
+                .create_buffer_mapped(3, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&[frustum.position.x as f32, frustum.position.y as f32, frustum.position.z as f32]);
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 12);
+            let mut rpass = super::render::create_default_render_pass(encoder, buffers);
+            rpass.set_pipeline(&self.skybox_pipeline);
+            rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
+            rpass.set_vertex_buffers(0, &[(&self.skybox_vertex_buffer, 0)]);
+            rpass.set_index_buffer(&self.skybox_index_buffer, 0);
+            rpass.draw_indexed(0..36, 0, 0..1);
+        }
+
+        // Draw the target if necessary
+        if let Some((target_pos, target_face)) = pointed_block {
+            // Generate the vertices
+            // TODO: maybe check if they changed since last frame
+            let src_buffer = device
+                .create_buffer_mapped(8, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&create_target_vertices(target_face));
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.target_vertex_buffer, 0, 8 * std::mem::size_of::<SkyboxVertex>() as u64);
+            // Update model buffer
+            let src_buffer = device
+                .create_buffer_mapped(3, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&[target_pos.px as f32, target_pos.py as f32, target_pos.pz as f32]);
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 12);
+            let mut rpass = super::render::create_default_render_pass(encoder, buffers);
+            rpass.set_pipeline(&self.target_pipeline);
+            rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
+            rpass.set_vertex_buffers(0, &[(&self.target_vertex_buffer, 0)]);
+            rpass.draw(0..8, 0..1);
         }
     }
 
@@ -289,4 +403,111 @@ fn create_chunk_bind_group(device: &wgpu::Device, layout: &wgpu::BindGroupLayout
             },
         ],
     })
+}
+
+/*========== SKYBOX RENDERING ==========*/
+/// Skybox vertex
+#[derive(Debug, Clone, Copy)]
+pub struct SkyboxVertex {
+    pub position: [f32; 3],
+}
+
+/// Skybox vertex attributes
+const SKYBOX_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 1] = [
+    wgpu::VertexAttributeDescriptor {
+        shader_location: 0,
+        format: wgpu::VertexFormat::Float3,
+        offset: 0,
+    },
+];
+
+const SKYBOX_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> = wgpu::BindGroupLayoutDescriptor {
+    bindings: &[
+        wgpu::BindGroupLayoutBinding { // view proj
+            binding: 0,
+            visibility: wgpu::ShaderStage::VERTEX,
+            ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+        },
+        wgpu::BindGroupLayoutBinding { // model
+            binding: 1,
+            visibility: wgpu::ShaderStage::VERTEX,
+            ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+        },
+    ],
+};
+
+/// Create skybox bind group
+fn create_vpm_bind_group(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, uniform_view_proj: &wgpu::Buffer, uniform_model: &wgpu::Buffer) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout,
+        bindings: &[
+            wgpu::Binding {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: uniform_view_proj,
+                    range: 0..64,
+                },
+            },
+            wgpu::Binding {
+                binding: 1,
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: uniform_model,
+                    range: 0..12,
+                },
+            },
+        ],
+    })
+}
+
+/*========== TARGET RENDERING ==========*/
+// `SkyboxVertex` is shamelessly stolen to also draw the targeted block
+
+/// Create target vertices for some given face
+fn create_target_vertices(face: usize) -> Vec<SkyboxVertex> {
+    // TODO: simplify this
+    let mut vertices = Vec::new();
+    fn vpos(i: i32, j: i32, k: i32, face: usize) -> SkyboxVertex {
+        let mut v = [i as f32, j as f32, k as f32];
+        for i in 0..3 {
+            if i == face / 2 {
+                // Move face forward
+                v[i] += 0.001 * (if face % 2 == 0 { 1.0 } else { -1.0 });
+            } else {
+                // Move edges inside the face
+                if v[i] == 1.0 {
+                    v[i] = 0.999;
+                } else {
+                    v[i] = 0.001;
+                }
+            }
+        }
+        SkyboxVertex { position: v }
+    }
+    let end_coord = [
+        if face == 1 { 1 } else { 2 },
+        if face == 3 { 1 } else { 2 },
+        if face == 5 { 1 } else { 2 },
+    ];
+    let start_coord = [
+        if face == 0 { 1 } else { 0 },
+        if face == 2 { 1 } else { 0 },
+        if face == 4 { 1 } else { 0 },
+    ];
+    for i in start_coord[0]..end_coord[0] {
+        for j in start_coord[1]..end_coord[1] {
+            for k in start_coord[2]..end_coord[2] {
+                let mut id = [i, j, k];
+                for i in 0..3 {
+                    if id[i] > start_coord[i] {
+                        let v1 = vpos(id[0], id[1], id[2], face);
+                        id[i] = 0;
+                        let v2 = vpos(id[0], id[1], id[2], face);
+                        id[i] = 1;
+                        vertices.extend([v1, v2].into_iter());
+                    }
+                }
+            }
+        }
+    }
+    vertices
 }

@@ -1,8 +1,8 @@
-#version 150 core
+#version 450
 
 
-in float pos_y;
-out vec4 ColorBuffer;
+layout(location = 0) in float pos_y;
+layout(location = 0) out vec4 ColorBuffer;
 
 
 
