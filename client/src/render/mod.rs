@@ -15,7 +15,7 @@ mod frustum;
 pub use self::frustum::Frustum;
 
 /* RENDERING-RESPONSIBLE MODULES */
-mod chunk;
 mod ui;
-pub use self::chunk::ChunkRenderer;
+mod world;
 pub use self::ui::UiRenderer;
+pub use self::world::WorldRenderer;

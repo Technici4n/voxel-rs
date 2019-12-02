@@ -28,7 +28,7 @@ use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
 use crate::window::WindowBuffers;
-use crate::render::{ChunkRenderer, UiRenderer, Frustum};
+use crate::render::{WorldRenderer, UiRenderer, Frustum};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -36,7 +36,7 @@ pub struct SinglePlayer {
     ui: Ui,
     ui_renderer: UiRenderer,
     world: World,
-    chunk_renderer: ChunkRenderer,
+    world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     model_regitry: Registry<VoxelModel>,
@@ -95,7 +95,7 @@ impl SinglePlayer {
 
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let chunk_renderer = ChunkRenderer::new(
+        let world_renderer = WorldRenderer::new(
             device,
             &mut encoder,
             data.texture_atlas,
@@ -107,7 +107,7 @@ impl SinglePlayer {
             ui: Ui::new(),
             ui_renderer,
             world: World::new(),
-            chunk_renderer,
+            world_renderer,
             block_registry: data.blocks,
             model_regitry: data.models,
             client,
@@ -200,7 +200,7 @@ impl State for SinglePlayer {
         // damned borrow checker :(
         let Self {
             ref mut world,
-            ref mut chunk_renderer,
+            ref mut world_renderer,
             ref render_distance,
             ..
         } = self;
@@ -213,7 +213,7 @@ impl State for SinglePlayer {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
-                chunk_renderer.remove_chunk(*chunk_pos);
+                world_renderer.remove_chunk(*chunk_pos);
                 light.remove(chunk_pos);
                 false
             }
@@ -233,7 +233,7 @@ impl State for SinglePlayer {
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.chunk_renderer
+                self.world_renderer
                     .update_chunk(&self.world, chunk_pos);
             }
         }
@@ -313,7 +313,7 @@ impl State for SinglePlayer {
             scale: 0.3,
         });*/
         // Draw chunks
-        self.chunk_renderer.render(
+        self.world_renderer.render(
             device,
             &mut encoder,
             buffers,

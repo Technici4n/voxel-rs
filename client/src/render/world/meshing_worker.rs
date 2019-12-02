@@ -5,7 +5,7 @@ use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::world::chunk::ChunkPos;
-use crate::render::chunk::ChunkVertex;
+use crate::render::world::ChunkVertex;
 
 pub type ChunkMesh = (ChunkPos, Vec<ChunkVertex>, Vec<u32>);
 
