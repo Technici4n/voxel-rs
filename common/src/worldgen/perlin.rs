@@ -183,7 +183,7 @@ pub fn perlin2d(
     }
     return result;
 }
-/// Horribly not optimized value perlin noise
+/// Value 2d noise
 pub fn value_noise2d(
     (x, y): (f32, f32),
     (size_x, size_y): (usize, usize),
@@ -231,19 +231,25 @@ pub fn value_noise2d(
         y_c[j] = ((u_y as i32) - min_y) as usize;
     }
 
-    for i in 0..size_x {
-        for j in 0..size_y {
+    unsafe {
+        for i in 0..size_x {
+            for j in 0..size_y {
+
+                let x_cc = *x_c.get_unchecked(i);
+                let y_cc = *y_c.get_unchecked(j);
+
                 // plz vectorize this for me
-                let a_a = values[x_c[i] * ny + y_c[j]];
-                let a_b = values[x_c[i] * ny + y_c[j]+ 1];
+                let a_a = *values.get_unchecked(x_cc * ny + y_cc);
+                let a_b = *values.get_unchecked(x_cc * ny + y_cc + 1);
 
                 let a = a_a + (a_b - a_a) * fy[j];
 
-                let b_a = values[x_c[i] * ny + y_c[j] + ny];
-                let b_b = values[x_c[i] * ny + y_c[j] + ny + 1];
+                let b_a = *values.get_unchecked(x_cc * ny + y_cc + ny);
+                let b_b = *values.get_unchecked(x_cc * ny + y_cc + ny + 1);
 
                 let b = b_a + (b_b - b_a) * fy[j];
                 to_add[i * size_y + j] += p * (a + (b - a) * fx[i]);
+            }
         }
     }
 }

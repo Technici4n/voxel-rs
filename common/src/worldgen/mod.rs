@@ -13,10 +13,12 @@ use crate::{
 use crate::debug::send_debug_info;
 use crate::worldgen::decorator::Decorator;
 use crate::worldgen::decorator::DecoratorPass;
+use crate::worldgen::topology::generate_chunk_topology;
 
 pub mod perlin;
 #[macro_use]
 pub mod decorator;
+pub mod topology;
 
 pub struct DefaultWorldGenerator {
     pregenerated_chunks: HashMap<ChunkPos, Chunk>,
@@ -89,65 +91,7 @@ impl DefaultWorldGenerator {
 
     fn pregenerate_chunk(chunk: &mut Chunk, block_registry: &Registry<Block>) {
         let t1 = Instant::now();
-        let stone_block = block_registry.get_id_by_name(&"stone".to_owned()).unwrap() as u16;
-        let grass_block = block_registry.get_id_by_name(&"grass".to_owned()).unwrap() as u16;
-        let dirt_block = block_registry.get_id_by_name(&"dirt".to_owned()).unwrap() as u16;
-        let dirt_grass = block_registry.get_id_by_name(&"dirt_grass".to_owned()).unwrap() as u16;
-
-        let px = (chunk.pos.px * CHUNK_SIZE as i64) as f32;
-        let py = (chunk.pos.py * CHUNK_SIZE as i64) as f32;
-        let pz = (chunk.pos.pz * CHUNK_SIZE as i64) as f32;
-        let freq = 1.0 / 64.0;
-
-        unsafe {
-            if py > 100.0 {
-                return;
-            } else if py + CHUNK_SIZE as f32 + 13.0 < 0.0 {
-                for i in 0..CHUNK_SIZE {
-                    for j in 0..CHUNK_SIZE {
-                        for k in 0..CHUNK_SIZE {
-                            chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), stone_block);
-                        }
-                    }
-                }
-                return;
-            }
-
-            let s = CHUNK_SIZE + 3;
-            let noise = perlin::perlin(px, py, pz, s as usize, freq, freq * 2.0, freq, 5, 0.4, 42);
-
-            for i in 0..CHUNK_SIZE {
-                for j in 0..CHUNK_SIZE {
-                    for k in 0..CHUNK_SIZE {
-                        // warning : indexing order
-                        if noise[(i * s * s + j * s + k) as usize] > (py + j as f32 + 10.0) / 110.0 {
-                            if noise[(i * s * s + (j + 1) * s + k) as usize]
-                                > (py + j as f32 + 11.0) / 110.0
-                            {
-                                if noise[(i * s * s + (j + 2) * s + k) as usize]
-                                    > (py + j as f32 + 12.0) / 110.0
-                                    && noise[(i * s * s + (j + 3) * s + k) as usize]
-                                    > (py + j as f32 + 13.0) / 110.0
-                                {
-                                    chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), stone_block);
-                                } else {
-                                    if noise[(i * s * s + (j + 1) * s + k) as usize]
-                                        > (py + j as f32 + 11.0) / 110.0
-                                        && noise[(i * s * s + (j + 2) * s + k) as usize]
-                                        < (py + j as f32 + 12.0) / 110.0 {
-                                        chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), dirt_grass);
-                                    }else{
-                                        chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), dirt_block);
-                                    }
-                                }
-                            } else {
-                                chunk.set_block_at_unsafe((i as u32, j as u32, k as u32), grass_block);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        generate_chunk_topology(chunk, block_registry);
         let t2 = Instant::now();
         println!(
             "Time to generate chunk : {} micros",
