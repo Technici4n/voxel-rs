@@ -4,7 +4,7 @@ use super::buffers::MultiBuffer;
 use voxel_rs_common::world::chunk::ChunkPos;
 use image::{ImageBuffer, Rgba};
 use voxel_rs_common::block::BlockMesh;
-use super::init::{load_glsl_shader, create_default_pipeline};
+use super::init::{ShaderStage, load_glsl_shader, create_default_pipeline};
 use crate::window::WindowBuffers;
 use super::world::meshing_worker::MeshingWorker;
 use crate::texture::load_image;
@@ -56,8 +56,6 @@ impl WorldRenderer {
         block_meshes: Vec<BlockMesh>,
         models: &Registry<VoxelModel>,
     ) -> Self {
-        let mut compiler = shaderc::Compiler::new().expect("Failed to create shader compiler");
-
         // Load texture atlas
         let texture_atlas = load_image(device, encoder, texture_atlas);
         let texture_atlas_view = texture_atlas.create_default_view();
@@ -84,15 +82,15 @@ impl WorldRenderer {
         // Create chunk pipeline
         let chunk_pipeline = {
             let vertex_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/world.vert");
+                load_glsl_shader(ShaderStage::Vertex, "assets/shaders/world.vert");
             let fragment_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/world.frag");
+                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/world.frag");
 
             create_default_pipeline(
                 device,
                 &chunk_bind_group_layout,
-                vertex_shader.as_binary(),
-                fragment_shader.as_binary(),
+                &vertex_shader,
+                &fragment_shader,
                 wgpu::PrimitiveTopology::TriangleList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<ChunkVertex>() as u64,
@@ -113,15 +111,15 @@ impl WorldRenderer {
         // Create skybox pipeline
         let skybox_pipeline = {
             let vertex_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/skybox.vert");
+                load_glsl_shader(ShaderStage::Vertex, "assets/shaders/skybox.vert");
             let fragment_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/skybox.frag");
+                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/skybox.frag");
 
             create_default_pipeline(
                 device,
                 &vpm_bind_group_layout,
-                vertex_shader.as_binary(),
-                fragment_shader.as_binary(),
+                &vertex_shader,
+                &fragment_shader,
                 wgpu::PrimitiveTopology::TriangleList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<SkyboxVertex>() as u64,
@@ -139,15 +137,15 @@ impl WorldRenderer {
         });
         let target_pipeline = {
             let vertex_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/target.vert");
+                load_glsl_shader(ShaderStage::Vertex, "assets/shaders/target.vert");
             let fragment_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/target.frag");
+                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/target.frag");
 
             create_default_pipeline(
                 device,
                 &vpm_bind_group_layout,
-                vertex_shader.as_binary(),
-                fragment_shader.as_binary(),
+                &vertex_shader,
+                &fragment_shader,
                 wgpu::PrimitiveTopology::LineList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<SkyboxVertex>() as u64,
@@ -161,15 +159,15 @@ impl WorldRenderer {
         // Create model pipeline
         let model_pipeline = {
             let vertex_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/model.vert");
+                load_glsl_shader(ShaderStage::Vertex, "assets/shaders/model.vert");
             let fragment_shader =
-                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/model.frag");
+                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/model.frag");
 
             create_default_pipeline(
                 device,
                 &vpm_bind_group_layout,
-                vertex_shader.as_binary(),
-                fragment_shader.as_binary(),
+                &vertex_shader,
+                &fragment_shader,
                 wgpu::PrimitiveTopology::TriangleList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<RgbVertex>() as u64,

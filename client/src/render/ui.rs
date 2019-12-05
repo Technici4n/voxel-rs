@@ -5,6 +5,7 @@ use wgpu_glyph::FontId;
 use super::buffers::DynamicBuffer;
 use crate::ui::PrimitiveBuffer;
 use crate::window::{WindowBuffers, WindowData};
+use super::init::ShaderStage;
 
 pub struct UiRenderer {
     // Glyph rendering
@@ -76,17 +77,16 @@ impl<'a> UiRenderer {
             });
 
         // Create shader modules
-        let mut compiler = shaderc::Compiler::new().expect("Failed to create shader compiler");
         let vertex_shader =
-            super::init::load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/gui-rect.vert");
+            super::init::load_glsl_shader(ShaderStage::Vertex, "assets/shaders/gui-rect.vert");
         let fragment_shader =
-            super::init::load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/gui-rect.frag");
+            super::init::load_glsl_shader(ShaderStage::Fragment, "assets/shaders/gui-rect.frag");
 
         let pipeline = super::init::create_default_pipeline(
             device,
             &uniform_layout,
-            vertex_shader.as_binary(),
-            fragment_shader.as_binary(),
+            &vertex_shader,
+            &fragment_shader,
             wgpu::PrimitiveTopology::TriangleList,
             wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<UiVertex>() as u64,

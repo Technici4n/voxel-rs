@@ -22,8 +22,8 @@ serde = "1.0"
 toml = "0.5"
 
 # Graphics
+glsl-to-spirv = "0.1"
 image = "0.22"
-shaderc = "0.6"
 texture_packer = "0.17"
 wgpu = "0.4"
 winit = "0.20.0-alpha4"
