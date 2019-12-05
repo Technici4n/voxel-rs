@@ -39,7 +39,7 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
-    model_regitry: Registry<VoxelModel>,
+    model_registry: Registry<VoxelModel>,
     client: Box<dyn Client>,
     render_distance: RenderDistance,
     // TODO: put this in the settigs
@@ -100,6 +100,7 @@ impl SinglePlayer {
             &mut encoder,
             data.texture_atlas,
             data.meshes,
+            &data.models,
         );
 
         Ok((Box::new(Self {
@@ -109,7 +110,7 @@ impl SinglePlayer {
             world: World::new(),
             world_renderer,
             block_registry: data.blocks,
-            model_regitry: data.models,
+            model_registry: data.models,
             client,
             render_distance,
             physics_simulation: ClientPhysicsSimulation::new(
@@ -301,17 +302,17 @@ impl State for SinglePlayer {
 
         crate::render::clear_color_and_depth(&mut encoder, buffers);
 
-        /*let mut model_to_draw = Vec::new();
-        model_to_draw.push(Model {
-            model_mesh_id: self
-                .model_regitry
+        let mut models_to_draw = Vec::new();
+        models_to_draw.push(crate::render::Model {
+            mesh_id: self
+                .model_registry
                 .get_id_by_name(&"knight".to_owned())
                 .unwrap(),
             pos_x: 0.0,
             pos_y: 55.0,
             pos_z: 0.0,
             scale: 0.3,
-        });*/
+        });
         // Draw chunks
         self.world_renderer.render(
             device,
@@ -321,6 +322,7 @@ impl State for SinglePlayer {
             &frustum,
             input_state.enable_culling,
             pointed_block,
+            &models_to_draw,
         );
 
         crate::render::clear_depth(&mut encoder, buffers);

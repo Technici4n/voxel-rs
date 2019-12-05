@@ -11,10 +11,14 @@ use crate::texture::load_image;
 use super::frustum::Frustum;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::world::{World, BlockPos};
+use voxel_rs_common::registry::Registry;
+use voxel_rs_common::data::vox::VoxelModel;
 
 mod meshing;
 mod meshing_worker;
+mod model;
 mod skybox;
+pub use self::model::Model;
 
 /// All the state necessary to render the world.
 pub struct WorldRenderer {
@@ -38,6 +42,10 @@ pub struct WorldRenderer {
     // Targeted block rendering
     target_vertex_buffer: wgpu::Buffer,
     target_pipeline: wgpu::RenderPipeline,
+    // Model rendering
+    model_index_buffers: MultiBuffer<u32, u32>,
+    model_vertex_buffers: MultiBuffer<u32, RgbVertex>,
+    model_pipeline: wgpu::RenderPipeline,
 }
 
 impl WorldRenderer {
@@ -46,6 +54,7 @@ impl WorldRenderer {
         encoder: &mut wgpu::CommandEncoder,
         texture_atlas: ImageBuffer<Rgba<u8>, Vec<u8>>,
         block_meshes: Vec<BlockMesh>,
+        models: &Registry<VoxelModel>,
     ) -> Self {
         let mut compiler = shaderc::Compiler::new().expect("Failed to create shader compiler");
 
@@ -149,6 +158,37 @@ impl WorldRenderer {
             )
         };
 
+        // Create model pipeline
+        let model_pipeline = {
+            let vertex_shader =
+                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Vertex, "assets/shaders/model.vert");
+            let fragment_shader =
+                load_glsl_shader(&mut compiler, shaderc::ShaderKind::Fragment, "assets/shaders/model.frag");
+
+            create_default_pipeline(
+                device,
+                &vpm_bind_group_layout,
+                vertex_shader.as_binary(),
+                fragment_shader.as_binary(),
+                wgpu::PrimitiveTopology::TriangleList,
+                wgpu::VertexBufferDescriptor {
+                    stride: std::mem::size_of::<RgbVertex>() as u64,
+                    step_mode: wgpu::InputStepMode::Vertex,
+                    attributes: &RGB_VERTEX_ATTRIBUTES,
+                },
+                true,
+            )
+        };
+
+        // Mesh models
+        let mut model_index_buffers = MultiBuffer::with_capacity(device, 0, wgpu::BufferUsage::INDEX);
+        let mut model_vertex_buffers = MultiBuffer::with_capacity(device, 0, wgpu::BufferUsage::VERTEX);
+        for mesh_id in 0..models.get_number_of_ids() {
+            let (vertices, indices) = self::model::mesh_model(models.get_value_by_id(mesh_id).unwrap());
+            model_index_buffers.update(device, encoder, mesh_id, &indices);
+            model_vertex_buffers.update(device, encoder, mesh_id, &vertices);
+        }
+
         Self {
             meshing_worker: MeshingWorker::new(block_meshes),
             uniform_view_proj,
@@ -163,6 +203,9 @@ impl WorldRenderer {
             vpm_bind_group,
             target_vertex_buffer,
             target_pipeline,
+            model_pipeline,
+            model_index_buffers,
+            model_vertex_buffers,
         }
     }
 
@@ -175,6 +218,7 @@ impl WorldRenderer {
         frustum: &Frustum,
         enable_culling: bool,
         pointed_block: Option<(BlockPos, usize)>,
+        models: &[model::Model],
     ) {
         //============= RECEIVE CHUNK MESHES =============//
         for (pos, vertices, indices) in self.meshing_worker.get_processed_chunks() {
@@ -281,6 +325,28 @@ impl WorldRenderer {
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
             rpass.set_vertex_buffers(0, &[(&self.target_vertex_buffer, 0)]);
             rpass.draw(0..8, 0..1);
+        }
+
+        // Draw the models
+        for model in models {
+            // Update model buffer
+            let src_buffer = device
+                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&[model.scale, 0.0, 0.0, 0.0, 0.0, model.scale, 0.0, 0.0, 0.0, 0.0, model.scale, 0.0, model.pos_x, model.pos_y, model.pos_z, 1.0]);
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
+            // Draw model
+            let mut rpass = super::render::create_default_render_pass(encoder, buffers);
+            rpass.set_pipeline(&self.model_pipeline);
+            rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
+            rpass.set_vertex_buffers(0, &[(&self.model_vertex_buffers.get_buffer(), 0)]);
+            rpass.set_index_buffer(&self.model_index_buffers.get_buffer(), 0);
+            let (index_pos, index_len) = self.model_index_buffers.get_pos_len(&model.mesh_id).unwrap();
+            let (vertex_pos, _) = self.model_vertex_buffers.get_pos_len(&model.mesh_id).unwrap();
+            rpass.draw_indexed(
+                (index_pos as u32)..((index_pos + index_len) as u32),
+                vertex_pos as i32,
+                0..1,
+            );
         }
     }
 
@@ -511,3 +577,23 @@ fn create_target_vertices(face: usize) -> Vec<SkyboxVertex> {
     }
     vertices
 }
+
+/*========== MODEL RENDERING ==========*/
+#[derive(Debug, Clone, Copy)]
+pub struct RgbVertex {
+    pub position: [f32; 3],
+    pub info: u32,
+}
+
+const RGB_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 2] = [
+    wgpu::VertexAttributeDescriptor {
+        shader_location: 0,
+        format: wgpu::VertexFormat::Float3,
+        offset: 0,
+    },
+    wgpu::VertexAttributeDescriptor {
+        shader_location: 1,
+        format: wgpu::VertexFormat::Uint,
+        offset: 4 * 3,
+    },
+];

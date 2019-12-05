@@ -18,4 +18,4 @@ pub use self::frustum::Frustum;
 mod ui;
 mod world;
 pub use self::ui::UiRenderer;
-pub use self::world::WorldRenderer;
+pub use self::world::{Model, WorldRenderer};
