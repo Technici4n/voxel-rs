@@ -151,7 +151,7 @@ impl HighestOpaqueBlock {
     pub fn new(pos: ChunkPosXZ) -> Self {
         Self {
             pos,
-            y: [0; (CHUNK_SIZE * CHUNK_SIZE) as usize],
+            y: [-100; (CHUNK_SIZE * CHUNK_SIZE) as usize],
         }
     }
 }

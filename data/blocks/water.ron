@@ -1,0 +1,3 @@
+NormalCube(
+    face_textures: ["water", "water", "water", "water", "water", "water"],
+)
