@@ -1,30 +1,39 @@
-#version 330
+#version 450
 
-in vec3 v_Norm;
-in vec2 v_UvPos;
-in vec2 v_UvSize;
-in vec2 v_UvOffset;
-in float occl;
-in float v_LightLevel;
+layout(location = 0) flat in vec3 i_norm;
+layout(location = 1) in float i_occl;
+layout(location = 2) flat in vec2 i_texture_top_left;
+layout(location = 3) flat in vec2 i_texture_size;
+layout(location = 4) flat in vec2 i_texture_max_uv;
+layout(location = 5) in vec2 i_texture_uv;
+layout(location = 6) flat in float i_light_level;
 
-out vec4 ColorBuffer;
+layout(location = 0) out vec4 o_color;
 
-uniform sampler2D TextureAtlas;
+layout(set = 0, binding = 1) uniform sampler u_sampler;
+layout(set = 0, binding = 2) uniform texture2D u_texture_atlas;
 
 const vec3 SUN_DIRECTION = normalize(vec3(0, 1, 0.5));
 const float SUN_FRACTION = 0.3;
-
-vec3 srgbDecode(vec3 color){
-    float r = color.r < 0.04045 ? (1.0 / 12.92) * color.r : pow((color.r + 0.055) * (1.0 / 1.055), 2.4);
-    float g = color.g < 0.04045 ? (1.0 / 12.92) * color.g : pow((color.g + 0.055) * (1.0 / 1.055), 2.4);
-    float b = color.b < 0.04045 ? (1.0 / 12.92) * color.b : pow((color.b + 0.055) * (1.0 / 1.055), 2.4);
-    return vec3(r, g, b);
-}
+const vec2 EPSILON = vec2(1e-7, 1e-7);
 
 void main() {
-    float lightFactor = pow(0.8, 15.0 - v_LightLevel);
-    vec2 actualPosition = v_UvPos + mod(v_UvOffset, v_UvSize);
-    ColorBuffer = lightFactor * vec4(srgbDecode(texture(TextureAtlas, actualPosition).xyz), 1.0) * occl * (1.0 - SUN_FRACTION + SUN_FRACTION * abs(dot(v_Norm, SUN_DIRECTION)));
-    ColorBuffer.a = 1.0;
+    /* TEXTURE ACCESS */
+    // avoid going out of bounds when multisampling is enabled
+    vec2 corrected_uv = clamp(i_texture_uv, EPSILON, i_texture_max_uv - EPSILON);
+    // compute the texture gradients before texture wrapping
+    vec2 x_derivative = dFdx(corrected_uv);
+    vec2 y_derivative = dFdy(corrected_uv);
+    // wrap texture
+    vec2 actual_uv = i_texture_top_left + mod(corrected_uv, i_texture_size);
+    // get texture value
+    vec4 tex_color = textureGrad(sampler2D(u_texture_atlas, u_sampler), actual_uv, x_derivative, y_derivative);
 
+    /* VARIOUS BRIGHTNESS FACTORS */
+    float light_factor = pow(0.8, 15.0 - i_light_level);
+    float normal_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(i_norm, SUN_DIRECTION));
+    float total_factor = light_factor * i_occl * normal_factor;
+
+    /* OUTPUT */
+    o_color = vec4(total_factor, total_factor, total_factor, 1.0) * tex_color;
 }

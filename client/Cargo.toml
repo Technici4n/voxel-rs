@@ -22,17 +22,15 @@ serde = "1.0"
 toml = "0.5"
 
 # Graphics
-gfx = "0.18"
-gfx_core = "0.9"
-gfx_device_gl = "0.16"
-gfx_window_glutin = "0.31"
-glutin = "0.21"
 image = "0.22"
+shaderc = "0.6"
 texture_packer = "0.17"
+wgpu = "0.4"
+winit = "0.20.0-alpha4"
 
 # Gui
-gfx_glyph = "0.16"
 quint = { path = "../quint" }
+wgpu_glyph = "0.5"
 
 # Math
 nalgebra = "0.18"

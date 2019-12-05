@@ -1,5 +1,4 @@
 use anyhow::Result;
-use gfx::Device;
 use log::info;
 
 use voxel_rs_common::{
@@ -11,17 +10,16 @@ use voxel_rs_common::{
 };
 
 use crate::input::YawPitch;
-use crate::model::model::Model;
-use crate::world::meshing::ChunkMeshData;
+//use crate::model::model::Model;
+//use crate::world::meshing::ChunkMeshData;
 use crate::{
     fps::FpsCounter,
     input::InputState,
     settings::Settings,
-    ui::{renderer::UiRenderer, Ui},
-    window::{Gfx, State, StateTransition, WindowData, WindowFlags},
-    world::{frustum::Frustum, renderer::WorldRenderer},
+    ui::Ui,
+    window::{State, StateTransition, WindowData, WindowFlags},
 };
-use glutin::{ElementState, MouseButton};
+use winit::event::{ElementState, MouseButton};
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -29,6 +27,8 @@ use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
+use crate::window::WindowBuffers;
+use crate::render::{WorldRenderer, UiRenderer, Frustum};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -39,7 +39,7 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
-    model_regitry: Registry<VoxelModel>,
+    model_registry: Registry<VoxelModel>,
     client: Box<dyn Client>,
     render_distance: RenderDistance,
     // TODO: put this in the settigs
@@ -51,14 +51,14 @@ pub struct SinglePlayer {
 
 impl SinglePlayer {
     pub fn new_factory(client: Box<dyn Client>) -> crate::window::StateFactory {
-        Box::new(move |settings, gfx| Self::new(settings, gfx, client))
+        Box::new(move |settings, device| Self::new(settings, device, client))
     }
 
     pub fn new(
         settings: &mut Settings,
-        gfx: &mut Gfx,
+        device: &mut wgpu::Device,
         mut client: Box<dyn Client>,
-    ) -> Result<Box<dyn State>> {
+    ) -> Result<(Box<dyn State>, wgpu::CommandBuffer)> {
         info!("Launching singleplayer");
         // Wait for data and player_id from the server
         let (data, player_id) = {
@@ -90,20 +90,27 @@ impl SinglePlayer {
             z_min: z2,
         };
         client.send(ToServer::SetRenderDistance(render_distance));
+        // Create the renderers
+        let ui_renderer = UiRenderer::new(device);
 
-        // Load texture atlas
-        let texture_atlas = crate::texture::load_image(&mut gfx.factory, data.texture_atlas)?;
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let world_renderer = WorldRenderer::new(gfx, data.meshes, texture_atlas, &data.models);
+        let world_renderer = WorldRenderer::new(
+            device,
+            &mut encoder,
+            data.texture_atlas,
+            data.meshes,
+            &data.models,
+        );
 
-        Ok(Box::new(Self {
+        Ok((Box::new(Self {
             fps_counter: FpsCounter::new(),
             ui: Ui::new(),
-            ui_renderer: UiRenderer::new(gfx)?,
+            ui_renderer,
             world: World::new(),
-            world_renderer: world_renderer?,
+            world_renderer,
             block_registry: data.blocks,
-            model_regitry: data.models,
+            model_registry: data.models,
             client,
             render_distance,
             physics_simulation: ClientPhysicsSimulation::new(
@@ -117,7 +124,7 @@ impl SinglePlayer {
             yaw_pitch: Default::default(),
             debug_info: DebugInfo::new_current(),
             chunks_to_mesh: Default::default(),
-        }))
+        }), encoder.finish()))
     }
 }
 
@@ -129,7 +136,7 @@ impl State for SinglePlayer {
         _data: &WindowData,
         flags: &mut WindowFlags,
         _seconds_delta: f64,
-        gfx: &mut Gfx,
+        _device: &mut wgpu::Device,
     ) -> Result<StateTransition> {
         // Handle server messages
         loop {
@@ -207,8 +214,7 @@ impl State for SinglePlayer {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
                 true
             } else {
-                world_renderer.chunk_meshes.remove(chunk_pos);
-                world_renderer.meshing_worker.dequeue_chunk(*chunk_pos);
+                world_renderer.remove_chunk(*chunk_pos);
                 light.remove(chunk_pos);
                 false
             }
@@ -229,22 +235,7 @@ impl State for SinglePlayer {
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
                 self.world_renderer
-                    .meshing_worker
-                    .enqueue_chunk(ChunkMeshData::create_from_world(&self.world, chunk_pos));
-            }
-        }
-
-        // Send new chunks to the GPU
-        for (chunk_pos, vertices, indices) in self
-            .world_renderer
-            .meshing_worker
-            .get_processed_chunks()
-            .into_iter()
-        {
-            // Add the mesh if the chunk is still loaded
-            if self.world.has_chunk(chunk_pos) {
-                self.world_renderer
-                    .update_chunk_mesh(gfx, chunk_pos, vertices, indices);
+                    .update_chunk(&self.world, chunk_pos);
             }
         }
 
@@ -268,14 +259,15 @@ impl State for SinglePlayer {
         }
     }
 
-    fn render(
+    fn render<'a>(
         &mut self,
         _settings: &Settings,
-        gfx: &mut Gfx,
+        buffers: WindowBuffers<'a>,
+        device: &mut wgpu::Device,
         data: &WindowData,
         input_state: &InputState,
-    ) -> Result<StateTransition> {
-        // Count fps
+    ) -> Result<(StateTransition, wgpu::CommandBuffer)> {
+        // Count fps TODO: move this to update
         self.fps_counter.add_frame();
         send_debug_info("Player", "fps", format!("fps = {}", self.fps_counter.fps()));
 
@@ -284,7 +276,7 @@ impl State for SinglePlayer {
             self.yaw_pitch,
         );
 
-        // Try raytracing
+        // Try raytracing TODO: move this to update
         let pp = self.physics_simulation.get_player();
         let pointed_block = {
             let y = self.yaw_pitch.yaw.to_radians();
@@ -305,17 +297,15 @@ impl State for SinglePlayer {
             send_debug_info("Player", "pointedat", "Pointed block: None");
         }
 
-        // Clear buffers
-        gfx.encoder
-            .clear(&gfx.color_buffer, crate::window::CLEAR_COLOR);
-        gfx.encoder
-            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
-        // Draw world
+        // Begin rendering
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
-        let mut model_to_draw = Vec::new();
-        model_to_draw.push(Model {
-            model_mesh_id: self
-                .model_regitry
+        crate::render::clear_color_and_depth(&mut encoder, buffers);
+
+        let mut models_to_draw = Vec::new();
+        models_to_draw.push(crate::render::Model {
+            mesh_id: self
+                .model_registry
                 .get_id_by_name(&"knight".to_owned())
                 .unwrap(),
             pos_x: 0.0,
@@ -323,27 +313,26 @@ impl State for SinglePlayer {
             pos_z: 0.0,
             scale: 0.3,
         });
+        // Draw chunks
         self.world_renderer.render(
-            gfx,
+            device,
+            &mut encoder,
+            buffers,
             data,
             &frustum,
             input_state.enable_culling,
             pointed_block,
-            model_to_draw,
-        )?;
-        // Clear depth
-        gfx.encoder
-            .clear_depth(&gfx.depth_buffer, crate::window::CLEAR_DEPTH);
+            &models_to_draw,
+        );
+
+        crate::render::clear_depth(&mut encoder, buffers);
+
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
         self.ui_renderer
-            .render(gfx, &data, &self.ui.ui, self.ui.should_capture_mouse())?;
-        // Flush and swap buffers
-        gfx.encoder.flush(&mut gfx.device);
-        gfx.context.swap_buffers()?;
-        gfx.device.cleanup();
+            .render(buffers, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse());
 
-        Ok(StateTransition::KeepCurrent)
+        Ok((StateTransition::KeepCurrent, encoder.finish()))
     }
 
     fn handle_mouse_motion(&mut self, _settings: &Settings, delta: (f64, f64)) {
@@ -352,13 +341,13 @@ impl State for SinglePlayer {
         }
     }
 
-    fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition) {
+    fn handle_cursor_movement(&mut self, logical_position: winit::dpi::LogicalPosition) {
         self.ui.cursor_moved(logical_position);
     }
 
     fn handle_mouse_state_changes(
         &mut self,
-        changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
+        changes: Vec<(winit::event::MouseButton, winit::event::ElementState)>,
     ) {
         for (button, state) in changes.iter() {
             match *button {
@@ -377,7 +366,7 @@ impl State for SinglePlayer {
         self.ui.handle_mouse_state_changes(changes);
     }
 
-    fn handle_key_state_changes(&mut self, changes: Vec<(u32, glutin::ElementState)>) {
+    fn handle_key_state_changes(&mut self, changes: Vec<(u32, winit::event::ElementState)>) {
         self.ui.handle_key_state_changes(changes);
     }
 }

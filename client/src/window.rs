@@ -1,11 +1,15 @@
 use crate::{input::InputState, settings::Settings};
-use anyhow::{Context, Result};
-use glutin::{ElementState, MouseButton};
+use anyhow::Result;
 use log::info;
 use std::time::Instant;
+use wgpu::Device;
+use winit::window::Window;
+use winit::event::{MouseButton, ElementState};
+use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
+use winit::event_loop::ControlFlow;
 
 /// A closure that creates a new instance of `State`.
-pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Gfx) -> Result<Box<dyn State>>>;
+pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Device) -> Result<(Box<dyn State>, wgpu::CommandBuffer)>>;
 
 /// A transition from one state to another.
 pub enum StateTransition {
@@ -21,10 +25,10 @@ pub enum StateTransition {
 /// Read-only data that is provided to the states.
 #[derive(Debug, Clone)]
 pub struct WindowData {
-    /// Logical size of the window. See [the glutin documentation](glutin::dpi).
-    pub logical_window_size: glutin::dpi::LogicalSize,
+    /// Logical size of the window. See [the winit documentation](winit::dpi).
+    pub logical_window_size: LogicalSize,
     /// Physical size of the window.
-    pub physical_window_size: glutin::dpi::PhysicalSize,
+    pub physical_window_size: PhysicalSize,
     /// HiDpi factor of the window.
     pub hidpi_factor: f64,
     /// `true` if the window is currently focused
@@ -50,22 +54,23 @@ pub trait State {
         data: &WindowData,
         flags: &mut WindowFlags,
         seconds_delta: f64,
-        gfx: &mut Gfx,
+        device: &mut Device,
     ) -> Result<StateTransition>;
     /// Render.
     ///
     /// Note: The state is responsible for swapping buffers.
-    fn render(
+    fn render<'a>(
         &mut self,
         settings: &Settings,
-        gfx: &mut Gfx,
+        buffers: WindowBuffers<'a>,
+        device: &mut Device,
         data: &WindowData,
         input_state: &InputState,
-    ) -> Result<StateTransition>;
+    ) -> Result<(StateTransition, wgpu::CommandBuffer)>;
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
     /// Cursor moved
-    fn handle_cursor_movement(&mut self, logical_position: glutin::dpi::LogicalPosition);
+    fn handle_cursor_movement(&mut self, logical_position: LogicalPosition);
     /// Mouse clicked
     fn handle_mouse_state_changes(&mut self, changes: Vec<(MouseButton, ElementState)>);
     /// Key pressed
@@ -73,57 +78,82 @@ pub trait State {
 }
 
 /// Color format of the window's color buffer
-pub type ColorFormat = gfx::format::Srgba8;
+pub const COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bgra8Unorm;
 /// Format of the window's depth buffer
-pub type DepthFormat = gfx::format::DepthStencil;
-
-/// An error that can happen when manipulating the window.
-#[derive(Debug, Clone)]
-pub enum WindowError {
-    /// The window was closed unexpectedly.
-    ClosedUnexpectedly,
-    /// Setting the cursor position failed.
-    CouldntSetCursorPosition(String),
-}
+pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 /// Open a new window with the given settings and the given initial state
-pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Result<()> {
+pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     info!("Opening new window...");
-    // Initialize window and OpenGL context
+    // Create the window
     let window_title = "voxel-rs".to_owned();
-    let mut events_loop = glutin::EventsLoop::new();
-    let (context, device, mut factory, color_buffer, depth_buffer) = {
-        let window_builder = glutin::WindowBuilder::new()
-            .with_title(window_title.clone())
-            .with_dimensions(settings.window_size.into());
-        let context_builder = glutin::ContextBuilder::new()
-            .with_vsync(false)
-            .with_multisampling(4)
-            .with_gl(glutin::GlRequest::Specific(glutin::Api::OpenGl, (3, 3)));
-        gfx_window_glutin::init::<ColorFormat, DepthFormat>(
-            window_builder,
-            context_builder,
-            &events_loop,
-        )
-        .context("Failed to initialize the window and the OpenGL context")?
+    let event_loop = winit::event_loop::EventLoop::new();
+    let window = Window::new(&event_loop).expect("Failed to create window");
+    window.set_title(&window_title);
+    // Create the Surface, i.e. the render target of the program
+    let hidpi_factor = window.hidpi_factor();
+    let physical_window_size = window.inner_size().to_physical(hidpi_factor);
+    info!("Creating the swap chain");
+    let surface = wgpu::Surface::create(&window);
+    // Get the Device and the render Queue
+    let adapter = wgpu::Adapter::request(
+        &wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::HighPerformance, // TODO: configure this?
+            backends: wgpu::BackendBit::DX12,
+        },
+    ).expect("Failed to create adapter");
+    // TODO: device should be immutable
+    let (mut device, mut queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+        extensions: wgpu::Extensions {
+            anisotropic_filtering: false,
+        },
+        limits: wgpu::Limits::default(),
+    });
+    // Create the SwapChain
+    let mut sc_desc = wgpu::SwapChainDescriptor {
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        format: COLOR_FORMAT,
+        width: physical_window_size.width.round() as u32,
+        height: physical_window_size.height.round() as u32,
+        present_mode: wgpu::PresentMode::NoVsync,
     };
-    let encoder = factory.create_command_buffer().into();
-
-    let mut gfx = Gfx {
-        context,
-        device,
-        factory,
-        encoder,
-        color_buffer,
-        depth_buffer,
+    let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
+    info!("Creating the multisampled texture buffer");
+    let mut msaa_texture_descriptor = wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width: sc_desc.width,
+            height: sc_desc.height,
+            depth: 1,
+        },
+        array_layer_count: 1,
+        mip_level_count: 1,
+        sample_count: SAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: sc_desc.format,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
     };
+    let mut msaa_texture = device.create_texture(&msaa_texture_descriptor);
+    let mut msaa_texture_view = msaa_texture.create_default_view();
+    info!("Creating the depth buffer");
+    let mut depth_texture_descriptor = wgpu::TextureDescriptor {
+        size: wgpu::Extent3d {
+            width: sc_desc.width,
+            height: sc_desc.height,
+            depth: 1,
+        },
+        array_layer_count: 1,
+        mip_level_count: 1,
+        sample_count: SAMPLE_COUNT,
+        dimension: wgpu::TextureDimension::D2,
+        format: DEPTH_FORMAT,
+        usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+    };
+    let mut depth_texture = device.create_texture(&depth_texture_descriptor);
+    let mut depth_texture_view = depth_texture.create_default_view();
 
     let mut window_data = {
-        let logical_window_size = match gfx.context.window().get_inner_size() {
-            Some(logical_window_size) => logical_window_size,
-            None => return Err(WindowError::ClosedUnexpectedly)?,
-        };
-        let hidpi_factor = gfx.context.window().get_hidpi_factor();
+        let logical_window_size = window.inner_size();
+        let hidpi_factor = window.hidpi_factor();
         let physical_window_size = logical_window_size.to_physical(hidpi_factor);
         WindowData {
             logical_window_size,
@@ -142,179 +172,186 @@ pub fn open_window(settings: &mut Settings, initial_state: StateFactory) -> Resu
 
     info!("Done initializing the window. Moving on to the first state...");
 
-    let mut state =
-        initial_state(settings, &mut gfx).context("Failed to create initial window state")?;
+    let (mut state, cmd) =
+        initial_state(&mut settings, &mut device).expect("Failed to create initial window state");
+    queue.submit(&[cmd]);
 
     let mut previous_time = std::time::Instant::now();
 
-    loop {
-        let mut keep_running = true;
-        let mut window_resized = false;
-        let mut mouse_state_changes = Vec::new();
-        let mut key_state_changes = Vec::new();
-        // Handle events
-        events_loop.poll_events(|event| {
-            use glutin::Event::*;
-            match event {
-                WindowEvent { event, .. } => {
-                    use glutin::WindowEvent::*;
-                    match event {
-                        Resized(_) | HiDpiFactorChanged(_) => window_resized = true,
-                        Moved(_) => (),
-                        CloseRequested | Destroyed => keep_running = false,
-                        DroppedFile(_) | HoveredFile(_) | HoveredFileCancelled => (),
-                        ReceivedCharacter(_) => (),
-                        Focused(focused) => {
-                            window_data.focused = focused;
-                            input_state.clear();
-                        }
-                        KeyboardInput { input, .. } => {
-                            if input_state.process_keyboard_input(input) {
-                                key_state_changes.push((input.scancode, input.state));
-                            }
-                        }
-                        CursorMoved { position, .. } => state.handle_cursor_movement(position),
-                        CursorEntered { .. } | CursorLeft { .. } | MouseWheel { .. } => (),
-                        MouseInput {
-                            button,
-                            state: element_state,
-                            modifiers,
-                            ..
-                        } => {
-                            if input_state.process_mouse_input(element_state, button, modifiers) {
-                                mouse_state_changes.push((button, element_state));
-                            }
-                        }
-                        // weird events
-                        TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
-                        Refresh => (),
+    let mut window_resized = false;
+    let mut mouse_state_changes = Vec::new();
+    let mut key_state_changes = Vec::new();
+
+    // Main loop
+    event_loop.run(move |event, _, control_flow| {
+        use winit::event::Event::*;
+        match event {
+            /* NORMAL EVENT HANDLING */
+            WindowEvent { event, .. } => {
+                use winit::event::WindowEvent::*;
+                match event {
+                    Resized(_) | HiDpiFactorChanged(_) => window_resized = true,
+                    Moved(_) => (),
+                    CloseRequested | Destroyed => *control_flow = ControlFlow::Exit,
+                    DroppedFile(_) | HoveredFile(_) | HoveredFileCancelled => (),
+                    ReceivedCharacter(_) => (),
+                    Focused(focused) => {
+                        window_data.focused = focused;
+                        input_state.clear();
                     }
+                    KeyboardInput { input, .. } => {
+                        if input_state.process_keyboard_input(input) {
+                            key_state_changes.push((input.scancode, input.state));
+                        }
+                    }
+                    CursorMoved { position, .. } => state.handle_cursor_movement(position),
+                    CursorEntered { .. } | CursorLeft { .. } | MouseWheel { .. } => (),
+                    MouseInput {
+                        button,
+                        state: element_state,
+                        modifiers,
+                        ..
+                    } => {
+                        if input_state.process_mouse_input(element_state, button, modifiers) {
+                            mouse_state_changes.push((button, element_state));
+                        }
+                    }
+                    // weird events
+                    TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
+                    ModifiersChanged { .. } | RedrawRequested => () // TODO: handle these
                 }
-                // There is no need to handle device events,
-                // all relevant should already be received by the window.
-                DeviceEvent { event, .. } => {
-                    if !window_data.focused {
+            }
+            DeviceEvent { event, .. } => {
+                if !window_data.focused {
+                    return;
+                }
+                use winit::event::DeviceEvent::*;
+                match event {
+                    MouseMotion { delta } => state.handle_mouse_motion(&settings, delta),
+                    _ => (),
+                }
+            }
+            /* MAIN LOOP TICK */
+            EventsCleared => {
+                // If the window was resized, update the SwapChain and the window data
+                if window_resized {
+                    info!("The window was resized, adjusting buffers...");
+                    // Update window data
+                    window_data.logical_window_size = window.inner_size();
+                    window_data.hidpi_factor = window.hidpi_factor();
+                    let phys = window_data
+                        .logical_window_size
+                        .to_physical(window_data.hidpi_factor);
+                    window_data.physical_window_size = phys;
+                    // Update SwapChain
+                    sc_desc.width = phys.width.round() as u32;
+                    sc_desc.height = phys.height.round() as u32;
+                    swap_chain = device.create_swap_chain(&surface, &sc_desc);
+                    // TODO: remove copy/paste
+                    // Update depth buffer
+                    depth_texture_descriptor.size.width = sc_desc.width;
+                    depth_texture_descriptor.size.height = sc_desc.height;
+                    depth_texture = device.create_texture(&depth_texture_descriptor);
+                    depth_texture_view = depth_texture.create_default_view();
+                    // Udate MSAA frame buffer
+                    msaa_texture_descriptor.size.width = sc_desc.width;
+                    msaa_texture_descriptor.size.height = sc_desc.height;
+                    msaa_texture = device.create_texture(&msaa_texture_descriptor);
+                    msaa_texture_view = msaa_texture.create_default_view();
+                }
+                window_resized = false;
+
+                // Update state
+                let (v1, v2) = (Vec::new(), Vec::new()); // TODO: clean up
+                state.handle_mouse_state_changes(std::mem::replace(&mut mouse_state_changes, v1));
+                state.handle_key_state_changes(std::mem::replace(&mut key_state_changes, v2));
+                let seconds_delta = {
+                    let current_time = Instant::now();
+                    let delta = current_time - previous_time;
+                    previous_time = current_time;
+                    delta.as_secs() as f64 + delta.subsec_nanos() as f64 / 1e9
+                };
+                let state_transition = state
+                    .update(
+                        &mut settings,
+                        &input_state,
+                        &window_data,
+                        &mut window_flags,
+                        seconds_delta,
+                        &mut device,
+                    )
+                    .expect("Failed to `update` the current window state"); // TODO: remove this
+
+                // Update window flags
+                window.set_title(&window_flags.window_title);
+                if window_flags.hide_and_center_cursor && window_data.focused {
+                    window.set_cursor_visible(false);
+                    let sz = window_data.logical_window_size;
+                    window
+                        .set_cursor_position(winit::dpi::LogicalPosition {
+                            x: sz.width / 2.0,
+                            y: sz.height / 2.0,
+                        })
+                        .expect("Failed to center cursor"); // TODO: warn instead of panic ?
+                } else {
+                    window.set_cursor_visible(true);
+                }
+
+                // Transition if necessary
+                match state_transition {
+                    StateTransition::KeepCurrent => (),
+                    StateTransition::ReplaceCurrent(new_state) => {
+                        info!("Transitioning to a new window state...");
+                        let (new_state, cmd) =
+                            new_state(&mut settings, &mut device).expect("Failed to create next window state");
+                        state = new_state;
+                        queue.submit(&[cmd]);
                         return;
                     }
-                    use glutin::DeviceEvent::*;
-                    match event {
-                        MouseMotion { delta } => state.handle_mouse_motion(settings, delta),
-                        _ => (),
+                    StateTransition::CloseWindow => {
+                        *control_flow = ControlFlow::Exit;
                     }
                 }
-                Awakened | Suspended(_) => {
-                    // TODO: implement this ?
-                    unimplemented!("Awakening and suspending is not currently handled")
+
+                // Render frame
+                let frame = swap_chain.get_next_texture();
+                let (state_transition, commands) =
+                    state
+                    .render(&settings, WindowBuffers {
+                        texture_buffer: &frame.view,
+                        multisampled_texture_buffer: &msaa_texture_view,
+                        depth_buffer: &depth_texture_view,
+                    }, &mut device, &window_data, &input_state)
+                    .expect("Failed to `render` the current window state");
+                queue.submit(&[commands]);
+                match state_transition {
+                    StateTransition::KeepCurrent => (),
+                    StateTransition::ReplaceCurrent(new_state) => {
+                        let (new_state, cmd) =
+                            new_state(&mut settings, &mut device).expect("Failed to create next window state");
+                        state = new_state;
+                        queue.submit(&[cmd]);
+                    }
+                    StateTransition::CloseWindow => {
+                        *control_flow = ControlFlow::Exit;
+                    }
                 }
             }
-        });
-        if !keep_running {
-            return Ok(());
-        }
-        if window_resized {
-            window_data.logical_window_size = match gfx.context.window().get_inner_size() {
-                Some(logical_window_size) => logical_window_size,
-                None => return Err(WindowError::ClosedUnexpectedly)?,
-            };
-            window_data.hidpi_factor = gfx.context.window().get_hidpi_factor();
-            window_data.physical_window_size = window_data
-                .logical_window_size
-                .to_physical(window_data.hidpi_factor);
-            gfx_window_glutin::update_views(
-                &gfx.context,
-                &mut gfx.color_buffer,
-                &mut gfx.depth_buffer,
-            );
-        }
-
-        // Update state
-        state.handle_mouse_state_changes(mouse_state_changes);
-        state.handle_key_state_changes(key_state_changes);
-        let seconds_delta = {
-            let current_time = Instant::now();
-            let delta = current_time - previous_time;
-            previous_time = current_time;
-            delta.as_secs() as f64 + delta.subsec_nanos() as f64 / 1e9
-        };
-        let state_transition = state
-            .update(
-                settings,
-                &input_state,
-                &window_data,
-                &mut window_flags,
-                seconds_delta,
-                &mut gfx,
-            )
-            .context("Failed to `update` the current window state")?;
-
-        // Update window flags
-        gfx.context.window().set_title(&window_flags.window_title);
-        if window_flags.hide_and_center_cursor && window_data.focused {
-            gfx.context.window().hide_cursor(true);
-            let sz = window_data.logical_window_size;
-            gfx.context
-                .window()
-                .set_cursor_position(glutin::dpi::LogicalPosition {
-                    x: sz.width / 2.0,
-                    y: sz.height / 2.0,
-                })
-                .map_err(|why| WindowError::CouldntSetCursorPosition(why))?;
-        } else {
-            gfx.context.window().hide_cursor(false);
-        }
-
-        // Transition if necessary
-        match state_transition {
-            StateTransition::KeepCurrent => (),
-            StateTransition::ReplaceCurrent(new_state) => {
-                state =
-                    new_state(settings, &mut gfx).context("Failed to create next window state")?;
-                continue;
+            LoopDestroyed => {
+                // TODO: cleanup relevant stuff
             }
-            StateTransition::CloseWindow => {
-                return Ok(());
-            }
+            _ => ()
         }
-
-        // Render frame
-        match state
-            .render(settings, &mut gfx, &window_data, &input_state)
-            .context("Failed to `render` the current window state")?
-        {
-            StateTransition::KeepCurrent => (),
-            StateTransition::ReplaceCurrent(new_state) => {
-                state =
-                    new_state(settings, &mut gfx).context("Failed to create next window state")?;
-            }
-            StateTransition::CloseWindow => {
-                return Ok(());
-            }
-        }
-    }
+    });
 }
 
-impl std::fmt::Display for WindowError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            WindowError::ClosedUnexpectedly => write!(f, "The window was closed unexpectedly"),
-            WindowError::CouldntSetCursorPosition(why) => {
-                write!(f, "Couldn't set cursor position: {}", why)
-            }
-        }
-    }
-}
-
-impl std::error::Error for WindowError {}
-
-pub const CLEAR_COLOR: [f32; 4] = [0.2, 0.2, 0.2, 1.0];
+pub const CLEAR_COLOR: wgpu::Color = wgpu::Color { r: 0.2, g: 0.2, b: 0.2, a: 1.0 };
 pub const CLEAR_DEPTH: f32 = 1.0;
+pub const SAMPLE_COUNT: u32 = 4;
 
-/// Store for all rendering-related data
-pub struct Gfx {
-    pub context: glutin::WindowedContext<glutin::PossiblyCurrent>,
-    pub device: gfx_device_gl::Device,
-    pub factory: gfx_device_gl::Factory,
-    pub encoder: gfx::Encoder<gfx_device_gl::Resources, gfx_device_gl::CommandBuffer>,
-    pub color_buffer: gfx_core::handle::RenderTargetView<gfx_device_gl::Resources, ColorFormat>,
-    pub depth_buffer: gfx_core::handle::DepthStencilView<gfx_device_gl::Resources, DepthFormat>,
+#[derive(Debug, Clone, Copy)]
+pub struct WindowBuffers<'a> {
+    pub texture_buffer: &'a wgpu::TextureView,
+    pub multisampled_texture_buffer: &'a wgpu::TextureView,
+    pub depth_buffer: &'a wgpu::TextureView,
 }

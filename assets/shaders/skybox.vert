@@ -1,13 +1,11 @@
-#version 150 core
+#version 450
 
-in vec3 a_Pos;
+layout(location = 0) in vec3 a_Pos;
 
-out float pos_y;
+layout(location = 0) out float pos_y;
 
-uniform Transform {
-    mat4 u_ViewProj;
-    mat4 u_Model;
-};
+layout(set = 0, binding = 0) uniform Temp1 { mat4 u_ViewProj; };
+layout(set = 0, binding = 1) uniform Temp2 { mat4 u_Model; };
 
 
 void main() {

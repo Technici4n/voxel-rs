@@ -1,10 +1,10 @@
-#version 330
+#version 450
 
-in vec3 v_Norm;
-in float occl;
-in vec3 v_Rgb;
+layout(location = 0) in vec3 v_Norm;
+layout(location = 1) in float occl;
+layout(location = 2) in vec3 v_Rgb;
 
-out vec4 ColorBuffer;
+layout(location = 0) out vec4 ColorBuffer;
 
 const vec3 SUN_DIRECTION = normalize(vec3(0, 1, 0.5));
 const float SUN_FRACTION = 0.3;

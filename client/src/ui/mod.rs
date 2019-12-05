@@ -1,16 +1,16 @@
 use self::widgets::{Text, WithStyle};
-use crate::ui::renderer::TextPart;
 use crate::ui::widgets::Button;
 use crate::window::WindowData;
 use anyhow::Result;
-use gfx_glyph::Scale;
-use glutin::dpi::LogicalPosition;
+use wgpu_glyph::Scale;
+use winit::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
 use std::collections::HashMap;
 use voxel_rs_common::debug::DebugInfo;
 
-pub mod renderer;
 pub mod widgets;
+
+// TODO: rewrite ui because it's very badly designed
 
 #[derive(Debug, Clone, Copy)]
 pub enum Message {
@@ -19,7 +19,7 @@ pub enum Message {
 }
 
 pub struct Ui {
-    pub ui: quint::Ui<renderer::PrimitiveBuffer, Message>,
+    pub ui: quint::Ui<PrimitiveBuffer, Message>,
     messages: Vec<Message>,
     show_menu: bool,
     should_exit: bool,
@@ -80,7 +80,7 @@ impl Ui {
     fn draw_debug_info(
         &self,
         debug_info: HashMap<String, HashMap<String, String>>,
-    ) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
+    ) -> WidgetTree<PrimitiveBuffer, Message> {
         let white = [1.0, 1.0, 1.0, 1.0];
         let mut text = debug_info
             .into_iter()
@@ -131,7 +131,7 @@ impl Ui {
         }
     }
 
-    fn draw_menu(&self) -> WidgetTree<renderer::PrimitiveBuffer, Message> {
+    fn draw_menu(&self) -> WidgetTree<PrimitiveBuffer, Message> {
         let menu_button = |text: &'static str, message| {
             wt! {
                 Button {
@@ -167,7 +167,7 @@ impl Ui {
 
     pub fn handle_mouse_state_changes(
         &mut self,
-        changes: Vec<(glutin::MouseButton, glutin::ElementState)>,
+        changes: Vec<(winit::event::MouseButton, winit::event::ElementState)>,
     ) {
         let changes = changes
             .into_iter()
@@ -179,11 +179,11 @@ impl Ui {
         self.messages.extend(self.ui.update(changes));
     }
 
-    pub fn handle_key_state_changes(&mut self, changes: Vec<(u32, glutin::ElementState)>) {
+    pub fn handle_key_state_changes(&mut self, changes: Vec<(u32, winit::event::ElementState)>) {
         for (key, state) in changes.into_iter() {
             // Escape key
             if key == 1 {
-                if let glutin::ElementState::Pressed = state {
+                if let winit::event::ElementState::Pressed = state {
                     self.show_menu = !self.show_menu;
                 }
             }
@@ -208,8 +208,8 @@ impl Ui {
     }
 }
 
-pub fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
-    use glutin::MouseButton::*;
+pub fn quint_mouse_button(button: winit::event::MouseButton) -> quint::MouseButton {
+    use winit::event::MouseButton::*;
     match button {
         Left => quint::MouseButton::Left,
         Right => quint::MouseButton::Right,
@@ -218,9 +218,69 @@ pub fn quint_mouse_button(button: glutin::MouseButton) -> quint::MouseButton {
     }
 }
 
-pub fn quint_element_state(state: glutin::ElementState) -> quint::ButtonState {
+pub fn quint_element_state(state: winit::event::ElementState) -> quint::ButtonState {
     match state {
-        glutin::ElementState::Pressed => quint::ButtonState::Pressed,
-        glutin::ElementState::Released => quint::ButtonState::Released,
+        winit::event::ElementState::Pressed => quint::ButtonState::Pressed,
+        winit::event::ElementState::Released => quint::ButtonState::Released,
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RectanglePrimitive {
+    pub layout: quint::Layout,
+    pub color: [f32; 4],
+    pub z: f32,
+}
+
+#[derive(Debug, Clone)]
+pub struct TextPrimitive {
+    pub layout: quint::Layout,
+    pub parts: Vec<TextPart>,
+    pub z: f32,
+    pub centered: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct TrianglesPrimitive {
+    pub vertices: Vec<[f32; 3]>,
+    pub indices: Vec<u32>,
+    pub color: [f32; 4],
+}
+
+#[derive(Debug, Clone)]
+pub struct TextPart {
+    pub text: String,
+    pub font_size: wgpu_glyph::Scale,
+    pub color: [f32; 4],
+    pub font: Option<String>,
+}
+
+#[derive(Default, Debug)]
+pub struct PrimitiveBuffer {
+    pub rectangle: Vec<RectanglePrimitive>,
+    pub text: Vec<TextPrimitive>,
+    pub triangles: Vec<TrianglesPrimitive>,
+}
+
+impl PrimitiveBuffer {
+    pub fn draw_rectangle(&mut self, color: [f32; 4], layout: quint::Layout, z: f32) {
+        self.rectangle.push(RectanglePrimitive { color, layout, z });
+    }
+
+    pub fn draw_text(&mut self, parts: Vec<TextPart>, layout: quint::Layout, z: f32, centered: bool) {
+        self.text.push(TextPrimitive {
+            layout,
+            parts,
+            z,
+            centered,
+        })
+    }
+
+    pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
+        self.triangles.push(TrianglesPrimitive {
+            vertices,
+            indices,
+            color,
+        });
     }
 }

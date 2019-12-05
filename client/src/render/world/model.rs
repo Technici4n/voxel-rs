@@ -1,7 +1,15 @@
-use crate::world::renderer::VertexRGB;
 use voxel_rs_common::data::vox::VoxelModel;
+use super::RgbVertex;
 
-pub mod model;
+/// Data structure used to draw a pre-loaded model
+/// Contains the position, scale and its id in the model registry
+pub struct Model {
+    pub mesh_id: u32,
+    pub pos_x: f32,
+    pub pos_y: f32,
+    pub pos_z: f32,
+    pub scale: f32,
+}
 
 const D: [[i32; 3]; 6] = [
     [1, 0, 0],
@@ -52,8 +60,8 @@ const D_DELTA2: [[i32; 3]; 6] = [
     [0, 1, 0],
 ];
 
-pub fn mesh_model(model: &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>) {
-    let mut res_vertex: Vec<VertexRGB> = Vec::new();
+pub fn mesh_model(model: &VoxelModel) -> (Vec<RgbVertex>, Vec<u32>) {
+    let mut res_vertex: Vec<RgbVertex> = Vec::new();
     let mut res_index: Vec<usize> = Vec::new();
 
     let size_x = model.size_x;
@@ -252,8 +260,8 @@ pub fn mesh_model(model: &VoxelModel) -> (Vec<VertexRGB>, Vec<u32>) {
                         }
 
                         for kk in 0..4 {
-                            res_vertex.push(VertexRGB {
-                                pos: [px_[kk], py_[kk], pz_[kk]],
+                            res_vertex.push(RgbVertex {
+                                position: [px_[kk], py_[kk], pz_[kk]],
                                 info: v[kk],
                             });
                         }

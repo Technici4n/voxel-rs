@@ -1,6 +1,5 @@
-use super::renderer::PrimitiveBuffer;
-use crate::ui::renderer::TextPart;
 use quint::{Event, Layout, Position, Style, Widget};
+use super::{PrimitiveBuffer, TextPart};
 
 pub struct Text {
     pub text: Vec<TextPart>,

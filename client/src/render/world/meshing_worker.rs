@@ -1,12 +1,13 @@
-use crate::world::meshing::{greedy_meshing, ChunkMeshData};
-use crate::world::renderer::Vertex;
+//! Meshing worker, allowing meshing to be performed in a separate thread
+use super::meshing::{greedy_meshing, ChunkMeshData};
 use std::collections::{HashMap, VecDeque};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::world::chunk::ChunkPos;
+use crate::render::world::ChunkVertex;
 
-pub type ChunkMesh = (ChunkPos, Vec<Vertex>, Vec<u32>);
+pub type ChunkMesh = (ChunkPos, Vec<ChunkVertex>, Vec<u32>);
 
 /// A worker that runs the meshing on one or more other threads.
 pub struct MeshingWorker {

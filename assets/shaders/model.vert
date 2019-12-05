@@ -1,16 +1,14 @@
-#version 330
+#version 450
 
-in vec3 a_Pos;
-in uint a_Info;
+layout(location = 0) in vec3 a_Pos;
+layout(location = 1) in uint a_Info;
 
-uniform Transform {
-    mat4 u_ViewProj;
-    mat4 u_Model;
-};
+layout(set = 0, binding = 0) uniform Temp1 { mat4 u_ViewProj; };
+layout(set = 0, binding = 1) uniform Temp2 { mat4 u_Model; };
 
-out vec3 v_Norm;
-out float occl;
-out vec3 v_Rgb;
+layout(location = 0) out vec3 v_Norm;
+layout(location = 1) out float occl;
+layout(location = 2) out vec3 v_Rgb;
 
 
 vec3 get_normal(uint id) {

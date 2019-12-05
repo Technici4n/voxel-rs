@@ -1,9 +1,9 @@
-#version 330
+#version 450
 
-in vec4 v_Color;
+layout(location = 0) in vec4 i_color;
 
-out vec4 ColorBuffer;
+layout(location = 0) out vec4 o_color;
 
 void main() {
-    ColorBuffer = v_Color;
+    o_color = i_color;
 }

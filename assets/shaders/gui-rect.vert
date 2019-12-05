@@ -1,17 +1,16 @@
-#version 330
+#version 450
 
-in vec3 a_Pos;
-in vec4 a_Color;
-
-uniform Transform {
-    mat4 u_Transform;
-    bool u_Debug;
+layout(set = 0, binding = 0) uniform Transform {
+    mat4 u_transform;
 };
 
-out vec4 v_Color;
+layout(location = 0) in vec3 i_position;
+layout(location = 1) in vec4 i_color;
+
+layout(location = 0) out vec4 o_color;
 
 void main() {
-    gl_Position = u_Transform * vec4(a_Pos, 1.0);
+    gl_Position = u_transform * vec4(i_position, 1.0);
 
-    v_Color = a_Color;
+    o_color = i_color;
 }
