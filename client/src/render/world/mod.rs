@@ -59,7 +59,7 @@ impl WorldRenderer {
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
         let uniform_model = device.create_buffer(&wgpu::BufferDescriptor {
-            size: 12,
+            size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
 
@@ -252,9 +252,9 @@ impl WorldRenderer {
         {
             // Update model buffer
             let src_buffer = device
-                .create_buffer_mapped(3, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&[frustum.position.x as f32, frustum.position.y as f32, frustum.position.z as f32]);
-            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 12);
+                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&[1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, frustum.position.x as f32, frustum.position.y as f32, frustum.position.z as f32, 1.0]);
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.skybox_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
@@ -273,9 +273,9 @@ impl WorldRenderer {
             encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.target_vertex_buffer, 0, 8 * std::mem::size_of::<SkyboxVertex>() as u64);
             // Update model buffer
             let src_buffer = device
-                .create_buffer_mapped(3, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&[target_pos.px as f32, target_pos.py as f32, target_pos.pz as f32]);
-            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 12);
+                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(&[1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, target_pos.px as f32, target_pos.py as f32, target_pos.pz as f32, 1.0]);
+            encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.target_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
@@ -452,7 +452,7 @@ fn create_vpm_bind_group(device: &wgpu::Device, layout: &wgpu::BindGroupLayout, 
                 binding: 1,
                 resource: wgpu::BindingResource::Buffer {
                     buffer: uniform_model,
-                    range: 0..12,
+                    range: 0..64,
                 },
             },
         ],
