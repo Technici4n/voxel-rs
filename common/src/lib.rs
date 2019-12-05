@@ -7,5 +7,6 @@ pub mod network;
 pub mod physics;
 pub mod player;
 pub mod registry;
+pub mod time;
 pub mod world;
 pub mod worldgen;

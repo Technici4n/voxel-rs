@@ -2,7 +2,7 @@ use crate::worldgen::WorldGenerationWorker;
 use anyhow::Result;
 use log::info;
 use nalgebra::Vector3;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use voxel_rs_common::physics::aabb::AABB;
 use voxel_rs_common::physics::player::PhysicsPlayer;
@@ -15,6 +15,7 @@ use voxel_rs_common::{
     },
     physics::simulation::ServerPhysicsSimulation,
     player::RenderDistance,
+    time::AverageTimeCounter,
     world::CompressedLightChunk,
     world::{
         chunk::{ChunkPos, CompressedChunk},
@@ -58,8 +59,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut light_bfs_queue = FastBFSQueue::new();
     let mut ligth_data_reuse = [0; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
     let mut opaque_reuse = [false; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
-    let mut total_light_time = 0;
-    let mut light_count = 0;
+    let mut light_timing = AverageTimeCounter::new();
 
     info!("Server initialized successfully! Starting server loop");
     loop {
@@ -104,18 +104,15 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         let p = pitch.to_radians();
                         let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
                         // TODO: don't hardcode max dist
-                        println!("Received message");
                         if let Some((block, _face)) =
                             physics_player.get_pointed_at(dir, 10.0, &world)
                         {
-                            println!("found block!");
                             let chunk_pos = block.containing_chunk_pos();
                             if world.has_chunk(chunk_pos) {
                                 let mut new_chunk = (*world.get_chunk(chunk_pos).unwrap()).clone();
                                 new_chunk.set_block_at(block.pos_in_containing_chunk(), 0);
                                 world.set_chunk(new_chunk);
 
-                                println!("updated block");
                                 // TODO: remove copy paste
                                 if world.update_highest_opaque_block(chunk_pos) {
                                     // recompute the light of the 3x3 columns
@@ -228,7 +225,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                     ));
                 }
             }
-            -(min_distance as i64)
+            (u, -pos.py, -(min_distance as i64))
         });
 
         let t0 = Instant::now();
@@ -238,12 +235,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 world.update_light(&pos, &mut light_bfs_queue, &mut ligth_data_reuse, &mut opaque_reuse);
                 update_lightning_chunks.remove(&pos);
                 let t2 = Instant::now();
-                total_light_time += (t2 - t1).subsec_micros();
-                light_count += 1;
-                println!(
-                    "Average time to compute light : {} micros",
-                    total_light_time / light_count
-                );
+                light_timing.add_time(t2 - t1);
                 for (_, data) in players.iter_mut() {
                     data.loaded_chunks.remove(&pos);
                 }
@@ -251,6 +243,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 break;
             }
         }
+        send_debug_info("Server", "avglight", format!("Average time to compute light: {} μs", light_timing.average_time_micros()));
 
         // Tick game
         physics_simulation.step_simulation(Instant::now(), &world);

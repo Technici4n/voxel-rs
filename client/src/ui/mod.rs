@@ -5,7 +5,7 @@ use anyhow::Result;
 use wgpu_glyph::Scale;
 use winit::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use voxel_rs_common::debug::DebugInfo;
 
 pub mod widgets;
@@ -79,7 +79,7 @@ impl Ui {
 
     fn draw_debug_info(
         &self,
-        debug_info: HashMap<String, HashMap<String, String>>,
+        debug_info: BTreeMap<String, BTreeMap<String, String>>,
     ) -> WidgetTree<PrimitiveBuffer, Message> {
         let white = [1.0, 1.0, 1.0, 1.0];
         let mut text = debug_info

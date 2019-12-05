@@ -7,6 +7,8 @@ use voxel_rs_common::{
     world::chunk::{Chunk, ChunkPos},
     world::WorldGenerator,
 };
+use voxel_rs_common::time::AverageTimeCounter;
+use std::time::Instant;
 
 /// A worker that runs the world generation on one or more other threads.
 /// Chunks are processed lowest priority first.
@@ -80,6 +82,7 @@ fn launch_worker(
 ) {
     let mut queued_chunks = HashSet::new();
     let mut priorities = BTreeMap::new();
+    let mut worldgen_timing = AverageTimeCounter::new();
     loop {
         send_debug_info(
             "Chunks",
@@ -123,7 +126,11 @@ fn launch_worker(
             while let Some(pos) = positions.pop() {
                 if queued_chunks.remove(&pos) {
                     // Generate the chunk it if it is still queued
+                    let t1 = Instant::now();
                     let chunk = world_generator.generate_chunk(pos, &block_registry);
+                    let t2 = Instant::now();
+                    worldgen_timing.add_time(t2 - t1);
+                    send_debug_info("Chunks", "averagetime", format!("Average time to generate chunks: {} μs", worldgen_timing.average_time_micros()));
                     sender.send(chunk).unwrap();
                     break 'outer;
                 }

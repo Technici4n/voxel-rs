@@ -1,6 +1,6 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 use lazy_static::lazy_static;
-use std::{collections::HashMap, sync::Arc, sync::RwLock};
+use std::{collections::BTreeMap, sync::Arc, sync::RwLock};
 lazy_static! {
     static ref DEBUG_INFO: Arc<RwLock<Option<Sender<DebugInfoUnit>>>> = Arc::new(RwLock::new(None));
 }
@@ -16,7 +16,7 @@ struct DebugInfoUnit {
 /// There can only be one active `DebugInfo` at any time.
 pub struct DebugInfo {
     receiver: Receiver<DebugInfoUnit>,
-    sections: HashMap<String, HashMap<String, String>>,
+    sections: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 impl DebugInfo {
@@ -26,16 +26,16 @@ impl DebugInfo {
         *DEBUG_INFO.write().unwrap() = Some(sender);
         Self {
             receiver,
-            sections: HashMap::new(),
+            sections: BTreeMap::new(),
         }
     }
 
     /// Get the debug info
-    pub fn get_debug_info(&mut self) -> HashMap<String, HashMap<String, String>> {
+    pub fn get_debug_info(&mut self) -> BTreeMap<String, BTreeMap<String, String>> {
         while let Ok(diu) = self.receiver.try_recv() {
             self.sections
                 .entry(diu.section)
-                .or_insert(HashMap::new())
+                .or_insert(BTreeMap::new())
                 .insert(diu.id, diu.message);
         }
         self.sections.clone()

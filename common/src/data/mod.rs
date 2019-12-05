@@ -57,7 +57,6 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     }
 
     let (texture_atlas, texture_rects) = load_textures(textures)?;
-    dbg!(&texture_rects);
 
     //Load model
     let mut models = Registry::default();
@@ -224,7 +223,7 @@ fn load_textures(
         0,
         0,
     );
-    texture_buffer.save("atlas.png");
+    texture_buffer.save("atlas.png").expect("Failed to save texture atlas");
     Ok((
         texture_buffer,
         (0..textures.len())

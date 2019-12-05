@@ -1,5 +1,4 @@
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
 
 use crate::world::BlockPos;
 use crate::worldgen::perlin::rand_pos_int;
@@ -90,13 +89,7 @@ impl DefaultWorldGenerator {
     }
 
     fn pregenerate_chunk(chunk: &mut Chunk, block_registry: &Registry<Block>) {
-        let t1 = Instant::now();
         generate_chunk_topology(chunk, block_registry);
-        let t2 = Instant::now();
-        /*println!(
-            "Time to generate chunk : {} micros",
-            (t2 - t1).subsec_micros()
-        );*/
     }
 
     fn decorate_chunk(chunks: &mut Vec<Chunk>, decorator: &Decorator) {
