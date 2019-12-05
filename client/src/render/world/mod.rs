@@ -97,7 +97,7 @@ impl WorldRenderer {
                     step_mode: wgpu::InputStepMode::Vertex,
                     attributes: &CHUNK_VERTEX_ATTRIBUTES,
                 },
-                false,
+                true,
             )
         };
 
