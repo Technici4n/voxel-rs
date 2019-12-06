@@ -2,11 +2,11 @@ use self::widgets::{Text, WithStyle};
 use crate::ui::widgets::Button;
 use crate::window::WindowData;
 use anyhow::Result;
-use wgpu_glyph::Scale;
-use winit::dpi::LogicalPosition;
 use quint::{wt, Size, Style, WidgetTree};
 use std::collections::BTreeMap;
 use voxel_rs_common::debug::DebugInfo;
+use wgpu_glyph::Scale;
+use winit::dpi::LogicalPosition;
 
 pub mod widgets;
 
@@ -267,7 +267,13 @@ impl PrimitiveBuffer {
         self.rectangle.push(RectanglePrimitive { color, layout, z });
     }
 
-    pub fn draw_text(&mut self, parts: Vec<TextPart>, layout: quint::Layout, z: f32, centered: bool) {
+    pub fn draw_text(
+        &mut self,
+        parts: Vec<TextPart>,
+        layout: quint::Layout,
+        z: f32,
+        centered: bool,
+    ) {
         self.text.push(TextPrimitive {
             layout,
             parts,

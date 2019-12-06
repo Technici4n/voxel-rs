@@ -1,5 +1,5 @@
-use quint::{Event, Layout, Position, Style, Widget};
 use super::{PrimitiveBuffer, TextPart};
+use quint::{Event, Layout, Position, Style, Widget};
 
 pub struct Text {
     pub text: Vec<TextPart>,

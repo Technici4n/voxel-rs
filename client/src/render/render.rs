@@ -3,7 +3,9 @@
 use crate::window::WindowBuffers;
 
 /// Create an attachment for the depth buffer that doesn't clear it.
-pub fn create_default_depth_stencil_attachment(depth_buffer: &wgpu::TextureView) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
+pub fn create_default_depth_stencil_attachment(
+    depth_buffer: &wgpu::TextureView,
+) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
     wgpu::RenderPassDepthStencilAttachmentDescriptor {
         attachment: depth_buffer,
         depth_load_op: wgpu::LoadOp::Load,
@@ -16,7 +18,10 @@ pub fn create_default_depth_stencil_attachment(depth_buffer: &wgpu::TextureView)
 }
 
 /// Create a render pass that renders to the multisampled frame buffer without resolving and without clearing.
-pub fn create_default_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder, buffers: WindowBuffers<'a>) -> wgpu::RenderPass<'a> {
+pub fn create_default_render_pass<'a>(
+    encoder: &'a mut wgpu::CommandEncoder,
+    buffers: WindowBuffers<'a>,
+) -> wgpu::RenderPass<'a> {
     encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
             attachment: buffers.multisampled_texture_buffer,
@@ -25,7 +30,9 @@ pub fn create_default_render_pass<'a>(encoder: &'a mut wgpu::CommandEncoder, buf
             store_op: wgpu::StoreOp::Store,
             clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
         }],
-        depth_stencil_attachment: Some(create_default_depth_stencil_attachment(buffers.depth_buffer)),
+        depth_stencil_attachment: Some(create_default_depth_stencil_attachment(
+            buffers.depth_buffer,
+        )),
     })
 }
 
@@ -43,7 +50,9 @@ pub fn encode_resolve_render_pass<'a>(encoder: &mut wgpu::CommandEncoder, buffer
     });
 }
 
-fn create_clear_color_attachment(buffers: WindowBuffers) -> [wgpu::RenderPassColorAttachmentDescriptor; 1] {
+fn create_clear_color_attachment(
+    buffers: WindowBuffers,
+) -> [wgpu::RenderPassColorAttachmentDescriptor; 1] {
     [wgpu::RenderPassColorAttachmentDescriptor {
         attachment: buffers.multisampled_texture_buffer,
         resolve_target: None,
@@ -53,7 +62,9 @@ fn create_clear_color_attachment(buffers: WindowBuffers) -> [wgpu::RenderPassCol
     }]
 }
 
-fn create_clear_depth_attachment(buffers: WindowBuffers) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
+fn create_clear_depth_attachment(
+    buffers: WindowBuffers,
+) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
     wgpu::RenderPassDepthStencilAttachmentDescriptor {
         attachment: buffers.depth_buffer,
         depth_load_op: wgpu::LoadOp::Clear,

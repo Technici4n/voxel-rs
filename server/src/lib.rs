@@ -4,8 +4,11 @@ use log::info;
 use nalgebra::Vector3;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
+use voxel_rs_common::block::BlockId;
+use voxel_rs_common::light::FastBFSQueue;
 use voxel_rs_common::physics::aabb::AABB;
 use voxel_rs_common::physics::player::PhysicsPlayer;
+use voxel_rs_common::world::chunk::CHUNK_SIZE;
 use voxel_rs_common::{
     data::load_data,
     debug::send_debug_info,
@@ -23,9 +26,6 @@ use voxel_rs_common::{
     },
     worldgen::DefaultWorldGenerator,
 };
-use voxel_rs_common::world::chunk::CHUNK_SIZE;
-use voxel_rs_common::light::FastBFSQueue;
-use voxel_rs_common::block::BlockId;
 
 mod worldgen;
 
@@ -165,7 +165,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                 }
                             }
                         }
-                    },
+                    }
                     ToServer::SelectBlock(player_pos, yaw, pitch) => {
                         // TODO: check player pos and block
                         let physics_player = PhysicsPlayer {
@@ -181,11 +181,13 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         let p = pitch.to_radians();
                         let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
                         // TODO: don't hardcode max dist
-                        if let Some((block, _face)) = physics_player.get_pointed_at(dir, 10.0, &world) {
+                        if let Some((block, _face)) =
+                            physics_player.get_pointed_at(dir, 10.0, &world)
+                        {
                             // TODO: careful with more complicated blocks
                             players.get_mut(&id).unwrap().block_to_place = world.get_block(block);
                         }
-                    },
+                    }
                     ToServer::PlaceBlock(player_pos, yaw, pitch) => {
                         // TODO: check player pos and block
                         let physics_player = PhysicsPlayer {
@@ -202,7 +204,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
                         // TODO: don't hardcode max dist
                         if let Some((mut block, face)) =
-                        physics_player.get_pointed_at(dir, 10.0, &world)
+                            physics_player.get_pointed_at(dir, 10.0, &world)
                         {
                             block.px += D[face][0];
                             block.py += D[face][1];
@@ -210,7 +212,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             let chunk_pos = block.containing_chunk_pos();
                             if world.has_chunk(chunk_pos) {
                                 let mut new_chunk = (*world.get_chunk(chunk_pos).unwrap()).clone();
-                                new_chunk.set_block_at(block.pos_in_containing_chunk(), players.get(&id).unwrap().block_to_place);
+                                new_chunk.set_block_at(
+                                    block.pos_in_containing_chunk(),
+                                    players.get(&id).unwrap().block_to_place,
+                                );
                                 world.set_chunk(new_chunk);
 
                                 // TODO: remove copy paste
@@ -243,7 +248,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                 }
                             }
                         }
-                    },
+                    }
                 },
             }
         }
@@ -284,30 +289,26 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         }
 
         let mut lightning_prob_pass = HashMap::new(); // probable number of re-update of light
-        for c_pos in update_lightning_chunks.iter(){
-
-            for i in -1..=1{
-                for j in -1..=1{
-                    for k in -1..=1{
-                        let pos_adj = c_pos.offset(i,j, k);
-                        if generating_chunks.contains(&pos_adj){
-                            let u = match lightning_prob_pass.remove(&pos_adj){
+        for c_pos in update_lightning_chunks.iter() {
+            for i in -1..=1 {
+                for j in -1..=1 {
+                    for k in -1..=1 {
+                        let pos_adj = c_pos.offset(i, j, k);
+                        if generating_chunks.contains(&pos_adj) {
+                            let u = match lightning_prob_pass.remove(&pos_adj) {
                                 None => 0,
-                                Some(value) => value+1,
+                                Some(value) => value + 1,
                             };
                             lightning_prob_pass.insert(pos_adj, u);
                         }
                     }
                 }
             }
-
         }
-
-
 
         // Update light of one chunk at the time
         update_lightning_chunks_vec.sort_unstable_by_key(|pos| {
-            let u = match lightning_prob_pass.get(&pos){
+            let u = match lightning_prob_pass.get(&pos) {
                 None => 0,
                 Some(i) => *i,
             };
@@ -332,18 +333,30 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         while (Instant::now() - t0).subsec_millis() < 25 {
             if let Some(pos) = update_lightning_chunks_vec.pop() {
                 let t1 = Instant::now();
-                world.update_light(&pos, &mut light_bfs_queue, &mut ligth_data_reuse, &mut opaque_reuse);
+                world.update_light(
+                    &pos,
+                    &mut light_bfs_queue,
+                    &mut ligth_data_reuse,
+                    &mut opaque_reuse,
+                );
                 update_lightning_chunks.remove(&pos);
                 let t2 = Instant::now();
                 light_timing.add_time(t2 - t1);
                 for (_, data) in players.iter_mut() {
                     data.loaded_chunks.remove(&pos);
                 }
-            }else{
+            } else {
                 break;
             }
         }
-        send_debug_info("Server", "avglight", format!("Average time to compute light: {} μs", light_timing.average_time_micros()));
+        send_debug_info(
+            "Server",
+            "avglight",
+            format!(
+                "Average time to compute light: {} μs",
+                light_timing.average_time_micros()
+            ),
+        );
 
         // Tick game
         physics_simulation.step_simulation(Instant::now(), &world);

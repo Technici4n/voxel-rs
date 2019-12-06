@@ -3,13 +3,14 @@ use anyhow::Result;
 use log::info;
 use std::time::Instant;
 use wgpu::Device;
-use winit::window::Window;
-use winit::event::{MouseButton, ElementState};
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
+use winit::event::{ElementState, MouseButton};
 use winit::event_loop::ControlFlow;
+use winit::window::Window;
 
 /// A closure that creates a new instance of `State`.
-pub type StateFactory = Box<dyn FnOnce(&mut Settings, &mut Device) -> Result<(Box<dyn State>, wgpu::CommandBuffer)>>;
+pub type StateFactory =
+    Box<dyn FnOnce(&mut Settings, &mut Device) -> Result<(Box<dyn State>, wgpu::CommandBuffer)>>;
 
 /// A transition from one state to another.
 pub enum StateTransition {
@@ -96,12 +97,11 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     info!("Creating the swap chain");
     let surface = wgpu::Surface::create(&window);
     // Get the Device and the render Queue
-    let adapter = wgpu::Adapter::request(
-        &wgpu::RequestAdapterOptions {
-            power_preference: wgpu::PowerPreference::HighPerformance, // TODO: configure this?
-            backends: wgpu::BackendBit::DX12,
-        },
-    ).expect("Failed to create adapter");
+    let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
+        power_preference: wgpu::PowerPreference::HighPerformance, // TODO: configure this?
+        backends: wgpu::BackendBit::DX12,
+    })
+    .expect("Failed to create adapter");
     // TODO: device should be immutable
     let (mut device, mut queue) = adapter.request_device(&wgpu::DeviceDescriptor {
         extensions: wgpu::Extensions {
@@ -218,7 +218,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     }
                     // weird events
                     TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
-                    ModifiersChanged { .. } | RedrawRequested => () // TODO: handle these
+                    ModifiersChanged { .. } | RedrawRequested => (), // TODO: handle these
                 }
             }
             DeviceEvent { event, .. } => {
@@ -302,8 +302,8 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
                         info!("Transitioning to a new window state...");
-                        let (new_state, cmd) =
-                            new_state(&mut settings, &mut device).expect("Failed to create next window state");
+                        let (new_state, cmd) = new_state(&mut settings, &mut device)
+                            .expect("Failed to create next window state");
                         state = new_state;
                         queue.submit(&[cmd]);
                         return;
@@ -315,20 +315,25 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
 
                 // Render frame
                 let frame = swap_chain.get_next_texture();
-                let (state_transition, commands) =
-                    state
-                    .render(&settings, WindowBuffers {
-                        texture_buffer: &frame.view,
-                        multisampled_texture_buffer: &msaa_texture_view,
-                        depth_buffer: &depth_texture_view,
-                    }, &mut device, &window_data, &input_state)
+                let (state_transition, commands) = state
+                    .render(
+                        &settings,
+                        WindowBuffers {
+                            texture_buffer: &frame.view,
+                            multisampled_texture_buffer: &msaa_texture_view,
+                            depth_buffer: &depth_texture_view,
+                        },
+                        &mut device,
+                        &window_data,
+                        &input_state,
+                    )
                     .expect("Failed to `render` the current window state");
                 queue.submit(&[commands]);
                 match state_transition {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
-                        let (new_state, cmd) =
-                            new_state(&mut settings, &mut device).expect("Failed to create next window state");
+                        let (new_state, cmd) = new_state(&mut settings, &mut device)
+                            .expect("Failed to create next window state");
                         state = new_state;
                         queue.submit(&[cmd]);
                     }
@@ -340,12 +345,17 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
             LoopDestroyed => {
                 // TODO: cleanup relevant stuff
             }
-            _ => ()
+            _ => (),
         }
     });
 }
 
-pub const CLEAR_COLOR: wgpu::Color = wgpu::Color { r: 0.2, g: 0.2, b: 0.2, a: 1.0 };
+pub const CLEAR_COLOR: wgpu::Color = wgpu::Color {
+    r: 0.2,
+    g: 0.2,
+    b: 0.2,
+    a: 1.0,
+};
 pub const CLEAR_DEPTH: f32 = 1.0;
 pub const SAMPLE_COUNT: u32 = 4;
 

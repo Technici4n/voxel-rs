@@ -1,7 +1,7 @@
-use winit::event::{ElementState, KeyboardInput, ModifiersState, MouseButton};
 use std::collections::HashMap;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::player::PlayerInput;
+use winit::event::{ElementState, KeyboardInput, ModifiersState, MouseButton};
 
 /// A helper struct to keep track of the yaw and pitch of a player
 #[derive(Debug, Clone, Copy)]

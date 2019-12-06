@@ -40,8 +40,6 @@ impl BlockToPlace {
 }
 
 impl DefaultWorldGenerator {
-
-
     pub fn new(block_registry: &Registry<Block>) -> Self {
         let grass_block = block_registry.get_id_by_name(&"grass".to_owned()).unwrap() as u16;
         let leaves_block = block_registry.get_id_by_name(&"leaves".to_owned()).unwrap() as u16;
@@ -83,7 +81,7 @@ impl DefaultWorldGenerator {
         };
         Self {
             tree_decorator,
-            pregenerated_chunks_decorator_count : HashMap::new(),
+            pregenerated_chunks_decorator_count: HashMap::new(),
             pregenerated_chunks: HashMap::new(),
         }
     }
@@ -269,7 +267,6 @@ impl WorldGenerator for DefaultWorldGenerator {
         DefaultWorldGenerator::decorate_chunk(&mut chunks_vec, decorator);
 
         let chunk_res = std::mem::replace(&mut chunks_vec[13], chunk_center);
-
 
         for chunk in chunks_vec.drain(..) {
             let pos = chunk.pos.clone();

@@ -1,5 +1,5 @@
-use std::time::{Duration, Instant};
 use std::collections::VecDeque;
+use std::time::{Duration, Instant};
 
 /// Helper struct to calculate the average time of an operation
 pub struct AverageTimeCounter {
@@ -23,7 +23,7 @@ impl AverageTimeCounter {
                 self.times.pop_front();
                 self.total_micros -= duration.as_micros();
             } else {
-                break
+                break;
             }
         }
     }

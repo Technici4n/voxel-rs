@@ -1,14 +1,14 @@
 use std::collections::{BTreeMap, HashSet};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Instant;
 use voxel_rs_common::debug::send_debug_info;
+use voxel_rs_common::time::AverageTimeCounter;
 use voxel_rs_common::{
     block::Block,
     registry::Registry,
     world::chunk::{Chunk, ChunkPos},
     world::WorldGenerator,
 };
-use voxel_rs_common::time::AverageTimeCounter;
-use std::time::Instant;
 
 /// A worker that runs the world generation on one or more other threads.
 /// Chunks are processed lowest priority first.
@@ -130,7 +130,14 @@ fn launch_worker(
                     let chunk = world_generator.generate_chunk(pos, &block_registry);
                     let t2 = Instant::now();
                     worldgen_timing.add_time(t2 - t1);
-                    send_debug_info("Chunks", "averagetime", format!("Average time to generate chunks: {} μs", worldgen_timing.average_time_micros()));
+                    send_debug_info(
+                        "Chunks",
+                        "averagetime",
+                        format!(
+                            "Average time to generate chunks: {} μs",
+                            worldgen_timing.average_time_micros()
+                        ),
+                    );
                     sender.send(chunk).unwrap();
                     break 'outer;
                 }

@@ -77,7 +77,9 @@ pub fn compute_light(
                                             + (*cz * csize + k as usize);
                                         *opaque.get_unchecked_mut(s) = false;
                                         if (y0 + *cy as i64 - 1) * CHUNK_SIZE as i64 + j as i64
-                                            > *highest_opaque_block.y.get_unchecked((i * CHUNK_SIZE + k) as usize)
+                                            > *highest_opaque_block
+                                                .y
+                                                .get_unchecked((i * CHUNK_SIZE + k) as usize)
                                         {
                                             *light_data.get_unchecked_mut(s) = 15;
                                             queue.push((
@@ -106,7 +108,9 @@ pub fn compute_light(
                                         } else {
                                             *opaque.get_unchecked_mut(s) = false;
                                             if c.pos.py * CHUNK_SIZE as i64 + j as i64
-                                                > *highest_opaque_block.y.get_unchecked((i * CHUNK_SIZE + k) as usize)
+                                                > *highest_opaque_block
+                                                    .y
+                                                    .get_unchecked((i * CHUNK_SIZE + k) as usize)
                                             {
                                                 *light_data.get_unchecked_mut(s) = 15;
                                                 queue.push((
@@ -137,12 +141,12 @@ pub fn compute_light(
         const DY: [isize; 6] = [0, 0, 1, -1, 0, 0];
         const DZ: [isize; 6] = [0, 0, 0, 0, 1, -1];
 
-
         while !queue.is_empty() && transparent_count > 0 {
             let (x, y, z, ll) = *queue.pop();
             for i in 0..6 {
                 let (nx, ny, nz) = (x as isize + DX[i], y as isize + DY[i], z as isize + DZ[i]);
-                let s = (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
+                let s =
+                    (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
                 if MIN_VAL <= nx
                     && nx < MAX_VAL
                     && MIN_VAL <= ny
@@ -160,7 +164,11 @@ pub fn compute_light(
                         if nx as usize / csize == 1
                             && ny as usize / csize == 1
                             && nz as usize / csize == 1
-                            && !*opaque.get_unchecked(nx as usize * csize * csize * 9 + ny as usize * csize * 3 + nz as usize)
+                            && !*opaque.get_unchecked(
+                                nx as usize * csize * csize * 9
+                                    + ny as usize * csize * 3
+                                    + nz as usize,
+                            )
                         {
                             transparent_count -= 1;
                         }
@@ -172,12 +180,13 @@ pub fn compute_light(
         for i in 0..csize {
             for j in 0..csize {
                 for k in 0..csize {
-                    res.light_level[i * csize * csize + j * csize + k] = *light_data.get_unchecked((i + csize) * csize * csize * 9 + (j + csize) * 3 * csize + (k + csize));
+                    res.light_level[i * csize * csize + j * csize + k] = *light_data.get_unchecked(
+                        (i + csize) * csize * csize * 9 + (j + csize) * 3 * csize + (k + csize),
+                    );
                 }
             }
         }
     }
-
 
     return res;
 }
@@ -188,7 +197,6 @@ pub struct FastBFSQueue {
     data: Vec<(usize, usize, usize, u8)>,
     pop_index: usize,
     push_index: usize,
-
 }
 
 impl FastBFSQueue {
@@ -212,7 +220,8 @@ impl FastBFSQueue {
     #[inline(always)]
     pub unsafe fn pop(&mut self) -> &(usize, usize, usize, u8) {
         let res = self.data.get_unchecked(self.pop_index);
-        self.pop_index = (self.pop_index + 1) % (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize;
+        self.pop_index =
+            (self.pop_index + 1) % (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize;
         //assert_ne!(self.pop_index, self.push_index);
         return res;
     }
@@ -220,7 +229,8 @@ impl FastBFSQueue {
     #[inline(always)]
     pub unsafe fn push(&mut self, to_push: (usize, usize, usize, u8)) {
         *self.data.get_unchecked_mut(self.push_index) = to_push;
-        self.push_index = (self.push_index + 1) % (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize;
+        self.push_index =
+            (self.push_index + 1) % (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize;
         //assert_ne!(self.pop_index, self.push_index);
     }
 

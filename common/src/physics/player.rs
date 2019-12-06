@@ -88,7 +88,10 @@ impl PhysicsPlayer {
 impl Default for PhysicsPlayer {
     fn default() -> Self {
         Self {
-            aabb: AABB::new(Vector3::new(1.46, 52.6, 1.85), (PLAYER_SIDE, PLAYER_HEIGHT, PLAYER_SIDE)),
+            aabb: AABB::new(
+                Vector3::new(1.46, 52.6, 1.85),
+                (PLAYER_SIDE, PLAYER_HEIGHT, PLAYER_SIDE),
+            ),
             velocity: Vector3::zeros(),
         }
     }

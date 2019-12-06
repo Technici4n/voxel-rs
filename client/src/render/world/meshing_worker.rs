@@ -1,13 +1,13 @@
 //! Meshing worker, allowing meshing to be performed in a separate thread
 use super::meshing::{greedy_meshing, ChunkMeshData};
-use std::collections::{HashMap, BTreeMap};
+use crate::render::world::ChunkVertex;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::Instant;
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::time::AverageTimeCounter;
 use voxel_rs_common::world::chunk::ChunkPos;
-use crate::render::world::ChunkVertex;
-use std::time::Instant;
 
 pub type ChunkMesh = (ChunkPos, Vec<ChunkVertex>, Vec<u32>);
 
@@ -47,7 +47,9 @@ impl MeshingWorker {
 
     /// Update a chunk's priority
     pub fn update_chunk_priority(&mut self, pos: ChunkPos, priority: u64) {
-        self.sender.send(ToOtherThread::SetPriority(pos, priority)).unwrap();
+        self.sender
+            .send(ToOtherThread::SetPriority(pos, priority))
+            .unwrap();
     }
 
     /// Dequeue a chunk from processing if it's still in the queue.
@@ -98,7 +100,10 @@ fn launch_worker(
                 ToOtherThread::Enqueue(data) => {
                     let pos = data.chunk.pos;
                     queued_chunks.insert(pos, data);
-                    priorities.entry(u64::max_value()).or_insert_with(Vec::new).push(pos);
+                    priorities
+                        .entry(u64::max_value())
+                        .or_insert_with(Vec::new)
+                        .push(pos);
                 }
                 ToOtherThread::SetPriority(pos, priority) => {
                     if queued_chunks.contains_key(&pos) {
@@ -122,7 +127,14 @@ fn launch_worker(
                     let (vertices, indices, _, _) = greedy_meshing(data, &block_meshes, &mut quads);
                     let t2 = Instant::now();
                     meshing_timing.add_time(t2 - t1);
-                    send_debug_info("Chunks", "averagetime_meshing", format!("Average time to mesh chunks: {} μs", meshing_timing.average_time_micros()));
+                    send_debug_info(
+                        "Chunks",
+                        "averagetime_meshing",
+                        format!(
+                            "Average time to mesh chunks: {} μs",
+                            meshing_timing.average_time_micros()
+                        ),
+                    );
 
                     sender.send((chunk_pos, vertices, indices)).unwrap();
                     break 'outer;

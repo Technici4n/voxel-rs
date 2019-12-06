@@ -1,11 +1,11 @@
 //! Ui rendering
 
-use std::collections::{HashMap, BTreeMap};
-use wgpu_glyph::FontId;
 use super::buffers::DynamicBuffer;
+use super::init::ShaderStage;
 use crate::ui::PrimitiveBuffer;
 use crate::window::{WindowBuffers, WindowData};
-use super::init::ShaderStage;
+use std::collections::{BTreeMap, HashMap};
+use wgpu_glyph::FontId;
 
 pub struct UiRenderer {
     // Glyph rendering
@@ -41,40 +41,36 @@ impl<'a> UiRenderer {
             fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
         }
         log::info!("Fonts successfully loaded");
-        let glyph_brush =
-            glyph_brush_builder
-                //.depth_stencil_state(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR)
-                .build(device, crate::window::COLOR_FORMAT);
+        let glyph_brush = glyph_brush_builder
+            //.depth_stencil_state(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR)
+            .build(device, crate::window::COLOR_FORMAT);
 
         // Create uniform buffer
-        let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor { size: 64, usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST) });
+        let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            size: 64,
+            usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
+        });
 
         // Create bind group layout
-        let uniform_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                bindings: &[
-                    wgpu::BindGroupLayoutBinding {
-                        binding: 0,
-                        visibility: wgpu::ShaderStage::VERTEX,
-                        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-                    },
-                ],
-            });
+        let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            bindings: &[wgpu::BindGroupLayoutBinding {
+                binding: 0,
+                visibility: wgpu::ShaderStage::VERTEX,
+                ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+            }],
+        });
 
         // Create bind group
-        let uniforms_bind_group =
-            device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &uniform_layout,
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &transform_buffer,
-                            range: 0..16,
-                        },
-                    },
-                ],
-            });
+        let uniforms_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_layout,
+            bindings: &[wgpu::Binding {
+                binding: 0,
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: &transform_buffer,
+                    range: 0..16,
+                },
+            }],
+        });
 
         // Create shader modules
         let vertex_shader =
@@ -123,14 +119,15 @@ impl<'a> UiRenderer {
         let mut rect_vertices: Vec<UiVertex> = Vec::new();
         let mut rect_indices: Vec<u32> = Vec::new();
 
-        use crate::ui::{RectanglePrimitive, TrianglesPrimitive, TextPrimitive};
+        use crate::ui::{RectanglePrimitive, TextPrimitive, TrianglesPrimitive};
 
         // Rectangles
         for RectanglePrimitive {
             layout: l,
             color,
             z,
-        } in primitive_buffer.rectangle.into_iter() {
+        } in primitive_buffer.rectangle.into_iter()
+        {
             let a = UiVertex {
                 position: [l.x, l.y, z],
                 color: color.clone(),
@@ -159,9 +156,14 @@ impl<'a> UiRenderer {
             vertices,
             indices,
             color,
-        } in primitive_buffer.triangles.into_iter() {
+        } in primitive_buffer.triangles.into_iter()
+        {
             let index_offset = rect_vertices.len() as u32;
-            rect_vertices.extend(vertices.into_iter().map(|v| UiVertex { position: v, color }));
+            rect_vertices.extend(
+                vertices
+                    .into_iter()
+                    .map(|v| UiVertex { position: v, color }),
+            );
             rect_indices.extend(indices.into_iter().map(|id| id + index_offset));
         }
         // Text
@@ -170,7 +172,8 @@ impl<'a> UiRenderer {
             mut parts,
             z,
             centered,
-        } in primitive_buffer.text.into_iter() {
+        } in primitive_buffer.text.into_iter()
+        {
             let dpi = data.hidpi_factor as f32;
 
             for p in parts.iter_mut() {
@@ -272,10 +275,22 @@ impl<'a> UiRenderer {
             );
             // Update the uniform buffer to map (w, h) coordinates to [-1, 1]
             let transformation_matrix = [
-                2.0 / win_w as f32, 0.0, 0.0, 0.0,
-                0.0, 2.0 / win_h as f32, 0.0, 0.0,
-                0.0, 0.0, 0.5, 0.0,
-                -1.0, -1.0, 0.5, 1.0,
+                2.0 / win_w as f32,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                2.0 / win_h as f32,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.5,
+                0.0,
+                -1.0,
+                -1.0,
+                0.5,
+                1.0,
             ];
             let src_buffer = device
                 .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
@@ -287,10 +302,7 @@ impl<'a> UiRenderer {
             self.index_buffer.upload(device, encoder, &rect_indices);
             // Draw
             {
-                let mut rpass = super::render::create_default_render_pass(
-                    encoder,
-                    buffers,
-                );
+                let mut rpass = super::render::create_default_render_pass(encoder, buffers);
                 rpass.set_pipeline(&self.pipeline);
                 rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
                 rpass.set_vertex_buffers(0, &[(&self.vertex_buffer.get_buffer(), 0)]);

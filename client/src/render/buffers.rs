@@ -1,7 +1,7 @@
 //! Wrappers around the `wgpu::Buffer` struct.
 
-use std::hash::Hash;
 use std::collections::HashMap;
+use std::hash::Hash;
 
 /// A buffer that will automatically resize itself when necessary
 pub struct DynamicBuffer<T: Copy> {
@@ -14,7 +14,11 @@ pub struct DynamicBuffer<T: Copy> {
 
 impl<T: Copy + 'static> DynamicBuffer<T> {
     /// Create a new `DynamicBuffer` with enough capacity for `initial_capacity` elements of type `T`
-    pub fn with_capacity(device: &wgpu::Device, initial_capacity: usize, mut usage: wgpu::BufferUsage) -> Self {
+    pub fn with_capacity(
+        device: &wgpu::Device,
+        initial_capacity: usize,
+        mut usage: wgpu::BufferUsage,
+    ) -> Self {
         usage |= wgpu::BufferUsage::COPY_DST;
         Self {
             buffer: device.create_buffer(&wgpu::BufferDescriptor {
@@ -29,7 +33,12 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
     }
 
     /// Update the data of the buffer, resizing if needed
-    pub fn upload(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, data: &[T]) {
+    pub fn upload(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        data: &[T],
+    ) {
         if data.is_empty() {
             self.len = 0;
             return;
@@ -78,15 +87,25 @@ pub struct MultiBuffer<K: Hash + Eq + Clone, T: Copy + 'static> {
     phantom: std::marker::PhantomData<T>,
 }
 
-impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static> MultiBuffer<K, T> {
+impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static>
+    MultiBuffer<K, T>
+{
     /// Create a new `MultiBuffer` with enough capacity for `initial_capacity` elements of type `T`
-    pub fn with_capacity(device: &wgpu::Device, initial_capacity: usize, mut usage: wgpu::BufferUsage) -> Self {
+    pub fn with_capacity(
+        device: &wgpu::Device,
+        initial_capacity: usize,
+        mut usage: wgpu::BufferUsage,
+    ) -> Self {
         usage |= wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::COPY_SRC;
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             size: (initial_capacity * std::mem::size_of::<T>()) as u64,
             usage,
         });
-        let segments = vec![MultiBufferSegment { free: true, pos: 0, len: initial_capacity }];
+        let segments = vec![MultiBufferSegment {
+            free: true,
+            pos: 0,
+            len: initial_capacity,
+        }];
 
         Self {
             buffer,
@@ -101,7 +120,11 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
     /// Remove object `object` from the buffer
     pub fn remove(&mut self, object: &K) {
         if let Some(start_position) = self.objects.remove(object) {
-            let mut segment_position = self.segments.iter_mut().position(|seg| seg.pos == start_position).expect("logic error!");
+            let mut segment_position = self
+                .segments
+                .iter_mut()
+                .position(|seg| seg.pos == start_position)
+                .expect("logic error!");
             assert_eq!(false, self.segments[segment_position].free, "logic error!");
             self.segments[segment_position].free = true;
             // Merge with the segment before if possible
@@ -127,22 +150,30 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
     /// # Panics
     /// Will panic if `data` is empty.
     // TODO: handle memory fragmentation
-    pub fn update(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, object: K, data: &[T]) {
+    pub fn update(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        object: K,
+        data: &[T],
+    ) {
         assert!(data.len() > 0, "cannot add an empty slice to a MultiBuffer");
         // Remove the object if it's already in the buffer
         self.remove(&object);
         // Try to find the position to insert
-        let insert_position = self.segments.iter_mut().position(|seg| seg.len >= data.len() && seg.free);
+        let insert_position = self
+            .segments
+            .iter_mut()
+            .position(|seg| seg.len >= data.len() && seg.free);
         let insert_position = insert_position.unwrap_or_else(|| {
             // Reallocate at least twice the size
             self.reallocate(device, encoder, (self.len + data.len()).max(2 * self.len));
             self.segments.len() - 1
         });
         // Copy data into the buffer
-        let src_buffer =
-            device
-                .create_buffer_mapped(data.len(), wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(data);
+        let src_buffer = device
+            .create_buffer_mapped(data.len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(data);
         encoder.copy_buffer_to_buffer(
             &src_buffer,
             0,
@@ -156,22 +187,32 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         let extra_length = self.segments[insert_position].len - data.len();
         if extra_length > 0 {
             self.segments[insert_position].len -= extra_length;
-            if insert_position < self.segments.len() - 1 && self.segments[insert_position+1].free {
-                self.segments[insert_position+1].pos -= extra_length;
-                self.segments[insert_position+1].len += extra_length;
+            if insert_position < self.segments.len() - 1 && self.segments[insert_position + 1].free
+            {
+                self.segments[insert_position + 1].pos -= extra_length;
+                self.segments[insert_position + 1].len += extra_length;
             } else {
-                self.segments.insert(insert_position + 1, MultiBufferSegment {
-                    free: true,
-                    pos: self.segments[insert_position].pos + data.len(),
-                    len: extra_length,
-                });
+                self.segments.insert(
+                    insert_position + 1,
+                    MultiBufferSegment {
+                        free: true,
+                        pos: self.segments[insert_position].pos + data.len(),
+                        len: extra_length,
+                    },
+                );
             }
         }
         // Update the map
-        self.objects.insert(object.clone(), self.segments[insert_position].pos);
+        self.objects
+            .insert(object.clone(), self.segments[insert_position].pos);
     }
 
-    fn reallocate(&mut self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, new_len: usize) {
+    fn reallocate(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        new_len: usize,
+    ) {
         log::debug!(
             "Reallocating MultiBuffer<{}, {}> from length {} to length {}",
             std::any::type_name::<K>(),
@@ -184,7 +225,13 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
             size: (new_len * std::mem::size_of::<T>()) as u64,
             usage: self.usage,
         });
-        encoder.copy_buffer_to_buffer(&self.buffer, 0, &new_buffer, 0, (self.len * std::mem::size_of::<T>()) as u64);
+        encoder.copy_buffer_to_buffer(
+            &self.buffer,
+            0,
+            &new_buffer,
+            0,
+            (self.len * std::mem::size_of::<T>()) as u64,
+        );
         self.buffer = new_buffer;
         // Update segments and len
         let last_segment = self.segments.last_mut().expect("logic error!");
@@ -202,13 +249,25 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
 
     fn _assert_invariants(&self) {
         assert_eq!(self.segments.first().unwrap().pos, 0);
-        assert_eq!(self.segments.last().unwrap().pos + self.segments.last().unwrap().len, self.len);
-        for i in 0..(self.segments.len()-1) {
-            assert_eq!(self.segments[i].pos + self.segments[i].len, self.segments[i+1].pos);
-            assert!(!(self.segments[i].free && self.segments[i+1].free));
+        assert_eq!(
+            self.segments.last().unwrap().pos + self.segments.last().unwrap().len,
+            self.len
+        );
+        for i in 0..(self.segments.len() - 1) {
+            assert_eq!(
+                self.segments[i].pos + self.segments[i].len,
+                self.segments[i + 1].pos
+            );
+            assert!(!(self.segments[i].free && self.segments[i + 1].free));
         }
         for v in self.objects.values() {
-            let segment_position = self.segments.iter().enumerate().find(|(_, seg)| seg.pos == *v).expect("logic error!").0;
+            let segment_position = self
+                .segments
+                .iter()
+                .enumerate()
+                .find(|(_, seg)| seg.pos == *v)
+                .expect("logic error!")
+                .0;
             assert_eq!(false, self.segments[segment_position].free, "logic error!");
         }
         for s in self.segments.iter() {
@@ -229,7 +288,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
             Some(pos) => {
                 for seg in self.segments.iter() {
                     if *pos == seg.pos {
-                        return Some((seg.pos, seg.len))
+                        return Some((seg.pos, seg.len));
                     }
                 }
                 None
@@ -267,7 +326,8 @@ mod tests {
         let adapter = Adapter::request(&RequestAdapterOptions {
             power_preference: PowerPreference::HighPerformance,
             backends: BackendBit::PRIMARY,
-        }).unwrap();
+        })
+        .unwrap();
         let (device, mut queue) = adapter.request_device(&DeviceDescriptor {
             extensions: Extensions {
                 anisotropic_filtering: false,
@@ -307,7 +367,5 @@ mod tests {
         // Reallocate
         multi_buffer.update(&device, &mut encoder, 3u16, &seg2);
         assert_eq!(multi_buffer.get_pos_len(&3), Some((8, 4)));
-
-
     }
 }

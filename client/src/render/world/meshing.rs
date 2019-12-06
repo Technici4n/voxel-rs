@@ -75,7 +75,7 @@ impl ChunkMeshData {
         for i in 0..3 {
             for j in 0..3 {
                 for k in 0..3 {
-                    let np = pos.offset(i-1, j-1, k-1);
+                    let np = pos.offset(i - 1, j - 1, k - 1);
                     let idx = (i * 9 + j * 3 + k) as usize;
                     all_chunks[idx] = world.get_chunk(np);
                     all_light_chunks[idx] = world.get_light_chunk(np);

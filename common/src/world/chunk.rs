@@ -172,25 +172,30 @@ impl Chunk {
 
     #[inline(always)]
     pub unsafe fn get_block_at_unsafe(&self, (px, py, pz): (u32, u32, u32)) -> BlockId {
-        *self.data.get_unchecked((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize)
+        *self
+            .data
+            .get_unchecked((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize)
     }
 
     /// Set block at some position
     #[inline(always)]
     pub unsafe fn set_block_at_unsafe(&mut self, (px, py, pz): (u32, u32, u32), block: BlockId) {
-        *self.data.get_unchecked_mut((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize) = block;
+        *self
+            .data
+            .get_unchecked_mut((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize) =
+            block;
     }
 
     #[inline(always)]
     pub unsafe fn fill_unsafe(&mut self, block: BlockId) {
-        for i in 0..(CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize {
+        for i in 0..(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize {
             *self.data.get_unchecked_mut(i) = block;
         }
     }
 
     #[inline(always)]
     pub fn fill(&mut self, block: BlockId) {
-        for i in 0..(CHUNK_SIZE*CHUNK_SIZE*CHUNK_SIZE) as usize {
+        for i in 0..(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize {
             self.data[i] = block;
         }
     }

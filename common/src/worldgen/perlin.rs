@@ -254,7 +254,19 @@ pub fn value_noise2d(
     }
 }
 
-pub fn perlin2d_with_displacement(dx: &Vec<f32>, dy: &Vec<f32>, d: f32, x: f32, y: f32, size: usize, scale_x: f32, scale_y: f32, octave: i32, persistance: f32, seed: i32) -> Vec<f32> {
+pub fn perlin2d_with_displacement(
+    dx: &Vec<f32>,
+    dy: &Vec<f32>,
+    d: f32,
+    x: f32,
+    y: f32,
+    size: usize,
+    scale_x: f32,
+    scale_y: f32,
+    octave: i32,
+    persistance: f32,
+    seed: i32,
+) -> Vec<f32> {
     let mut res = vec![0.0; size * size];
 
     for j in 0..(size * size) {
@@ -264,34 +276,33 @@ pub fn perlin2d_with_displacement(dx: &Vec<f32>, dy: &Vec<f32>, d: f32, x: f32, 
         let mut tot_p = 0.0;
 
         for i in 0..octave {
-            let px = (x + (j / size) as f32 + (dx[j] - 0.5)*d) * sx;
-            let py = (y + (j % size) as f32 + (dy[j] - 0.5)*d) * sy;
+            let px = (x + (j / size) as f32 + (dx[j] - 0.5) * d) * sx;
+            let py = (y + (j % size) as f32 + (dy[j] - 0.5) * d) * sy;
 
             let ax = px.floor();
             let ay = py.floor();
 
-            let fx = smoothstep(px-ax);
-            let fy = smoothstep(py-ay);
+            let fx = smoothstep(px - ax);
+            let fy = smoothstep(py - ay);
 
             let ix = ax as i32;
             let iy = ay as i32;
-            let v_a_a = rand_pos(ix, iy, 0, seed+i);
-            let v_a_b = rand_pos(ix, iy+1, 0, seed+i);
-            let v_b_a = rand_pos(ix+1, iy, 0, seed+i);
-            let v_b_b = rand_pos(ix+1, iy+1, 0, seed+i);
+            let v_a_a = rand_pos(ix, iy, 0, seed + i);
+            let v_a_b = rand_pos(ix, iy + 1, 0, seed + i);
+            let v_b_a = rand_pos(ix + 1, iy, 0, seed + i);
+            let v_b_b = rand_pos(ix + 1, iy + 1, 0, seed + i);
 
-            let v_a = v_a_a + (v_a_b - v_a_a)*fy;
-            let v_b = v_b_a + (v_b_b - v_b_a)*fy;
-            let v = v_a + (v_b- v_a)*fx;
-            res[j] += p*v;
-            sx*=2.0;
-            sy*=2.0;
+            let v_a = v_a_a + (v_a_b - v_a_a) * fy;
+            let v_b = v_b_a + (v_b_b - v_b_a) * fy;
+            let v = v_a + (v_b - v_a) * fx;
+            res[j] += p * v;
+            sx *= 2.0;
+            sy *= 2.0;
             tot_p += p;
             p *= persistance;
         }
         res[j] /= tot_p;
     }
-
 
     return res;
 }

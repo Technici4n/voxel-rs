@@ -12,6 +12,8 @@ use voxel_rs_common::{
 use crate::input::YawPitch;
 //use crate::model::model::Model;
 //use crate::world::meshing::ChunkMeshData;
+use crate::render::{Frustum, UiRenderer, WorldRenderer};
+use crate::window::WindowBuffers;
 use crate::{
     fps::FpsCounter,
     input::InputState,
@@ -19,7 +21,6 @@ use crate::{
     ui::Ui,
     window::{State, StateTransition, WindowData, WindowFlags},
 };
-use winit::event::{ElementState, MouseButton};
 use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
@@ -27,8 +28,7 @@ use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
-use crate::window::WindowBuffers;
-use crate::render::{WorldRenderer, UiRenderer, Frustum};
+use winit::event::{ElementState, MouseButton};
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
@@ -93,7 +93,8 @@ impl SinglePlayer {
         // Create the renderers
         let ui_renderer = UiRenderer::new(device);
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let mut encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         let world_renderer = WorldRenderer::new(
             device,
@@ -103,28 +104,31 @@ impl SinglePlayer {
             &data.models,
         );
 
-        Ok((Box::new(Self {
-            fps_counter: FpsCounter::new(),
-            ui: Ui::new(),
-            ui_renderer,
-            world: World::new(),
-            world_renderer,
-            block_registry: data.blocks,
-            model_registry: data.models,
-            client,
-            render_distance,
-            physics_simulation: ClientPhysicsSimulation::new(
-                ServerState {
-                    physics_state: PhysicsState::default(),
-                    server_time: Instant::now(),
-                    input: Default::default(),
-                },
-                player_id,
-            ),
-            yaw_pitch: Default::default(),
-            debug_info: DebugInfo::new_current(),
-            chunks_to_mesh: Default::default(),
-        }), encoder.finish()))
+        Ok((
+            Box::new(Self {
+                fps_counter: FpsCounter::new(),
+                ui: Ui::new(),
+                ui_renderer,
+                world: World::new(),
+                world_renderer,
+                block_registry: data.blocks,
+                model_registry: data.models,
+                client,
+                render_distance,
+                physics_simulation: ClientPhysicsSimulation::new(
+                    ServerState {
+                        physics_state: PhysicsState::default(),
+                        server_time: Instant::now(),
+                        input: Default::default(),
+                    },
+                    player_id,
+                ),
+                yaw_pitch: Default::default(),
+                debug_info: DebugInfo::new_current(),
+                chunks_to_mesh: Default::default(),
+            }),
+            encoder.finish(),
+        ))
     }
 }
 
@@ -212,7 +216,10 @@ impl State for SinglePlayer {
         } = world;
         chunks.retain(|chunk_pos, _| {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
-                world_renderer.update_chunk_priority(*chunk_pos, chunk_pos.squared_euclidian_distance(player_chunk));
+                world_renderer.update_chunk_priority(
+                    *chunk_pos,
+                    chunk_pos.squared_euclidian_distance(player_chunk),
+                );
                 true
             } else {
                 world_renderer.remove_chunk(*chunk_pos);
@@ -235,8 +242,7 @@ impl State for SinglePlayer {
             self.chunks_to_mesh.remove(&chunk_pos);
             if self.world.has_chunk(chunk_pos) {
                 assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.world_renderer
-                    .update_chunk(&self.world, chunk_pos);
+                self.world_renderer.update_chunk(&self.world, chunk_pos);
             }
         }
 
@@ -299,7 +305,8 @@ impl State for SinglePlayer {
         }
 
         // Begin rendering
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+        let mut encoder =
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
 
         crate::render::clear_color_and_depth(&mut encoder, buffers);
 
@@ -331,8 +338,14 @@ impl State for SinglePlayer {
 
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
-        self.ui_renderer
-            .render(buffers, device, &mut encoder, &data, &self.ui.ui, self.ui.should_capture_mouse());
+        self.ui_renderer.render(
+            buffers,
+            device,
+            &mut encoder,
+            &data,
+            &self.ui.ui,
+            self.ui.should_capture_mouse(),
+        );
 
         Ok((StateTransition::KeepCurrent, encoder.finish()))
     }
@@ -359,21 +372,21 @@ impl State for SinglePlayer {
                 MouseButton::Left => match *state {
                     ElementState::Pressed => {
                         self.client.send(ToServer::BreakBlock(pp.aabb.pos, y, p));
-                    },
+                    }
                     _ => {}
-                }
+                },
                 MouseButton::Right => match *state {
                     ElementState::Pressed => {
                         self.client.send(ToServer::PlaceBlock(pp.aabb.pos, y, p));
-                    },
+                    }
                     _ => {}
-                }
+                },
                 MouseButton::Middle => match *state {
                     ElementState::Pressed => {
                         self.client.send(ToServer::SelectBlock(pp.aabb.pos, y, p));
-                    },
+                    }
                     _ => {}
-                }
+                },
                 _ => {}
             }
         }

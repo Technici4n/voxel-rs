@@ -67,7 +67,11 @@ pub fn create_skybox(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer) {
     }
 
     (
-        device.create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX).fill_from_slice(&vertices),
-        device.create_buffer_mapped(indices.len(), wgpu::BufferUsage::INDEX).fill_from_slice(&indices),
+        device
+            .create_buffer_mapped(vertices.len(), wgpu::BufferUsage::VERTEX)
+            .fill_from_slice(&vertices),
+        device
+            .create_buffer_mapped(indices.len(), wgpu::BufferUsage::INDEX)
+            .fill_from_slice(&indices),
     )
 }

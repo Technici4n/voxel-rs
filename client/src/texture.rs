@@ -68,10 +68,9 @@ pub fn load_image(
     for level in 0..MIPMAP_LEVELS {
         info!("Copying mipmap level {mipmap_level}", mipmap_level = level);
         let current_size = image_size >> level;
-        let src_buffer =
-            device
-                .create_buffer_mapped(mipmaps[level as usize].len(), wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&mipmaps[level as usize][..]);
+        let src_buffer = device
+            .create_buffer_mapped(mipmaps[level as usize].len(), wgpu::BufferUsage::COPY_SRC)
+            .fill_from_slice(&mipmaps[level as usize][..]);
         let buffer_view = wgpu::BufferCopyView {
             buffer: &src_buffer,
             offset: 0,
@@ -82,13 +81,21 @@ pub fn load_image(
             texture: &texture,
             mip_level: level,
             array_layer: 0,
-            origin: wgpu::Origin3d { x: 0.0, y: 0.0, z: 0.0, },
+            origin: wgpu::Origin3d {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            },
         };
-        encoder.copy_buffer_to_texture(buffer_view, texture_view, wgpu::Extent3d {
-            width: current_size,
-            height: current_size,
-            depth: 1,
-        });
+        encoder.copy_buffer_to_texture(
+            buffer_view,
+            texture_view,
+            wgpu::Extent3d {
+                width: current_size,
+                height: current_size,
+                depth: 1,
+            },
+        );
     }
     info!("Texture loading successful");
     texture

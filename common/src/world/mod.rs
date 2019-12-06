@@ -321,7 +321,7 @@ impl World {
         pos: &ChunkPos,
         bfs_queue: &mut FastBFSQueue,
         light_data: &mut [u8; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
-        opaque: &mut [bool; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize]
+        opaque: &mut [bool; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
     ) -> bool {
         if self.chunks.contains_key(&pos) {
             let light = {
@@ -351,7 +351,14 @@ impl World {
                         }
                     }
                 }
-                compute_light(vec_chunk, vec_highest_opaque_block, bfs_queue, light_data, opaque).light_level
+                compute_light(
+                    vec_chunk,
+                    vec_highest_opaque_block,
+                    bfs_queue,
+                    light_data,
+                    opaque,
+                )
+                .light_level
             };
 
             // updating the light

@@ -223,7 +223,9 @@ fn load_textures(
         0,
         0,
     );
-    texture_buffer.save("atlas.png").expect("Failed to save texture atlas");
+    texture_buffer
+        .save("atlas.png")
+        .expect("Failed to save texture atlas");
     Ok((
         texture_buffer,
         (0..textures.len())
