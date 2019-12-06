@@ -16,6 +16,10 @@ pub enum ToServer {
     UpdateInput(PlayerInput),
     /// Break a block (player pos, yaw, pitch)
     BreakBlock(Vector3<f64>, f64, f64),
+    /// Select a block
+    SelectBlock(Vector3<f64>, f64, f64),
+    /// Place a block
+    PlaceBlock(Vector3<f64>, f64, f64),
 }
 
 /// A message sent to the client by the server

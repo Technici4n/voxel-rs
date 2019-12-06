@@ -25,14 +25,36 @@ use voxel_rs_common::{
 };
 use voxel_rs_common::world::chunk::CHUNK_SIZE;
 use voxel_rs_common::light::FastBFSQueue;
+use voxel_rs_common::block::BlockId;
 
 mod worldgen;
 
+// TODO: refactor
+const D: [[i64; 3]; 6] = [
+    [1, 0, 0],
+    [-1, 0, 0],
+    [0, 1, 0],
+    [0, -1, 0],
+    [0, 0, 1],
+    [0, 0, -1],
+];
+
 /// The data that the server stores for every player.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 struct PlayerData {
     loaded_chunks: HashSet<ChunkPos>,
     render_distance: RenderDistance,
+    block_to_place: BlockId,
+}
+
+impl Default for PlayerData {
+    fn default() -> Self {
+        Self {
+            loaded_chunks: Default::default(),
+            render_distance: Default::default(),
+            block_to_place: 1,
+        }
+    }
 }
 
 /// Start a new server instance.
@@ -143,7 +165,85 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                 }
                             }
                         }
-                    }
+                    },
+                    ToServer::SelectBlock(player_pos, yaw, pitch) => {
+                        // TODO: check player pos and block
+                        let physics_player = PhysicsPlayer {
+                            aabb: AABB {
+                                pos: player_pos,
+                                size_x: 0.0,
+                                size_y: 0.0,
+                                size_z: 0.0,
+                            },
+                            velocity: Vector3::zeros(),
+                        };
+                        let y = yaw.to_radians();
+                        let p = pitch.to_radians();
+                        let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
+                        // TODO: don't hardcode max dist
+                        if let Some((block, _face)) = physics_player.get_pointed_at(dir, 10.0, &world) {
+                            // TODO: careful with more complicated blocks
+                            players.get_mut(&id).unwrap().block_to_place = world.get_block(block);
+                        }
+                    },
+                    ToServer::PlaceBlock(player_pos, yaw, pitch) => {
+                        // TODO: check player pos and block
+                        let physics_player = PhysicsPlayer {
+                            aabb: AABB {
+                                pos: player_pos,
+                                size_x: 0.0,
+                                size_y: 0.0,
+                                size_z: 0.0,
+                            },
+                            velocity: Vector3::zeros(),
+                        };
+                        let y = yaw.to_radians();
+                        let p = pitch.to_radians();
+                        let dir = Vector3::new(-y.sin() * p.cos(), p.sin(), -y.cos() * p.cos());
+                        // TODO: don't hardcode max dist
+                        if let Some((mut block, face)) =
+                        physics_player.get_pointed_at(dir, 10.0, &world)
+                        {
+                            block.px += D[face][0];
+                            block.py += D[face][1];
+                            block.pz += D[face][2];
+                            let chunk_pos = block.containing_chunk_pos();
+                            if world.has_chunk(chunk_pos) {
+                                let mut new_chunk = (*world.get_chunk(chunk_pos).unwrap()).clone();
+                                new_chunk.set_block_at(block.pos_in_containing_chunk(), players.get(&id).unwrap().block_to_place);
+                                world.set_chunk(new_chunk);
+
+                                // TODO: remove copy paste
+                                if world.update_highest_opaque_block(chunk_pos) {
+                                    // recompute the light of the 3x3 columns
+                                    for &c_pos in world.chunks.keys() {
+                                        if c_pos.py <= chunk_pos.py
+                                            && (c_pos.px - chunk_pos.px).abs() <= 1
+                                            && (c_pos.pz - chunk_pos.pz).abs() <= 1
+                                        {
+                                            if !update_lightning_chunks.contains(&c_pos) {
+                                                update_lightning_chunks.insert(c_pos);
+                                                update_lightning_chunks_vec.push(c_pos);
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // compute only the light for the chunk
+                                    for &c_pos in world.chunks.keys() {
+                                        if (c_pos.py - chunk_pos.py).abs() <= 1
+                                            && (c_pos.px - chunk_pos.px).abs() <= 1
+                                            && (c_pos.pz - chunk_pos.pz).abs() <= 1
+                                        {
+                                            if !update_lightning_chunks.contains(&c_pos) {
+                                                update_lightning_chunks.insert(c_pos);
+                                                update_lightning_chunks_vec.push(c_pos);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
                 },
             }
         }

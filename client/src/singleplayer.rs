@@ -350,16 +350,28 @@ impl State for SinglePlayer {
         changes: Vec<(winit::event::MouseButton, winit::event::ElementState)>,
     ) {
         for (button, state) in changes.iter() {
+            let pp = self.physics_simulation.get_player();
+            let y = self.yaw_pitch.yaw;
+            let p = self.yaw_pitch.pitch;
             match *button {
                 MouseButton::Left => match *state {
                     ElementState::Pressed => {
-                        let pp = self.physics_simulation.get_player();
-                        let y = self.yaw_pitch.yaw;
-                        let p = self.yaw_pitch.pitch;
                         self.client.send(ToServer::BreakBlock(pp.aabb.pos, y, p));
-                    }
+                    },
                     _ => {}
-                },
+                }
+                MouseButton::Right => match *state {
+                    ElementState::Pressed => {
+                        self.client.send(ToServer::PlaceBlock(pp.aabb.pos, y, p));
+                    },
+                    _ => {}
+                }
+                MouseButton::Middle => match *state {
+                    ElementState::Pressed => {
+                        self.client.send(ToServer::SelectBlock(pp.aabb.pos, y, p));
+                    },
+                    _ => {}
+                }
                 _ => {}
             }
         }
