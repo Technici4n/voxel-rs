@@ -1,11 +1,13 @@
 //! Meshing worker, allowing meshing to be performed in a separate thread
 use super::meshing::{greedy_meshing, ChunkMeshData};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, BTreeMap};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::debug::send_debug_info;
+use voxel_rs_common::time::AverageTimeCounter;
 use voxel_rs_common::world::chunk::ChunkPos;
 use crate::render::world::ChunkVertex;
+use std::time::Instant;
 
 pub type ChunkMesh = (ChunkPos, Vec<ChunkVertex>, Vec<u32>);
 
@@ -18,6 +20,7 @@ pub struct MeshingWorker {
 /// Message sent to the other threads.
 enum ToOtherThread {
     Enqueue(ChunkMeshData),
+    SetPriority(ChunkPos, u64),
     Dequeue(ChunkPos),
 }
 
@@ -40,6 +43,11 @@ impl MeshingWorker {
     /// Enqueue a chunk
     pub fn enqueue_chunk(&mut self, data: ChunkMeshData) {
         self.sender.send(ToOtherThread::Enqueue(data)).unwrap();
+    }
+
+    /// Update a chunk's priority
+    pub fn update_chunk_priority(&mut self, pos: ChunkPos, priority: u64) {
+        self.sender.send(ToOtherThread::SetPriority(pos, priority)).unwrap();
     }
 
     /// Dequeue a chunk from processing if it's still in the queue.
@@ -68,7 +76,8 @@ fn launch_worker(
     let mut quads = Vec::new();
 
     let mut queued_chunks = HashMap::new();
-    let mut ordered_positions = VecDeque::new();
+    let mut priorities = BTreeMap::new();
+    let mut meshing_timing = AverageTimeCounter::new();
     loop {
         send_debug_info(
             "Chunks",
@@ -87,8 +96,17 @@ fn launch_worker(
         } {
             match message {
                 ToOtherThread::Enqueue(data) => {
-                    ordered_positions.push_back(data.chunk.pos);
-                    queued_chunks.insert(data.chunk.pos, data);
+                    let pos = data.chunk.pos;
+                    queued_chunks.insert(pos, data);
+                    priorities.entry(u64::max_value()).or_insert_with(Vec::new).push(pos);
+                }
+                ToOtherThread::SetPriority(pos, priority) => {
+                    if queued_chunks.contains_key(&pos) {
+                        priorities
+                            .entry(priority)
+                            .or_insert_with(Vec::new)
+                            .push(pos);
+                    }
                 }
                 ToOtherThread::Dequeue(pos) => {
                     queued_chunks.remove(&pos);
@@ -96,13 +114,23 @@ fn launch_worker(
             }
         }
 
-        // Mesh the first chunk that is in the queue
-        while let Some(chunk_pos) = ordered_positions.pop_front() {
-            if let Some(data) = queued_chunks.remove(&chunk_pos) {
-                let (vertices, indices, _, _) = greedy_meshing(data, &block_meshes, &mut quads);
-                sender.send((chunk_pos, vertices, indices)).unwrap();
-                break;
+        // Mesh the chunk with the lowest priority
+        'outer: while let Some((&priority, positions)) = priorities.iter_mut().next() {
+            while let Some(chunk_pos) = positions.pop() {
+                if let Some(data) = queued_chunks.remove(&chunk_pos) {
+                    let t1 = Instant::now();
+                    let (vertices, indices, _, _) = greedy_meshing(data, &block_meshes, &mut quads);
+                    let t2 = Instant::now();
+                    meshing_timing.add_time(t2 - t1);
+                    send_debug_info("Chunks", "averagetime_meshing", format!("Average time to mesh chunks: {} μs", meshing_timing.average_time_micros()));
+
+                    sender.send((chunk_pos, vertices, indices)).unwrap();
+                    break 'outer;
+                }
             }
+
+            priorities.remove(&priority);
+            break;
         }
     }
 }

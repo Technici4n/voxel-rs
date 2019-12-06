@@ -217,22 +217,25 @@ impl WorldRenderer {
         enable_culling: bool,
         pointed_block: Option<(BlockPos, usize)>,
         models: &[model::Model],
+        world: &World,
     ) {
         //============= RECEIVE CHUNK MESHES =============//
         for (pos, vertices, indices) in self.meshing_worker.get_processed_chunks() {
-            if vertices.len() > 0 && indices.len() > 0 {
-                self.chunk_vertex_buffers.update(
-                    device,
-                    encoder,
-                    pos,
-                    &vertices[..],
-                );
-                self.chunk_index_buffers.update(
-                    device,
-                    encoder,
-                    pos,
-                    &indices[..],
-                );
+            if world.has_chunk(pos) {
+                if vertices.len() > 0 && indices.len() > 0 {
+                    self.chunk_vertex_buffers.update(
+                        device,
+                        encoder,
+                        pos,
+                        &vertices[..],
+                    );
+                    self.chunk_index_buffers.update(
+                        device,
+                        encoder,
+                        pos,
+                        &indices[..],
+                    );
+                }
             }
         }
 
@@ -354,6 +357,10 @@ impl WorldRenderer {
         pos: ChunkPos,
     ) {
         self.meshing_worker.enqueue_chunk(self::meshing::ChunkMeshData::create_from_world(world, pos));
+    }
+
+    pub fn update_chunk_priority(&mut self, pos: ChunkPos, priority: u64) {
+        self.meshing_worker.update_chunk_priority(pos, priority);
     }
 
     pub fn remove_chunk(&mut self, pos: ChunkPos) {

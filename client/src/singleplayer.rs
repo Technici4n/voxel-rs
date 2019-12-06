@@ -212,6 +212,7 @@ impl State for SinglePlayer {
         } = world;
         chunks.retain(|chunk_pos, _| {
             if render_distance.is_chunk_visible(p, *chunk_pos) {
+                world_renderer.update_chunk_priority(*chunk_pos, chunk_pos.squared_euclidian_distance(player_chunk));
                 true
             } else {
                 world_renderer.remove_chunk(*chunk_pos);
@@ -323,6 +324,7 @@ impl State for SinglePlayer {
             input_state.enable_culling,
             pointed_block,
             &models_to_draw,
+            &self.world,
         );
 
         crate::render::clear_depth(&mut encoder, buffers);

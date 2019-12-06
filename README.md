@@ -13,9 +13,12 @@ We are still looking for a better name...
 - [x] Frustum culling for chunks
 - [x] Ambient occlusion using textures
 - [x] Lighting
+- [x] Block placing and breaking
 - [ ] Entities and player mesh (@Azercoco)
-- [ ] Block placing and breaking (@Azercoco)
-- [ ] Custom network protocol on top of UDP (@Technici4n)
+- [ ] Items and inventories (@Technici4n)
+- [ ] Tile entities and metadata (@Technici4n)
+- [ ] Crafting (@Technici4n)
+- [ ] Player health (@Technici4n)
 - [ ] Clean custom GUI (@Technici4n)
 - [ ] Custom key mapping (@Technici4n)
 - [ ] Smooth Lightning (@Azercoco)
@@ -24,11 +27,8 @@ We are still looking for a better name...
 - [ ] Day/night cycle (@Azercoco)
 - [ ] Fog (@Azercoco)
 - [ ] Fix aliasing issues
-- [ ] Items and inventories
-- [ ] Tile entities and metadata
-- [ ] Crafting
-- [ ] Player health
 - [ ] Fluid support
+- [ ] Custom network protocol on top of UDP (@Technici4n)
 - [ ] Client and server integration on singleplayer
 - [ ] WebAssembly modding support
 - [ ] Choose another name for the game
