@@ -13,6 +13,7 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use texture_packer::{TexturePacker, TexturePackerConfig};
+use crate::item::ItemType;
 
 #[derive(Debug, Clone)]
 pub struct Data {
@@ -92,47 +93,24 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     let model_knight = load_voxel_model("data/model/chr_knight.vox").unwrap();
     models.register("knight".to_owned(), model_knight)?;
 
-    // Load blocks
-    let mut block_datas: Vec<(String, BlockType)> = Vec::new();
-    let blocks_directory = data_directory.join("blocks");
-    info!(
-        "Loading blocks from directory {}",
-        blocks_directory.display()
-    );
-    for dir_entry in fs::read_dir(blocks_directory).context("couldn't read block directory")? {
-        let dir_entry = dir_entry.context("failed to read directory entry")?;
-        if dir_entry
-            .file_type()
-            .context("failed to get file type")?
-            .is_file()
-        {
-            let file_path = dir_entry.path();
+    // Load items
+    let items_directory = data_directory.join("items");
+    let item_datas: Vec<(String, ItemType)> = load_files_from_folder(items_directory);
 
-            match file_path.extension() {
-                None => panic!("No file extension"),
-                Some(ext) => {
-                    if ext == "ron" {
-                        let mut file = fs::File::open(file_path.clone())
-                            .context("couldn't open .ron block file")?;
-                        let mut buffer = String::new();
-                        file.read_to_string(&mut buffer)?;
-                        block_datas.push((
-                            file_path
-                                .file_stem()
-                                .context("failed to get file stem")?
-                                .to_str()
-                                .unwrap()
-                                .to_owned(),
-                            ron::de::from_str(&buffer)
-                                .context("failed to parse .ron block file")?,
-                        ));
-                    } else {
-                        panic!("Unsupported file extension");
-                    }
-                }
+    // Generate item models
+    for (name, ty) in item_datas.into_iter() {
+        match ty {
+            ItemType::NormalItem { texture } => {
+                let texture_rect = texture_rects[texture_registry.get_id_by_name(&texture).unwrap() as usize];
+                let model = self::vox::item::generate_item_model(texture_rect, &texture_atlas);
+                models.register(format!("item:{}", name), model).expect("Failed to register item model");
             }
         }
     }
+
+    // Load blocks
+    let blocks_directory = data_directory.join("blocks");
+    let block_datas: Vec<(String, BlockType)> = load_files_from_folder(blocks_directory);
 
     info!("Processing collected block and texture data");
     let mut blocks = Registry::default();
@@ -144,7 +122,7 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
             name: "air".to_owned(),
             block_type: BlockType::Air,
         },
-    )?;
+    ).expect("Couldn't register air in the registry.");
     meshes.push(BlockMesh::Empty);
 
     for (name, block_type) in block_datas.into_iter() {
@@ -189,7 +167,7 @@ pub struct TextureRect {
     pub height: f32,
 }
 
-const MAX_TEXTURE_SIZE: u32 = 2048;
+pub const MAX_TEXTURE_SIZE: u32 = 2048;
 
 const TEXTURE_PACKER_CONFIG: TexturePackerConfig = TexturePackerConfig {
     max_width: MAX_TEXTURE_SIZE,
@@ -243,4 +221,66 @@ fn load_textures(
             })
             .collect(),
     ))
+}
+
+/// Load all <name>.ron files from a given folder and parse them into type `T`.
+fn load_files_from_folder<T: serde::de::DeserializeOwned>(
+    directory: PathBuf,
+) -> Vec<(String, T)> {
+    let mut result = Vec::new();
+    info!(
+        "Loading objects of type {} from directory {}",
+        std::any::type_name::<T>(),
+        directory.display(),
+    );
+    for dir_entry in fs::read_dir(directory).expect("Failed to read from directory") {
+        let dir_entry = dir_entry.expect("Failed to read directory entry");
+        if dir_entry
+            .file_type()
+            .expect("Failed to get file type")
+            .is_file()
+        {
+            let file_path = dir_entry.path();
+
+            match file_path.extension() {
+                None => log::warn!("No file extension for file {}, skipping...", file_path.display()),
+                Some(ext) => {
+                    if ext == "ron" {
+                        log::info!("Attempting to read file {}", file_path.display());
+                        let mut file = fs::File::open(file_path.clone())
+                            .expect("Failed to open file");
+                        let mut buffer = String::new();
+                        file.read_to_string(&mut buffer).expect("Failed to read from file");
+                        let file_stem = file_path
+                            .file_stem()
+                            .expect("Failed to get file stem")
+                            .to_str()
+                            .unwrap()
+                            .to_owned();
+
+                        let parsed_file = {
+                            if ext == "ron" {
+                                match ron::de::from_str(&buffer) {
+                                    Ok(x) => x,
+                                    Err(e) => {
+                                        log::error!("Failed to parse RON: {}, skipping...", e);
+                                        continue
+                                    }
+                                }
+                            } else {
+                                unreachable!("No parser for file format");
+                            }
+                        };
+                        result.push((
+                            file_stem,
+                            parsed_file,
+                        ));
+                    } else {
+                        log::warn!("Unsupported file extension {:?}, skipping...", ext); // TODO: display instead of debug
+                    }
+                }
+            }
+        }
+    }
+    result
 }

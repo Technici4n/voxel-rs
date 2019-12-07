@@ -321,6 +321,13 @@ impl State for SinglePlayer {
             pos_z: 0.0,
             scale: 0.3,
         });
+        models_to_draw.push(crate::render::Model {
+            mesh_id: self.model_registry.get_id_by_name(&"item:ingot_iron".to_owned()).unwrap(),
+            pos_x: 30.0,
+            pos_y: 55.0,
+            pos_z: 30.0,
+            scale: 1.0/32.0,
+        });
         // Draw chunks
         self.world_renderer.render(
             device,

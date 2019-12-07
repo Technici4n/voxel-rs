@@ -8,7 +8,7 @@ pub type BlockId = u16;
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename = "Block")]
 pub enum BlockType {
-    Air,
+    Air, // TODO: skip when deserializing
     NormalCube { face_textures: Vec<String> },
 }
 

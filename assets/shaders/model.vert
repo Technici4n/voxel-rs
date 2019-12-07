@@ -12,33 +12,19 @@ layout(location = 2) out vec3 v_Rgb;
 
 
 vec3 get_normal(uint id) {
-    if(id == 0u) {
+    if (id == 0u) {
         return vec3(1.0, 0.0, 0.0);
-    } else if(id == 1u) {
+    } else if (id == 1u) {
         return vec3(-1.0, 0.0, 0.0);
-    } else if(id == 2u) {
+    } else if (id == 2u) {
         return vec3(0.0, 1.0, 0.0);
-    } else if(id == 3u) {
+    } else if (id == 3u) {
         return vec3(0.0, -1.0, 0.0);
-    } else if(id == 4u) {
+    } else if (id == 4u) {
         return vec3(0.0, 0.0, 1.0);
     } else {
         return vec3(0.0, 0.0, -1.0);
     }
-}
-
-vec3 srgbEncode(vec3 color){
-    float r = color.r < 0.0031308 ? 12.92 * color.r : 1.055 * pow(color.r, 1.0/2.4) - 0.055;
-    float g = color.g < 0.0031308 ? 12.92 * color.g : 1.055 * pow(color.g, 1.0/2.4) - 0.055;
-    float b = color.b < 0.0031308 ? 12.92 * color.b : 1.055 * pow(color.b, 1.0/2.4) - 0.055;
-    return vec3(r, g, b);
-}
-
-vec3 srgbDecode(vec3 color){
-    float r = color.r < 0.04045 ? (1.0 / 12.92) * color.r : pow((color.r + 0.055) * (1.0 / 1.055), 2.4);
-    float g = color.g < 0.04045 ? (1.0 / 12.92) * color.g : pow((color.g + 0.055) * (1.0 / 1.055), 2.4);
-    float b = color.b < 0.04045 ? (1.0 / 12.92) * color.b : pow((color.b + 0.055) * (1.0 / 1.055), 2.4);
-    return vec3(r, g, b);
 }
 
 void main() {
@@ -67,6 +53,6 @@ void main() {
     float gg = float(g)/255.0;
     float bb = float(b)/255.0;
 
-    v_Rgb = srgbDecode(vec3(rr,gg,bb));
+    v_Rgb = vec3(rr,gg,bb);
 
 }

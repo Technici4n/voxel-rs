@@ -10,5 +10,10 @@ const vec3 SUN_DIRECTION = normalize(vec3(0, 1, 0.5));
 const float SUN_FRACTION = 0.3;
 
 void main() {
-    ColorBuffer = occl * vec4(v_Rgb, 1.0) * (1.0 - SUN_FRACTION + SUN_FRACTION * abs(dot(v_Norm, SUN_DIRECTION)));
+    /* VARIOUS BRIGHTNESS FACTORS */
+    float normal_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(v_Norm, SUN_DIRECTION));
+    float total_factor = occl * normal_factor;
+
+    /* OUTPUT */
+    ColorBuffer = vec4(v_Rgb * total_factor, 1.0);
 }
