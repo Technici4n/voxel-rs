@@ -27,6 +27,7 @@ We are still looking for a better name...
 - [ ] Day/night cycle (@Azercoco)
 - [ ] Fog (@Azercoco)
 - [ ] Fix aliasing issues
+- [ ] Fix window issues
 - [ ] Fluid support
 - [ ] Custom network protocol on top of UDP (@Technici4n)
 - [ ] Client and server integration on singleplayer
@@ -35,4 +36,4 @@ We are still looking for a better name...
 
 ## Screenshots
 Current state:
-![Current state](screenshots/20191113.png)
+![Current state](screenshots/20191212.png)
