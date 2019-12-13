@@ -12,7 +12,7 @@ use crate::{
 use crate::debug::send_debug_info;
 use crate::worldgen::decorator::Decorator;
 use crate::worldgen::decorator::DecoratorPass;
-use crate::worldgen::topology::generate_chunk_topology;
+use crate::worldgen::topology::{generate_chunk_topology, HeightMap};
 
 pub mod perlin;
 #[macro_use]
@@ -23,6 +23,7 @@ pub struct DefaultWorldGenerator {
     pregenerated_chunks: HashMap<ChunkPos, Chunk>,
     pregenerated_chunks_decorator_count: HashMap<ChunkPos, u32>,
     tree_decorator: Decorator,
+    height_map: HeightMap,
 }
 
 struct BlockToPlace {
@@ -83,11 +84,12 @@ impl DefaultWorldGenerator {
             tree_decorator,
             pregenerated_chunks_decorator_count: HashMap::new(),
             pregenerated_chunks: HashMap::new(),
+            height_map : HeightMap::new(),
         }
     }
 
-    fn pregenerate_chunk(chunk: &mut Chunk, block_registry: &Registry<Block>) {
-        generate_chunk_topology(chunk, block_registry);
+    fn pregenerate_chunk(chunk: &mut Chunk, block_registry: &Registry<Block>, height_map:  &mut HeightMap) {
+        generate_chunk_topology(chunk, block_registry, height_map);
     }
 
     fn decorate_chunk(chunks: &mut Vec<Chunk>, decorator: &Decorator) {
@@ -252,6 +254,7 @@ impl WorldGenerator for DefaultWorldGenerator {
                                 DefaultWorldGenerator::pregenerate_chunk(
                                     &mut chunk,
                                     &block_registry,
+                                    &mut self.height_map
                                 );
                                 chunk
                             }
