@@ -32,14 +32,14 @@ pub fn generate_ground_level(px: f32, pz: f32) -> Vec<f32> {
     let noise1 = perlin::perlin2d_with_displacement(
         &dx1,
         &dy1,
-        CHUNK_SIZE as f32,
+        2.0*(CHUNK_SIZE as f32),
         px,
         pz,
         CHUNK_SIZE as usize,
-        1.0 / 64.0,
-        1.0 / 64.0,
+        1.0 / 128.0,
+        1.0 / 128.0,
         5,
-        0.4,
+        0.3,
         2,
     );
     let noise2 = perlin::perlin2d(
@@ -48,8 +48,8 @@ pub fn generate_ground_level(px: f32, pz: f32) -> Vec<f32> {
         CHUNK_SIZE as usize,
         1.0 / 256.0,
         1.0 / 256.0,
-        6,
-        0.5,
+        5,
+        0.3,
         3,
     );
 
@@ -106,7 +106,7 @@ pub fn generate_chunk_topology(chunk: &mut Chunk, block_registry: &Registry<Bloc
     }
 
     if !(only_air || only_stone) {
-        let noise = perlin::perlin(px, py, pz, s, freq, freq * 2.0, freq, 4, 0.7, 42);
+        let noise = perlin::perlin(px, py, pz, s, freq, freq * 2.0, freq, 4, 0.5, 42);
         for i in 0..CHUNK_SIZE {
             for j in 0..CHUNK_SIZE {
                 for k in 0..CHUNK_SIZE {

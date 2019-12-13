@@ -40,11 +40,11 @@ void main() {
     if(code_occl == 3u){
         occl = 1.0;
     }else if(code_occl == 2u){
-        occl = 0.65;
+        occl = 0.8;
     }else if(code_occl == 1u){
-        occl = 0.4;
+        occl = 0.6;
     }else{
-        occl = 0.3;
+        occl = 0.5;
     }
 
     v_Norm = get_normal(normal);

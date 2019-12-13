@@ -43,11 +43,11 @@ float get_occl(uint code_occl) {
     if (code_occl == 3u) {
         return 1.0;
     } else if (code_occl == 2u) {
-        return 0.65;
+        return 0.8;
     } else if (code_occl == 1u) {
-        return 0.4;
+        return 0.6;
     } else {
-        return 0.3;
+        return 0.4;
     }
 }
 
