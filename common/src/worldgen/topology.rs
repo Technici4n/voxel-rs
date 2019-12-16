@@ -41,7 +41,7 @@ pub fn generate_ground_level(px: f32, pz: f32) -> Vec<f32> {
         1.0 / 64.0,
         1.0 / 64.0,
         5,
-        0.4,
+        0.5,
         0,
     );
     let dy1 = perlin::perlin2d(
@@ -51,7 +51,7 @@ pub fn generate_ground_level(px: f32, pz: f32) -> Vec<f32> {
         1.0 / 64.0,
         1.0 / 64.0,
         5,
-        0.4,
+        0.5,
         1,
     );
 
@@ -65,7 +65,7 @@ pub fn generate_ground_level(px: f32, pz: f32) -> Vec<f32> {
         1.0 / 128.0,
         1.0 / 128.0,
         5,
-        0.3,
+        0.4,
         2,
     );
     let noise2 = perlin::perlin2d(
@@ -81,7 +81,10 @@ pub fn generate_ground_level(px: f32, pz: f32) -> Vec<f32> {
 
     for i in 0..(CHUNK_SIZE * CHUNK_SIZE) as usize {
         let a = noise2[i] * 130.0;
-        let h1 = (noise1[i] - 0.4) * a;
+        let mut h1 = (noise1[i]) * a - 10.0;
+        if h1 <= 0.0 {
+            h1 *=3.0;
+        }
         res[i] = h1;
     }
 
@@ -107,7 +110,7 @@ pub fn generate_chunk_topology(chunk: &mut Chunk, block_registry: &Registry<Bloc
                 let y = j as i32 + (CHUNK_SIZE as i32)*(chunk.pos.py as i32);
                 let hm = h[(i*CHUNK_SIZE + k) as usize];
                 if y > hm {
-                    if y <= 0{
+                    if y < 0{
                       unsafe{chunk.set_block_at_unsafe((i,j, k), water_block);}
                     }else {
                         break;

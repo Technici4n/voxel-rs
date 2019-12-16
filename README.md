@@ -36,4 +36,5 @@ We are still looking for a better name...
 
 ## Screenshots
 Current state:
-![Current state](screenshots/20191212.png)
+![Current state](screenshots/20191216.png)
+![Current state](screenshots/20191216-2.png)
