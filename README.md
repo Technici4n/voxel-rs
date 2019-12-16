@@ -37,3 +37,7 @@ We are still looking for a better name...
 ## Screenshots
 Current state:
 ![Current state](screenshots/20191212.png)
+
+## License
+The code is licensed under the [MIT license](LICENSE), copyright Azercoco and Technici4n.
+The textures are released under the [CC-BY 4.0 license](TEXTURES_LICENSE), copyright Azercoco and Technici4n.
