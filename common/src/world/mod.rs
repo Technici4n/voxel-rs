@@ -81,6 +81,12 @@ impl LightChunk {
     pub fn get_light_at(&self, (px, py, pz): (u32, u32, u32)) -> u8 {
         self.light[(px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize]
     }
+
+    /// Get light at some position without bound checking
+    #[inline(always)]
+    pub  unsafe fn get_light_at_unsafe(&self, (px, py, pz): (u32, u32, u32)) -> u8 {
+        *self.light.get_unchecked((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize)
+    }
 }
 
 /// An RLE-compressed chunk

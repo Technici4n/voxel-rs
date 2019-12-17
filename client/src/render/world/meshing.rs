@@ -159,35 +159,39 @@ pub fn greedy_meshing(
     }
 
     // TODO: for light, we don't need the 8 corners
-    for i in 0..N_SIZE {
-        for j in 0..N_SIZE {
-            for k in 0..N_SIZE {
-                let ci = chunk_index(i, j, k);
-                if ci == 13 {
-                    // 13 = 9 + 3 + 1 is the current chunk
-                    chunk_mask[uind(i, j, k)] = meshes[chunk_data.chunk.get_block_at((
-                        i as u32 - 1,
-                        j as u32 - 1,
-                        k as u32 - 1,
-                    )) as usize]
-                        .is_opaque();
-                    light_levels[uind(i, j, k)] = chunk_data.light_chunk.get_light_at((
-                        i as u32 - 1,
-                        j as u32 - 1,
-                        k as u32 - 1,
-                    ));
-                } else {
-                    if let Some(c) = &chunk_data.all_chunks[ci] {
-                        chunk_mask[uind(i, j, k)] =
-                            meshes[c.get_block_at(outside_position(i, j, k)) as usize].is_opaque();
-                    }
-                    if let Some(lc) = &chunk_data.all_light_chunks[ci] {
-                        light_levels[uind(i, j, k)] = lc.get_light_at(outside_position(i, j, k));
+
+        for i in 0..N_SIZE {
+            for j in 0..N_SIZE {
+                for k in 0..N_SIZE {
+                    let ci = chunk_index(i, j, k);
+                    if ci == 13 {
+                        unsafe {
+                            // 13 = 9 + 3 + 1 is the current chunk
+                            chunk_mask[uind(i, j, k)] = meshes[chunk_data.chunk.get_block_at_unsafe((
+                                i as u32 - 1,
+                                j as u32 - 1,
+                                k as u32 - 1,
+                            )) as usize]
+                                .is_opaque();
+                            light_levels[uind(i, j, k)] = chunk_data.light_chunk.get_light_at_unsafe((
+                                i as u32 - 1,
+                                j as u32 - 1,
+                                k as u32 - 1,
+                            ));
+                        }
+                    } else {
+                        if let Some(c) = &chunk_data.all_chunks[ci] {
+                            chunk_mask[uind(i, j, k)] =
+                                meshes[c.get_block_at(outside_position(i, j, k)) as usize].is_opaque();
+                        }
+                        if let Some(lc) = &chunk_data.all_light_chunks[ci] {
+                            light_levels[uind(i, j, k)] = lc.get_light_at(outside_position(i, j, k));
+                        }
                     }
                 }
             }
         }
-    }
+
 
     const D_DELTA0: [[i32; 3]; 6] = [
         [1, 0, 0],
@@ -232,9 +236,10 @@ pub fn greedy_meshing(
         for i in 0..(CHUNK_SIZE as i32) {
             for j in 0..(CHUNK_SIZE as i32) {
                 for k in 0..(CHUNK_SIZE as i32) {
-                    if chunk_mask[ind(i + 1, j + 1, k + 1)] {
+                    unsafe{
+                    if *chunk_mask.get_unchecked(ind(i + 1, j + 1, k + 1)) {
                         //checking if not void
-                        if !chunk_mask[ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])] {
+                        if !*chunk_mask.get_unchecked(ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])) {
                             let mut coins = [0; 4];
                             let mut edge = [0; 4];
 
@@ -247,7 +252,7 @@ pub fn greedy_meshing(
                                     let dz =
                                         1 + D[s][2] + D_DELTA1[s][2] * i2 + D_DELTA2[s][2] * j2;
 
-                                    if chunk_mask[ind(i + dx, j + dy, k + dz)] {
+                                    if *chunk_mask.get_unchecked(ind(i + dx, j + dy, k + dz)) {
                                         match (i2, j2) {
                                             (-1, -1) => {
                                                 coins[0] += 1;
@@ -283,8 +288,8 @@ pub fn greedy_meshing(
                                 }
                             }
 
-                            let light_level = light_levels
-                                [ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2])];
+                            let light_level = *light_levels
+                                .get_unchecked(ind(i + 1 + D[s][0], j + 1 + D[s][1], k + 1 + D[s][2]));
                             let quad = Quad {
                                 v1: (s as u32)
                                     + (ambiant_occl(coins[0], edge[0]) << 3)
@@ -306,6 +311,7 @@ pub fn greedy_meshing(
                             to_mesh[ind_mesh(s, i, j, k)] = true;
                             tot_quad += 1;
                         }
+                    }
                     }
                 }
             }
@@ -356,11 +362,12 @@ pub fn greedy_meshing(
             for j in 0..(CHUNK_SIZE as i32) {
                 // y y x x x x
                 for k in 0..(CHUNK_SIZE as i32) {
+                    unsafe{
                     // z z z z y y
                     let (px, py, pz) = ijk_to_pos(s, i, j, k);
-                    if to_mesh[ind_mesh(s, px, py, pz)] {
-                        to_mesh[ind_mesh(s, px, py, pz)] = false;
-                        let current_quad = quads[ind_mesh(s, px, py, pz)];
+                    if *to_mesh.get_unchecked(ind_mesh(s, px, py, pz)) {
+                        *to_mesh.get_unchecked_mut(ind_mesh(s, px, py, pz)) = false;
+                        let current_quad = *quads.get_unchecked(ind_mesh(s, px, py, pz));
                         let mut j_end = j + 1; // + y + x + x
                         let mut k_end = k + 1; // +z + z + x
 
@@ -371,22 +378,22 @@ pub fn greedy_meshing(
                             let mut pos = ijk_to_pos(s, i, j2, k);
 
                             while j2 < CHUNK_SIZE as i32
-                                && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
-                            {
-                                let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
-                                if next_quad.v1 == current_quad.v1
-                                    && next_quad.v2 == current_quad.v2
-                                    && next_quad.v1 == next_quad.v3
-                                    && next_quad.v2 == next_quad.v4
-                                    && current_quad.block_id == next_quad.block_id
+                                && *to_mesh.get_unchecked(ind_mesh(s, pos.0, pos.1, pos.2))
                                 {
-                                    to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
-                                    j2 += 1;
-                                    pos = ijk_to_pos(s, i, j2, k);
-                                } else {
-                                    break;
+                                    let next_quad = *quads.get_unchecked(ind_mesh(s, pos.0, pos.1, pos.2));
+                                    if next_quad.v1 == current_quad.v1
+                                        && next_quad.v2 == current_quad.v2
+                                        && next_quad.v1 == next_quad.v3
+                                        && next_quad.v2 == next_quad.v4
+                                        && current_quad.block_id == next_quad.block_id
+                                    {
+                                        *to_mesh.get_unchecked_mut(ind_mesh(s, pos.0, pos.1, pos.2)) = false;
+                                        j2 += 1;
+                                        pos = ijk_to_pos(s, i, j2, k);
+                                    } else {
+                                        break;
+                                    }
                                 }
-                            }
                             j_end = j2;
 
                             if current_quad.v1 == current_quad.v2 {
@@ -396,7 +403,7 @@ pub fn greedy_meshing(
                                     for j3 in j..j_end {
                                         let pos = ijk_to_pos(s, i, j3, k2);
                                         let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
-                                        if !(to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
+                                        if !(*to_mesh.get_unchecked(ind_mesh(s, pos.0, pos.1, pos.2))
                                             && next_quad.is_same()
                                             && next_quad.v1 == current_quad.v1
                                             && next_quad.block_id == current_quad.block_id)
@@ -407,7 +414,7 @@ pub fn greedy_meshing(
 
                                     for j3 in j..j_end {
                                         let pos = ijk_to_pos(s, i, j3, k2);
-                                        to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
+                                        *to_mesh.get_unchecked_mut(ind_mesh(s, pos.0, pos.1, pos.2)) = false;
                                     }
                                     k2 += 1;
                                 }
@@ -420,22 +427,22 @@ pub fn greedy_meshing(
                             let mut k2 = k + 1;
                             let mut pos = ijk_to_pos(s, i, j, k2);
                             while k2 < CHUNK_SIZE as i32
-                                && to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)]
-                            {
-                                let next_quad = quads[ind_mesh(s, pos.0, pos.1, pos.2)];
-                                if next_quad.v1 == current_quad.v1
-                                    && next_quad.v3 == current_quad.v3
-                                    && next_quad.v1 == next_quad.v2
-                                    && next_quad.v3 == next_quad.v4
-                                    && next_quad.block_id == current_quad.block_id
+                                && *to_mesh.get_unchecked(ind_mesh(s, pos.0, pos.1, pos.2))
                                 {
-                                    to_mesh[ind_mesh(s, pos.0, pos.1, pos.2)] = false;
-                                    k2 += 1;
-                                    pos = ijk_to_pos(s, i, j, k2);
-                                } else {
-                                    break;
+                                    let next_quad = *quads.get_unchecked(ind_mesh(s, pos.0, pos.1, pos.2));
+                                    if next_quad.v1 == current_quad.v1
+                                        && next_quad.v3 == current_quad.v3
+                                        && next_quad.v1 == next_quad.v2
+                                        && next_quad.v3 == next_quad.v4
+                                        && next_quad.block_id == current_quad.block_id
+                                    {
+                                        *to_mesh.get_unchecked_mut(ind_mesh(s, pos.0, pos.1, pos.2)) = false;
+                                        k2 += 1;
+                                        pos = ijk_to_pos(s, i, j, k2);
+                                    } else {
+                                        break;
+                                    }
                                 }
-                            }
                             k_end = k2;
                         }
 
@@ -528,6 +535,7 @@ pub fn greedy_meshing(
                         n_of_different_vertex += 4;
                         act_quad += 1;
                     }
+                }
                 }
             }
         }
