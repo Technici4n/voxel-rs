@@ -7,6 +7,7 @@ use super::world::meshing_worker::MeshingWorker;
 use crate::texture::load_image;
 use crate::window::WindowBuffers;
 use image::{ImageBuffer, Rgba};
+use nalgebra::{Matrix4, Similarity3, Translation3, UnitQuaternion, Vector3};
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::send_debug_info;
@@ -376,27 +377,24 @@ impl WorldRenderer {
 
         // Draw the models
         for model in models {
+            // Compute model matrix
+            let mut transform = Similarity3::identity();
+            transform.append_scaling_mut(model.scale);
+            let offset_translation = Translation3::from(-Vector3::from(model.rot_offset));
+            transform.append_translation_mut(&offset_translation);
+            transform.append_rotation_mut(&UnitQuaternion::from_axis_angle(
+                &Vector3::y_axis(),
+                model.rot_y,
+            ));
+            transform.append_translation_mut(&Translation3::from(
+                Vector3::new(model.pos_x, model.pos_y, model.pos_z)
+                    + &Vector3::from(model.rot_offset),
+            ));
+            let transformation_matrix: Matrix4<f32> = nalgebra::convert(transform);
             // Update model buffer
             let src_buffer = device
-                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&[
-                    model.scale,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    model.scale,
-                    0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    model.scale,
-                    0.0,
-                    model.pos_x,
-                    model.pos_y,
-                    model.pos_z,
-                    1.0,
-                ]);
+                .create_buffer_mapped(4, wgpu::BufferUsage::COPY_SRC)
+                .fill_from_slice(transformation_matrix.as_ref());
             encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
             // Draw model
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);

@@ -84,11 +84,15 @@ impl DefaultWorldGenerator {
             tree_decorator,
             pregenerated_chunks_decorator_count: HashMap::new(),
             pregenerated_chunks: HashMap::new(),
-            height_map : HeightMap::new(),
+            height_map: HeightMap::new(),
         }
     }
 
-    fn pregenerate_chunk(chunk: &mut Chunk, block_registry: &Registry<Block>, height_map:  &mut HeightMap) {
+    fn pregenerate_chunk(
+        chunk: &mut Chunk,
+        block_registry: &Registry<Block>,
+        height_map: &mut HeightMap,
+    ) {
         generate_chunk_topology(chunk, block_registry, height_map);
     }
 
@@ -254,7 +258,7 @@ impl WorldGenerator for DefaultWorldGenerator {
                                 DefaultWorldGenerator::pregenerate_chunk(
                                     &mut chunk,
                                     &block_registry,
-                                    &mut self.height_map
+                                    &mut self.height_map,
                                 );
                                 chunk
                             }
