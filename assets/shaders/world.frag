@@ -14,7 +14,7 @@ layout(set = 0, binding = 1) uniform sampler u_sampler;
 layout(set = 0, binding = 2) uniform texture2D u_texture_atlas;
 
 const vec3 SUN_DIRECTION = normalize(vec3(0, 1, 0.5));
-const float SUN_FRACTION = 0.3;
+const float SUN_FRACTION = 0.1;
 const vec2 EPSILON = vec2(1e-7, 1e-7);
 
 void main() {
@@ -31,7 +31,7 @@ void main() {
 
     /* VARIOUS BRIGHTNESS FACTORS */
     float light_factor = pow(0.8, 15.0 - i_light_level);
-    float normal_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * min(0.0, dot(i_norm, SUN_DIRECTION));
+    float normal_factor = 1.0 - SUN_FRACTION + SUN_FRACTION * dot(i_norm, SUN_DIRECTION);
     float total_factor = light_factor * i_occl * normal_factor;
 
     /* OUTPUT */
