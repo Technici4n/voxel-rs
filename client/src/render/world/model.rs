@@ -4,11 +4,17 @@ use voxel_rs_common::data::vox::VoxelModel;
 /// Data structure used to draw a pre-loaded model
 /// Contains the position, scale and its id in the model registry
 pub struct Model {
+    /// Id in the model registry
     pub mesh_id: u32,
     pub pos_x: f32,
     pub pos_y: f32,
     pub pos_z: f32,
+    /// Model scaling
     pub scale: f32,
+    /// Model rotation (after scaling)
+    pub rot_y: f32,
+    /// Offset to apply before rotating the model
+    pub rot_offset: [f32; 3],
 }
 
 const D: [[i32; 3]; 6] = [

@@ -26,6 +26,7 @@ use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
+use voxel_rs_common::item::{Item, ItemMesh};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use voxel_rs_common::world::chunk::ChunkPos;
 use winit::event::{ElementState, MouseButton};
@@ -39,6 +40,8 @@ pub struct SinglePlayer {
     world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
+    item_registry: Registry<Item>,
+        item_meshes: Vec<ItemMesh>,
     model_registry: Registry<VoxelModel>,
     client: Box<dyn Client>,
     render_distance: RenderDistance,
@@ -47,6 +50,7 @@ pub struct SinglePlayer {
     yaw_pitch: YawPitch,
     debug_info: DebugInfo,
     chunks_to_mesh: HashSet<ChunkPos>,
+    start_time: Instant,
 }
 
 impl SinglePlayer {
@@ -113,6 +117,8 @@ impl SinglePlayer {
                 world_renderer,
                 block_registry: data.blocks,
                 model_registry: data.models,
+                item_registry: data.items,
+                item_meshes: data.item_meshes,
                 client,
                 render_distance,
                 physics_simulation: ClientPhysicsSimulation::new(
@@ -126,6 +132,7 @@ impl SinglePlayer {
                 yaw_pitch: Default::default(),
                 debug_info: DebugInfo::new_current(),
                 chunks_to_mesh: Default::default(),
+                start_time: Instant::now(),
             }),
             encoder.finish(),
         ))
@@ -320,13 +327,21 @@ impl State for SinglePlayer {
             pos_y: 55.0,
             pos_z: 0.0,
             scale: 0.3,
+            rot_offset: [0.0, 0.0, 0.0],
+            rot_y: 0.0,
         });
+        let item_rotation = (Instant::now() - self.start_time).as_secs_f32(); // TODO: use f64
         models_to_draw.push(crate::render::Model {
-            mesh_id: self.model_registry.get_id_by_name(&"item:ingot_iron".to_owned()).unwrap(),
+            mesh_id: self
+                .model_registry
+                .get_id_by_name(&"item:ingot_iron".to_owned())
+                .unwrap(),
             pos_x: 30.0,
             pos_y: 55.0,
             pos_z: 30.0,
-            scale: 1.0/32.0,
+            scale: 1.0 / 32.0,
+            rot_offset: [0.5, 0.5, 1.0 / 64.0],
+            rot_y: item_rotation,
         });
         // Draw chunks
         self.world_renderer.render(

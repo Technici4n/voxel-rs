@@ -6,6 +6,7 @@ use crate::{
 };
 
 use crate::data::vox::{load_voxel_model, VoxelModel};
+use crate::item::{Item, ItemMesh, ItemType};
 use anyhow::{Context, Result};
 use image::{ImageBuffer, Rgba};
 use log::info;
@@ -13,7 +14,6 @@ use std::fs;
 use std::io::Read;
 use std::path::PathBuf;
 use texture_packer::{TexturePacker, TexturePackerConfig};
-use crate::item::ItemType;
 
 #[derive(Debug, Clone)]
 pub struct Data {
@@ -21,6 +21,8 @@ pub struct Data {
     pub meshes: Vec<BlockMesh>,
     pub texture_atlas: ImageBuffer<Rgba<u8>, Vec<u8>>,
     pub models: Registry<VoxelModel>,
+    pub items: Registry<Item>,
+    pub item_meshes: Vec<ItemMesh>,
 }
 
 // TODO: decent error handling
@@ -96,14 +98,33 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     // Load items
     let items_directory = data_directory.join("items");
     let item_datas: Vec<(String, ItemType)> = load_files_from_folder(items_directory);
+    let mut items = Registry::default();
+    let mut item_meshes = Vec::new();
 
     // Generate item models
     for (name, ty) in item_datas.into_iter() {
-        match ty {
+        match &ty {
             ItemType::NormalItem { texture } => {
-                let texture_rect = texture_rects[texture_registry.get_id_by_name(&texture).unwrap() as usize];
+                let texture_rect =
+                    texture_rects[texture_registry.get_id_by_name(texture).unwrap() as usize];
                 let model = self::vox::item::generate_item_model(texture_rect, &texture_atlas);
-                models.register(format!("item:{}", name), model).expect("Failed to register item model");
+                let mesh_center = (
+                    model.size_x as f32 / 2.0,
+                    model.size_y as f32 / 2.0,
+                    model.size_z as f32 / 2.0,
+                );
+                let scale = 1.0 / usize::max(model.size_x, model.size_y) as f32;
+                let mesh_id = models
+                    .register(format!("item:{}", name), model)
+                    .expect("Failed to register item model");
+                items
+                    .register(name.clone(), Item { name, ty })
+                    .expect("Failed to register item");
+                item_meshes.push(ItemMesh::SimpleMesh {
+                    mesh_id,
+                    scale,
+                    mesh_center,
+                });
             }
         }
     }
@@ -116,13 +137,15 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     let mut blocks = Registry::default();
     let mut meshes = Vec::new();
     // Add air
-    blocks.register(
-        "air".to_owned(),
-        Block {
-            name: "air".to_owned(),
-            block_type: BlockType::Air,
-        },
-    ).expect("Couldn't register air in the registry.");
+    blocks
+        .register(
+            "air".to_owned(),
+            Block {
+                name: "air".to_owned(),
+                block_type: BlockType::Air,
+            },
+        )
+        .expect("Couldn't register air in the registry.");
     meshes.push(BlockMesh::Empty);
 
     for (name, block_type) in block_datas.into_iter() {
@@ -156,6 +179,8 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
         meshes,
         texture_atlas,
         models,
+        items,
+        item_meshes,
     })
 }
 
@@ -224,9 +249,7 @@ fn load_textures(
 }
 
 /// Load all <name>.ron files from a given folder and parse them into type `T`.
-fn load_files_from_folder<T: serde::de::DeserializeOwned>(
-    directory: PathBuf,
-) -> Vec<(String, T)> {
+fn load_files_from_folder<T: serde::de::DeserializeOwned>(directory: PathBuf) -> Vec<(String, T)> {
     let mut result = Vec::new();
     info!(
         "Loading objects of type {} from directory {}",
@@ -243,14 +266,18 @@ fn load_files_from_folder<T: serde::de::DeserializeOwned>(
             let file_path = dir_entry.path();
 
             match file_path.extension() {
-                None => log::warn!("No file extension for file {}, skipping...", file_path.display()),
+                None => log::warn!(
+                    "No file extension for file {}, skipping...",
+                    file_path.display()
+                ),
                 Some(ext) => {
                     if ext == "ron" {
                         log::info!("Attempting to read file {}", file_path.display());
-                        let mut file = fs::File::open(file_path.clone())
-                            .expect("Failed to open file");
+                        let mut file =
+                            fs::File::open(file_path.clone()).expect("Failed to open file");
                         let mut buffer = String::new();
-                        file.read_to_string(&mut buffer).expect("Failed to read from file");
+                        file.read_to_string(&mut buffer)
+                            .expect("Failed to read from file");
                         let file_stem = file_path
                             .file_stem()
                             .expect("Failed to get file stem")
@@ -264,19 +291,17 @@ fn load_files_from_folder<T: serde::de::DeserializeOwned>(
                                     Ok(x) => x,
                                     Err(e) => {
                                         log::error!("Failed to parse RON: {}, skipping...", e);
-                                        continue
+                                        continue;
                                     }
                                 }
                             } else {
                                 unreachable!("No parser for file format");
                             }
                         };
-                        result.push((
-                            file_stem,
-                            parsed_file,
-                        ));
+                        result.push((file_stem, parsed_file));
                     } else {
-                        log::warn!("Unsupported file extension {:?}, skipping...", ext); // TODO: display instead of debug
+                        log::warn!("Unsupported file extension {:?}, skipping...", ext);
+                        // TODO: display instead of debug
                     }
                 }
             }
