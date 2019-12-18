@@ -122,13 +122,12 @@ impl CompressedChunk {
 
     /// Recover original chunk
     pub fn to_chunk(&self) -> Chunk {
-        let mut data = Vec::new();
-        data.resize((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize, 0);
+        let mut data = unsafe { crate::collections::zero_initialized_vec((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize) };
 
         let mut i = 0;
         for &(len, block) in self.data.iter() {
-            for j in 0..len {
-                data[(i + j) as usize] = block;
+            for el in &mut data[(i as usize)..((i+len) as usize)] {
+                *el = block;
             }
             i += len;
         }

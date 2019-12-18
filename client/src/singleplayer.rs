@@ -41,7 +41,7 @@ pub struct SinglePlayer {
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     item_registry: Registry<Item>,
-        item_meshes: Vec<ItemMesh>,
+    item_meshes: Vec<ItemMesh>,
     model_registry: Registry<VoxelModel>,
     client: Box<dyn Client>,
     render_distance: RenderDistance,
