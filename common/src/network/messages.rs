@@ -3,9 +3,10 @@ use crate::{
     physics::simulation::ServerState,
     player::PlayerId,
     player::{PlayerInput, RenderDistance},
-    world::{chunk::CompressedChunk, CompressedLightChunk},
+    world::{chunk::Chunk, LightChunk},
 };
 use nalgebra::Vector3;
+use std::sync::Arc;
 
 /// A message sent to the server by the client
 #[derive(Debug, Clone)]
@@ -28,7 +29,7 @@ pub enum ToClient {
     /// Send the game data
     GameData(Data),
     /// Send the chunk at some position
-    Chunk(CompressedChunk, CompressedLightChunk),
+    Chunk(Arc<Chunk>, Arc<LightChunk>),
     /// Update the whole of the physics simulation
     // TODO: only send part of the physics simulation
     UpdatePhysics(ServerState),

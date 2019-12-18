@@ -20,6 +20,7 @@ pub struct BlockPos {
 }
 
 impl BlockPos {
+    #[inline(always)]
     pub fn containing_chunk_pos(self) -> ChunkPos {
         ChunkPos {
             px: self.px.div_euclid(CHUNK_SIZE as i64),
@@ -28,6 +29,7 @@ impl BlockPos {
         }
     }
 
+    #[inline(always)]
     pub fn pos_in_containing_chunk(self) -> (u32, u32, u32) {
         (
             self.px.rem_euclid(CHUNK_SIZE as i64) as u32,
@@ -216,13 +218,13 @@ impl World {
     }
 
     /// Set the chunk at position `pos`
-    pub fn set_chunk(&mut self, chunk: Chunk) {
-        self.chunks.insert(chunk.pos, Arc::new(chunk));
+    pub fn set_chunk(&mut self, chunk: Arc<Chunk>) {
+        self.chunks.insert(chunk.pos, chunk);
     }
 
     /// Set the light chunk at position `pos`
-    pub fn set_light_chunk(&mut self, chunk: LightChunk) {
-        self.light.insert(chunk.pos, Arc::new(chunk));
+    pub fn set_light_chunk(&mut self, chunk: Arc<LightChunk>) {
+        self.light.insert(chunk.pos, chunk);
     }
 
     /// Function to be called when updating a chunk to update highest

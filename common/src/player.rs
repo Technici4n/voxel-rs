@@ -1,5 +1,4 @@
-use crate::{world::chunk::ChunkPos, world::BlockPos};
-use nalgebra::Vector3;
+use crate::world::chunk::ChunkPos;
 use serde::Deserialize;
 
 /// The input of a player
@@ -49,14 +48,12 @@ pub struct RenderDistance {
 
 impl RenderDistance {
     /// Create an iterator over the chunks in the render distance around the player pos
-    pub fn iterate_around_player(self, player_pos: Vector3<f64>) -> impl Iterator<Item = ChunkPos> {
-        let player_chunk = BlockPos::from(player_pos).containing_chunk_pos();
+    pub fn iterate_around_player(self, player_chunk: ChunkPos) -> impl Iterator<Item = ChunkPos> {
         RenderDistanceIterator::new(self, player_chunk)
     }
 
     /// Check whether a chunk is in render distance of the player
-    pub fn is_chunk_visible(self, player_pos: Vector3<f64>, chunk_pos: ChunkPos) -> bool {
-        let player_chunk = BlockPos::from(player_pos).containing_chunk_pos();
+    pub fn is_chunk_visible(self, player_chunk: ChunkPos, chunk_pos: ChunkPos) -> bool {
         chunk_pos.px - player_chunk.px <= self.x_max as i64
             && chunk_pos.py - player_chunk.py <= self.y_max as i64
             && chunk_pos.pz - player_chunk.pz <= self.z_max as i64

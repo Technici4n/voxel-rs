@@ -3,6 +3,7 @@ use anyhow::Result;
 use log::info;
 use nalgebra::Vector3;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 use voxel_rs_common::block::BlockId;
 use voxel_rs_common::light::FastBFSQueue;
@@ -19,9 +20,8 @@ use voxel_rs_common::{
     physics::simulation::ServerPhysicsSimulation,
     player::RenderDistance,
     time::AverageTimeCounter,
-    world::CompressedLightChunk,
     world::{
-        chunk::{ChunkPos, CompressedChunk},
+        chunk::ChunkPos,
         BlockPos, World,
     },
     worldgen::DefaultWorldGenerator,
@@ -76,7 +76,6 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut generating_chunks = HashSet::new();
     // Pending light updates
     let mut update_lightning_chunks = HashSet::new();
-    let mut update_lightning_chunks_vec = Vec::new();
     // Light update BFS queue
     let mut light_bfs_queue = FastBFSQueue::new();
     let mut ligth_data_reuse = [0; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize];
@@ -133,7 +132,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             if world.has_chunk(chunk_pos) {
                                 let mut new_chunk = (*world.get_chunk(chunk_pos).unwrap()).clone();
                                 new_chunk.set_block_at(block.pos_in_containing_chunk(), 0);
-                                world.set_chunk(new_chunk);
+                                world.set_chunk(Arc::new(new_chunk));
 
                                 // TODO: remove copy paste
                                 if world.update_highest_opaque_block(chunk_pos) {
@@ -143,10 +142,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                             && (c_pos.px - chunk_pos.px).abs() <= 1
                                             && (c_pos.pz - chunk_pos.pz).abs() <= 1
                                         {
-                                            if !update_lightning_chunks.contains(&c_pos) {
-                                                update_lightning_chunks.insert(c_pos);
-                                                update_lightning_chunks_vec.push(c_pos);
-                                            }
+                                            update_lightning_chunks.insert(c_pos);
                                         }
                                     }
                                 } else {
@@ -156,10 +152,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                             && (c_pos.px - chunk_pos.px).abs() <= 1
                                             && (c_pos.pz - chunk_pos.pz).abs() <= 1
                                         {
-                                            if !update_lightning_chunks.contains(&c_pos) {
-                                                update_lightning_chunks.insert(c_pos);
-                                                update_lightning_chunks_vec.push(c_pos);
-                                            }
+                                            update_lightning_chunks.insert(c_pos);
                                         }
                                     }
                                 }
@@ -216,7 +209,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                     block.pos_in_containing_chunk(),
                                     players.get(&id).unwrap().block_to_place,
                                 );
-                                world.set_chunk(new_chunk);
+                                world.set_chunk(Arc::new(new_chunk));
 
                                 // TODO: remove copy paste
                                 if world.update_highest_opaque_block(chunk_pos) {
@@ -226,10 +219,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                             && (c_pos.px - chunk_pos.px).abs() <= 1
                                             && (c_pos.pz - chunk_pos.pz).abs() <= 1
                                         {
-                                            if !update_lightning_chunks.contains(&c_pos) {
-                                                update_lightning_chunks.insert(c_pos);
-                                                update_lightning_chunks_vec.push(c_pos);
-                                            }
+                                            update_lightning_chunks.insert(c_pos);
                                         }
                                     }
                                 } else {
@@ -239,10 +229,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                                             && (c_pos.px - chunk_pos.px).abs() <= 1
                                             && (c_pos.pz - chunk_pos.pz).abs() <= 1
                                         {
-                                            if !update_lightning_chunks.contains(&c_pos) {
-                                                update_lightning_chunks.insert(c_pos);
-                                                update_lightning_chunks_vec.push(c_pos);
-                                            }
+                                            update_lightning_chunks.insert(c_pos);
                                         }
                                     }
                                 }
@@ -257,7 +244,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             // Only insert the chunk in the world if it was still being generated.
             if generating_chunks.remove(&chunk.pos) {
                 let pos = chunk.pos.clone();
-                world.set_chunk(chunk);
+                world.set_chunk(Arc::new(chunk));
                 if world.update_highest_opaque_block(pos) {
                     // recompute the light of the 3x3 columns
                     for &c_pos in world.chunks.keys() {
@@ -265,10 +252,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             && (c_pos.px - pos.px).abs() <= 1
                             && (c_pos.pz - pos.pz).abs() <= 1
                         {
-                            if !update_lightning_chunks.contains(&c_pos) {
-                                update_lightning_chunks.insert(c_pos);
-                                update_lightning_chunks_vec.push(c_pos);
-                            }
+                            update_lightning_chunks.insert(c_pos);
                         }
                     }
                 } else {
@@ -278,10 +262,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             && (c_pos.px - pos.px).abs() <= 1
                             && (c_pos.pz - pos.pz).abs() <= 1
                         {
-                            if !update_lightning_chunks.contains(&c_pos) {
-                                update_lightning_chunks.insert(c_pos);
-                                update_lightning_chunks_vec.push(c_pos);
-                            }
+                            update_lightning_chunks.insert(c_pos);
                         }
                     }
                 }
@@ -306,25 +287,22 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             }
         }
 
+        let player_chunks = players
+            .iter()
+            .flat_map(|(id, _)| physics_simulation.get_state().physics_state.players.get(id))
+            .map(|player| BlockPos::from(player.aabb.pos).containing_chunk_pos())
+            .collect::<Vec<_>>();
+        let mut update_lightning_chunks_vec = update_lightning_chunks.iter().cloned().collect::<Vec<_>>();
         // Update light of one chunk at the time
-        update_lightning_chunks_vec.sort_unstable_by_key(|pos| {
+        update_lightning_chunks_vec.sort_by_cached_key(|pos| {
             let u = match lightning_prob_pass.get(&pos) {
                 None => 0,
                 Some(i) => *i,
             };
 
             let mut min_distance = 1_000_000_000;
-            for (player, _) in players.iter() {
-                if let Some(pl) = physics_simulation
-                    .get_state()
-                    .physics_state
-                    .players
-                    .get(player)
-                {
-                    min_distance = min_distance.min(pos.squared_euclidian_distance(
-                        BlockPos::from(pl.aabb.pos).containing_chunk_pos(),
-                    ));
-                }
+            for player_chunk in &player_chunks {
+                min_distance = u64::min(min_distance, pos.squared_euclidian_distance(*player_chunk));
             }
             (u, -pos.py, -(min_distance as i64))
         });
@@ -371,16 +349,17 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         // Send chunks to players
         let mut player_positions = Vec::new();
         for (player, data) in players.iter_mut() {
-            let player_pos = physics_simulation
+            let player_chunk = BlockPos::from(physics_simulation
                 .get_state()
                 .physics_state
                 .players
                 .get(player)
                 .unwrap()
-                .get_camera_position();
-            player_positions.push((player_pos, data.render_distance));
+                .get_camera_position()
+            ).containing_chunk_pos();
+            player_positions.push((player_chunk, data.render_distance));
             // Send new chunks
-            for chunk_pos in data.render_distance.iterate_around_player(player_pos) {
+            for chunk_pos in data.render_distance.iterate_around_player(player_chunk) {
                 // The player hasn't received the chunk yet
                 if !data.loaded_chunks.contains(&chunk_pos) {
                     if let Some(chunk) = world.get_chunk(chunk_pos) {
@@ -388,10 +367,8 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         server.send(
                             *player,
                             ToClient::Chunk(
-                                CompressedChunk::from_chunk(&chunk),
-                                CompressedLightChunk::from_chunk(
-                                    &world.get_add_light_chunk(chunk_pos),
-                                ),
+                                chunk.clone(),
+                                world.get_add_light_chunk(chunk_pos).clone(),
                             ),
                         );
                         data.loaded_chunks.insert(chunk_pos);
@@ -407,7 +384,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             // Drop chunks that are too far away
             let render_distance = data.render_distance;
             data.loaded_chunks
-                .retain(|chunk_pos| render_distance.is_chunk_visible(player_pos, *chunk_pos));
+                .retain(|chunk_pos| render_distance.is_chunk_visible(player_chunk, *chunk_pos));
         }
 
         // Drop chunks that are far from all players (and update chunk priorities)
@@ -417,8 +394,8 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             ..
         } = world;
         chunks.retain(|chunk_pos, _| {
-            for (player_position, render_distance) in player_positions.iter() {
-                if render_distance.is_chunk_visible(*player_position, *chunk_pos) {
+            for (player_chunk, render_distance) in player_positions.iter() {
+                if render_distance.is_chunk_visible(*player_chunk, *chunk_pos) {
                     return true;
                 }
             }
@@ -428,10 +405,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         generating_chunks.retain(|chunk_pos| {
             let mut min_distance = 1_000_000_000;
             let mut retain = false;
-            for (player_position, render_distance) in player_positions.iter() {
-                if render_distance.is_chunk_visible(*player_position, *chunk_pos) {
+            for (player_chunk, render_distance) in player_positions.iter() {
+                if render_distance.is_chunk_visible(*player_chunk, *chunk_pos) {
                     min_distance = min_distance.min(chunk_pos.squared_euclidian_distance(
-                        BlockPos::from(*player_position).containing_chunk_pos(),
+                        *player_chunk,
                     ));
                     retain = true;
                 }
@@ -443,6 +420,15 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             }
             retain
         });
+        update_lightning_chunks.retain(|chunk_pos| {
+            for (player_chunk, render_distance) in player_positions.iter() {
+                if render_distance.is_chunk_visible(*player_chunk, *chunk_pos) {
+                    return true;
+                }
+            }
+            light.remove(chunk_pos);
+            false
+        });
 
         send_debug_info("Chunks", "server",
                         format!(
@@ -450,7 +436,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                             world.chunks.len(),
                             world.light.len(),
                             generating_chunks.len(),
-                            update_lightning_chunks_vec.len(),
+                            update_lightning_chunks.len(),
                         ));
 
         // Nothing else to do for now :-)

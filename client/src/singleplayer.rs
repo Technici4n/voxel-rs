@@ -51,6 +51,7 @@ pub struct SinglePlayer {
     debug_info: DebugInfo,
     chunks_to_mesh: HashSet<ChunkPos>,
     start_time: Instant,
+    priority_update_count: usize,
 }
 
 impl SinglePlayer {
@@ -133,6 +134,7 @@ impl SinglePlayer {
                 debug_info: DebugInfo::new_current(),
                 chunks_to_mesh: Default::default(),
                 start_time: Instant::now(),
+                priority_update_count: 0,
             }),
             encoder.finish(),
         ))
@@ -156,13 +158,14 @@ impl State for SinglePlayer {
                 ClientEvent::ServerMessage(message) => match message {
                     ToClient::Chunk(chunk, light_chunk) => {
                         // TODO: make sure this only happens once
-                        self.world.set_chunk(chunk.to_chunk());
-                        self.world.set_light_chunk(light_chunk.to_chunk());
+                        let chunk_pos = chunk.pos;
+                        self.world.set_chunk(chunk);
+                        self.world.set_light_chunk(light_chunk);
                         // Queue chunks for meshing
                         for i in -1..=1 {
                             for j in -1..=1 {
                                 for k in -1..=1 {
-                                    self.chunks_to_mesh.insert(chunk.pos.offset(i, j, k));
+                                    self.chunks_to_mesh.insert(chunk_pos.offset(i, j, k));
                                 }
                             }
                         }
@@ -214,6 +217,7 @@ impl State for SinglePlayer {
             ref mut world,
             ref mut world_renderer,
             ref render_distance,
+            ref mut priority_update_count,
             ..
         } = self;
         let World {
@@ -221,12 +225,20 @@ impl State for SinglePlayer {
             ref mut light,
             ..
         } = world;
+        // We need to quickly update close chunks, but we don't want to send too many priority
+        // updates for far chunks
+        const PRIORITY_UPDATE_THRESHOLD: u64 = 16;
+        const PRIORITY_UPDATE_CHANCE: usize = 47;
         chunks.retain(|chunk_pos, _| {
-            if render_distance.is_chunk_visible(p, *chunk_pos) {
-                world_renderer.update_chunk_priority(
-                    *chunk_pos,
-                    chunk_pos.squared_euclidian_distance(player_chunk),
-                );
+            if render_distance.is_chunk_visible(player_chunk, *chunk_pos) {
+                let priority = chunk_pos.squared_euclidian_distance(player_chunk);
+                if priority < PRIORITY_UPDATE_THRESHOLD || *priority_update_count == 0 {
+                    world_renderer.update_chunk_priority(
+                        *chunk_pos,
+                        priority,
+                    );
+                }
+                *priority_update_count = (*priority_update_count + 1) % PRIORITY_UPDATE_CHANCE;
                 true
             } else {
                 world_renderer.remove_chunk(*chunk_pos);
