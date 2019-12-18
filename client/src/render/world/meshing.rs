@@ -249,7 +249,7 @@ pub fn greedy_meshing(
     for s in 0..6 {
         let mut opaque_blocks_count_pass = opaque_blocks_count;
         // each direction
-        'ijk: for j in 0..(CHUNK_SIZE as i32) {
+        'faces: for j in 0..(CHUNK_SIZE as i32) {
             for i in 0..(CHUNK_SIZE as i32) {
                 for k in 0..(CHUNK_SIZE as i32) {
                     unsafe {
@@ -330,7 +330,7 @@ pub fn greedy_meshing(
                                 tot_quad += 1;
                             }
                         } else if opaque_blocks_count_pass == 0 {
-                            break 'ijk;
+                            break 'faces;
                         }
                     }
                 }
@@ -394,7 +394,7 @@ pub fn greedy_meshing(
         let dky = delta2[1];
         let dkz = delta2[2];
 
-        'ijk: for i in 0..(CHUNK_SIZE as i32) {
+        'quads: for i in 0..(CHUNK_SIZE as i32) {
             // x x y y z z
             for j in 0..(CHUNK_SIZE as i32) {
                 // y y x x x x
@@ -581,7 +581,7 @@ pub fn greedy_meshing(
                             n_of_different_vertex += 4;
                             act_quad += 1;
                         } else if *to_mesh_faces.get_unchecked(s) == 0 {
-                            break 'ijk;
+                            break 'quads;
                         }
                     }
                 }
