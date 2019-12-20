@@ -1,5 +1,4 @@
 use self::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
-use crate::light::{compute_light, FastBFSQueue};
 use crate::world::chunk::ChunkPosXZ;
 use crate::{
     block::{Block, BlockId},
@@ -319,68 +318,6 @@ impl World {
         self.highest_opaque_block
             .insert(chunk_pos_xz, highest_opaque_block);
         return true;
-    }
-
-    /// Update the light of a chunk at chunkPos
-    /// Return true if they has been an update
-    pub fn update_light(
-        &mut self,
-        pos: &ChunkPos,
-        bfs_queue: &mut FastBFSQueue,
-        light_data: &mut [u8; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
-        opaque: &mut [bool; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
-    ) -> bool {
-        if self.chunks.contains_key(&pos) {
-            let light = {
-                let mut vec_chunk: Vec<Option<Arc<Chunk>>> = Vec::new();
-                let mut vec_highest_opaque_block: Vec<HighestOpaqueBlock> = Vec::new();
-
-                // Creating the datastructure to be sent to the lightning algorithm
-                for i in -1..=1 {
-                    for k in -1..=1 {
-                        let pos_act = pos.offset(i, 0, k);
-                        let pos_xz: ChunkPosXZ = pos_act.into();
-                        vec_highest_opaque_block.push(
-                            (*self
-                                .highest_opaque_block
-                                .entry(pos_xz)
-                                .or_insert_with(|| HighestOpaqueBlock::new(pos_xz)))
-                            .clone(),
-                        );
-                    }
-                }
-
-                for i in -1..=1 {
-                    for j in -1..=1 {
-                        for k in -1..=1 {
-                            let pos_act = pos.offset(i, j, k);
-                            vec_chunk.push(self.get_chunk(pos_act));
-                        }
-                    }
-                }
-                compute_light(
-                    vec_chunk,
-                    vec_highest_opaque_block,
-                    bfs_queue,
-                    light_data,
-                    opaque,
-                )
-                .light_level
-            };
-
-            // updating the light
-            self.light.insert(
-                *pos,
-                Arc::new(LightChunk {
-                    light: light.to_vec(),
-                    pos: *pos,
-                }),
-            );
-
-            true
-        } else {
-            false
-        }
     }
 }
 

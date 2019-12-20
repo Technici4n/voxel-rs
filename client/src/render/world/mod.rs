@@ -3,7 +3,7 @@
 use super::buffers::MultiBuffer;
 use super::frustum::Frustum;
 use super::init::{create_default_pipeline, load_glsl_shader, ShaderStage};
-use super::world::meshing_worker::MeshingWorker;
+use super::world::meshing_worker::{MeshingState, MeshingWorker};
 use crate::texture::load_image;
 use crate::window::WindowBuffers;
 use image::{ImageBuffer, Rgba};
@@ -193,7 +193,7 @@ impl WorldRenderer {
         }
 
         Self {
-            meshing_worker: MeshingWorker::new(block_meshes),
+            meshing_worker: MeshingWorker::new(MeshingState::new(block_meshes)),
             uniform_view_proj,
             uniform_model,
             chunk_index_buffers: MultiBuffer::with_capacity(device, 1000, wgpu::BufferUsage::INDEX),
@@ -229,7 +229,7 @@ impl WorldRenderer {
         world: &World,
     ) {
         //============= RECEIVE CHUNK MESHES =============//
-        for (pos, vertices, indices) in self.meshing_worker.get_processed_chunks() {
+        for (pos, vertices, indices) in self.meshing_worker.get_processed() {
             if world.has_chunk(pos) {
                 if vertices.len() > 0 && indices.len() > 0 {
                     self.chunk_vertex_buffers
@@ -420,15 +420,15 @@ impl WorldRenderer {
 
     pub fn update_chunk(&mut self, world: &World, pos: ChunkPos) {
         self.meshing_worker
-            .enqueue_chunk(self::meshing::ChunkMeshData::create_from_world(world, pos));
+            .enqueue(pos, self::meshing::ChunkMeshData::create_from_world(world, pos));
     }
 
-    pub fn update_chunk_priority(&mut self, pos: ChunkPos, priority: u64) {
-        self.meshing_worker.update_chunk_priority(pos, priority);
+    pub fn update_position(&mut self, player_pos: ChunkPos) {
+        self.meshing_worker.update_player_pos(vec![player_pos]);
     }
 
     pub fn remove_chunk(&mut self, pos: ChunkPos) {
-        self.meshing_worker.dequeue_chunk(pos);
+        self.meshing_worker.dequeue(pos);
         self.chunk_vertex_buffers.remove(&pos);
         self.chunk_index_buffers.remove(&pos);
     }

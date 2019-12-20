@@ -28,7 +28,6 @@ use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::item::{Item, ItemMesh};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
-use voxel_rs_common::world::chunk::ChunkPos;
 use winit::event::{ElementState, MouseButton};
 
 /// State of a singleplayer world
@@ -49,9 +48,7 @@ pub struct SinglePlayer {
     physics_simulation: ClientPhysicsSimulation,
     yaw_pitch: YawPitch,
     debug_info: DebugInfo,
-    chunks_to_mesh: HashSet<ChunkPos>,
     start_time: Instant,
-    priority_update_count: usize,
 }
 
 impl SinglePlayer {
@@ -132,9 +129,7 @@ impl SinglePlayer {
                 ),
                 yaw_pitch: Default::default(),
                 debug_info: DebugInfo::new_current(),
-                chunks_to_mesh: Default::default(),
                 start_time: Instant::now(),
-                priority_update_count: 0,
             }),
             encoder.finish(),
         ))
@@ -151,6 +146,7 @@ impl State for SinglePlayer {
         _seconds_delta: f64,
         _device: &mut wgpu::Device,
     ) -> Result<StateTransition> {
+        let mut chunks_to_mesh = HashSet::new();
         // Handle server messages
         loop {
             match self.client.receive_event() {
@@ -165,7 +161,7 @@ impl State for SinglePlayer {
                         for i in -1..=1 {
                             for j in -1..=1 {
                                 for k in -1..=1 {
-                                    self.chunks_to_mesh.insert(chunk_pos.offset(i, j, k));
+                                    chunks_to_mesh.insert(chunk_pos.offset(i, j, k));
                                 }
                             }
                         }
@@ -192,6 +188,15 @@ impl State for SinglePlayer {
 
         let p = self.physics_simulation.get_camera_position();
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
+        // Send current position to meshing
+        self.world_renderer.update_position(player_chunk);
+        // Send chunk updates to meshing
+        for chunk_pos in chunks_to_mesh.into_iter() {
+            if self.world.has_chunk(chunk_pos) {
+                assert_eq!(self.world.has_light_chunk(chunk_pos), true);
+                self.world_renderer.update_chunk(&self.world, chunk_pos);
+            }
+        }
 
         // Debug current player position, yaw and pitch
         send_debug_info(
@@ -217,7 +222,6 @@ impl State for SinglePlayer {
             ref mut world,
             ref mut world_renderer,
             ref render_distance,
-            ref mut priority_update_count,
             ..
         } = self;
         let World {
@@ -225,20 +229,8 @@ impl State for SinglePlayer {
             ref mut light,
             ..
         } = world;
-        // We need to quickly update close chunks, but we don't want to send too many priority
-        // updates for far chunks
-        const PRIORITY_UPDATE_THRESHOLD: u64 = 16;
-        const PRIORITY_UPDATE_CHANCE: usize = 47;
         chunks.retain(|chunk_pos, _| {
             if render_distance.is_chunk_visible(player_chunk, *chunk_pos) {
-                let priority = chunk_pos.squared_euclidian_distance(player_chunk);
-                if priority < PRIORITY_UPDATE_THRESHOLD || *priority_update_count == 0 {
-                    world_renderer.update_chunk_priority(
-                        *chunk_pos,
-                        priority,
-                    );
-                }
-                *priority_update_count = (*priority_update_count + 1) % PRIORITY_UPDATE_CHANCE;
                 true
             } else {
                 world_renderer.remove_chunk(*chunk_pos);
@@ -246,24 +238,6 @@ impl State for SinglePlayer {
                 false
             }
         });
-
-        // Update meshing (for roughly 10 milliseconds)
-        // TODO: put this in the renderer ?
-        let meshing_start = Instant::now();
-        let mut chunk_updates: Vec<_> = self.chunks_to_mesh.iter().cloned().collect();
-        // Sort the chunks so that the nearest ones are meshed first
-        chunk_updates.sort_unstable_by_key(|pos| pos.squared_euclidian_distance(player_chunk));
-        for chunk_pos in chunk_updates.into_iter() {
-            if (Instant::now() - meshing_start).subsec_millis() > 10 {
-                break;
-            }
-            // Only mesh the chunks if it needs updating
-            self.chunks_to_mesh.remove(&chunk_pos);
-            if self.world.has_chunk(chunk_pos) {
-                assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.world_renderer.update_chunk(&self.world, chunk_pos);
-            }
-        }
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 

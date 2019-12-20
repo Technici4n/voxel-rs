@@ -21,9 +21,11 @@ pub fn compute_light(
     chunks: Vec<Option<Arc<Chunk>>>,
     highest_opaque_blocks: Vec<HighestOpaqueBlock>,
     queue: &mut FastBFSQueue,
-    light_data: &mut [u8; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
-    opaque: &mut [bool; (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize],
+    light_data: &mut [u8],
+    opaque: &mut [bool],
 ) -> LightData {
+    assert!(light_data.len() >= (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize);
+    assert!(opaque.len() >= (CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize);
     let mut res = LightData::new();
     queue.clear();
 
