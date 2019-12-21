@@ -5,6 +5,7 @@ use voxel_rs_common::network::dummy;
 use voxel_rs_server::launch_server;
 
 mod fps;
+mod gui;
 mod input;
 //mod mainmenu; TODO: fix this
 mod render;

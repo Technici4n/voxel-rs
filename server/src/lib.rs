@@ -26,6 +26,7 @@ use voxel_rs_common::{
     worldgen::DefaultWorldGenerator,
 };
 use voxel_rs_common::world::HighestOpaqueBlock;
+use voxel_rs_common::time::AverageTimeCounter;
 
 mod light;
 mod worldgen;
@@ -80,10 +81,12 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut generating_chunks = HashSet::new();
     // Pending light updates
     let mut update_lightning_chunks = HashSet::new();
+    let mut server_timing = AverageTimeCounter::new();
 
     info!("Server initialized successfully! Starting server loop");
     loop {
         // Handle messages
+        let loop_start = Instant::now();
         loop {
             match server.receive_event() {
                 ServerEvent::NoEvent => break,
@@ -277,8 +280,8 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         // Send light updates
         for chunk_pos in update_lightning_chunks.drain() {
             if world.has_chunk(chunk_pos) {
-                let mut chunks = Vec::new();
-                let mut highest_opaque_blocks = Vec::new();
+                let mut chunks = Vec::with_capacity(27);
+                let mut highest_opaque_blocks = Vec::with_capacity(9);
 
                 for i in -1..=1 {
                     for k in -1..=1 {
@@ -303,23 +306,6 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
 
                 let data = ChunkLightingData { chunks, highest_opaque_blocks };
                 light_worker.enqueue(chunk_pos, data);
-            }
-        }
-        let mut lightning_prob_pass = HashMap::new(); // probable number of re-update of light
-        for c_pos in update_lightning_chunks.iter() {
-            for i in -1..=1 {
-                for j in -1..=1 {
-                    for k in -1..=1 {
-                        let pos_adj = c_pos.offset(i, j, k);
-                        if generating_chunks.contains(&pos_adj) {
-                            let u = match lightning_prob_pass.remove(&pos_adj) {
-                                None => 0,
-                                Some(value) => value + 1,
-                            };
-                            lightning_prob_pass.insert(pos_adj, u);
-                        }
-                    }
-                }
             }
         }
 
@@ -424,5 +410,8 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         ));
 
         // Nothing else to do for now :-)
+
+        server_timing.add_time(Instant::now() - loop_start);
+        send_debug_info("Server", "timing", format!("Average server loop time: {} microseconds", server_timing.average_time_micros()));
     }
 }

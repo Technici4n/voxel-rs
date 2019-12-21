@@ -16,7 +16,8 @@ struct DebugInfoUnit {
 /// There can only be one active `DebugInfo` at any time.
 pub struct DebugInfo {
     receiver: Receiver<DebugInfoUnit>,
-    sections: BTreeMap<String, BTreeMap<String, String>>,
+    sections: BTreeMap<String, (bool, u32, BTreeMap<String, String>)>,
+    next_id: u32,
 }
 
 impl DebugInfo {
@@ -27,18 +28,26 @@ impl DebugInfo {
         Self {
             receiver,
             sections: BTreeMap::new(),
+            next_id: 0,
         }
     }
 
     /// Get the debug info
-    pub fn get_debug_info(&mut self) -> BTreeMap<String, BTreeMap<String, String>> {
+    pub fn get_debug_info(&mut self) -> &mut BTreeMap<String, (bool, u32, BTreeMap<String, String>)> {
+        let Self { ref mut next_id, .. } = self;
         while let Ok(diu) = self.receiver.try_recv() {
-            self.sections
+            let (_, _, inner_map) = self.sections
                 .entry(diu.section)
-                .or_insert(BTreeMap::new())
-                .insert(diu.id, diu.message);
+                .or_insert_with(|| {
+                    *next_id += 1;
+                    (false, *next_id - 1, BTreeMap::new())
+                });
+            let stored_message = inner_map
+                .entry(diu.id)
+                .or_insert_with(String::new);
+            *stored_message = diu.message;
         }
-        self.sections.clone()
+        &mut self.sections
     }
 }
 

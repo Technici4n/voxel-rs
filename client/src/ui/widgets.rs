@@ -24,7 +24,7 @@ impl<T> Widget<PrimitiveBuffer, T> for Text {
     }
 
     fn render(&self, buffer: &mut PrimitiveBuffer, _cursor_position: Position, layout: Layout) {
-        buffer.draw_text(self.text.clone(), layout, 0.0, false);
+        //buffer.draw_text(self.text.clone(), layout, 0.0, false);
     }
 }
 
@@ -98,7 +98,7 @@ where
         if hovering {
             l.y += 2.0;
         }
-        buffer.draw_text(self.text.clone(), l, 0.1, true);
+        //buffer.draw_text(self.text.clone(), l, 0.1, true);
     }
 
     fn on_event(

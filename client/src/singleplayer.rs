@@ -29,12 +29,14 @@ use voxel_rs_common::debug::{send_debug_info, DebugInfo};
 use voxel_rs_common::item::{Item, ItemMesh};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
 use winit::event::{ElementState, MouseButton};
+use crate::gui::Gui;
 
 /// State of a singleplayer world
 pub struct SinglePlayer {
     fps_counter: FpsCounter,
     ui: Ui,
     ui_renderer: UiRenderer,
+    gui: Gui,
     world: World,
     world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
@@ -111,6 +113,7 @@ impl SinglePlayer {
                 fps_counter: FpsCounter::new(),
                 ui: Ui::new(),
                 ui_renderer,
+                gui: Gui::new(),
                 world: World::new(),
                 world_renderer,
                 block_registry: data.blocks,
@@ -346,12 +349,16 @@ impl State for SinglePlayer {
 
         // Draw ui
         self.ui.rebuild(&mut self.debug_info, data)?;
+        self.gui.prepare();
+        crate::gui::experiments::render_debug_info(&mut self.gui, &mut self.debug_info);
+        self.gui.finish();
         self.ui_renderer.render(
             buffers,
             device,
             &mut encoder,
             &data,
             &self.ui.ui,
+            &mut self.gui,
             self.ui.should_capture_mouse(),
         );
 
@@ -366,6 +373,8 @@ impl State for SinglePlayer {
 
     fn handle_cursor_movement(&mut self, logical_position: winit::dpi::LogicalPosition) {
         self.ui.cursor_moved(logical_position);
+        let (x, y) = logical_position.into();
+        self.gui.update_mouse_position(x, y);
     }
 
     fn handle_mouse_state_changes(
@@ -394,6 +403,17 @@ impl State for SinglePlayer {
                         self.client.send(ToServer::SelectBlock(pp.aabb.pos, y, p));
                     }
                     _ => {}
+                },
+                _ => {}
+            }
+            match *button {
+                MouseButton::Left => match *state {
+                    ElementState::Pressed => {
+                        self.gui.update_mouse_button(true);
+                    }
+                    ElementState::Released => {
+                        self.gui.update_mouse_button(false);
+                    }
                 },
                 _ => {}
             }

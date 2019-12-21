@@ -110,10 +110,13 @@ impl<'a> UiRenderer {
         encoder: &mut wgpu::CommandEncoder,
         data: &WindowData,
         ui: &quint::Ui<PrimitiveBuffer, Message>,
+        gui: &mut crate::gui::Gui,
         draw_crosshair: bool,
     ) {
-        let mut primitive_buffer = PrimitiveBuffer::default();
-        ui.render(&mut primitive_buffer);
+        // Render test dropdown
+        let mut primitive_buffer = gui.drain_primitives();
+
+        //ui.render(&mut primitive_buffer);
 
         // Render primitives
         let mut rect_vertices: Vec<UiVertex> = Vec::new();
@@ -168,18 +171,20 @@ impl<'a> UiRenderer {
         }
         // Text
         for TextPrimitive {
-            layout: l,
+            x, y, w, h,
             mut parts,
             z,
-            centered,
+            center_horizontally, center_vertically,
         } in primitive_buffer.text.into_iter()
         {
             let dpi = data.hidpi_factor as f32;
 
+            // Apply DPI to font size
             for p in parts.iter_mut() {
                 p.font_size.x *= dpi;
                 p.font_size.y *= dpi;
             }
+            // Get font IDs
             let Self { ref fonts, .. } = &self;
             let parts = parts
                 .iter()
@@ -194,26 +199,48 @@ impl<'a> UiRenderer {
                         .unwrap_or_default(),
                 })
                 .collect();
-            let section = if centered {
-                wgpu_glyph::VariedSection {
-                    text: parts,
-                    screen_position: ((l.x + l.width / 2.0) * dpi, (l.y + l.height / 2.0) * dpi),
-                    bounds: (l.width * dpi, l.height * dpi),
-                    z,
-                    layout: wgpu_glyph::Layout::Wrap {
-                        line_breaker: Default::default(),
-                        v_align: wgpu_glyph::VerticalAlign::Center,
-                        h_align: wgpu_glyph::HorizontalAlign::Center,
-                    },
-                }
+            // Calculate positions
+            let mut x = x as f32;
+            let mut y = y as f32;
+            let mut w = match w {
+                Some(w) => w as f32,
+                None => std::f32::INFINITY,
+            };
+            let mut h = match h {
+                Some(h) => h as f32,
+                None => std::f32::INFINITY,
+            };
+            if center_horizontally {
+                x += w/2.0;
+            }
+            if center_vertically {
+                y += h/2.0;
+            }
+            // Apply DPI to positions
+            x *= dpi;
+            y *= dpi;
+            w *= dpi;
+            h *= dpi;
+            let v_align = if center_vertically {
+                wgpu_glyph::VerticalAlign::Center
             } else {
-                wgpu_glyph::VariedSection {
-                    text: parts,
-                    screen_position: (l.x * dpi, l.y * dpi),
-                    bounds: (l.width * dpi, l.height * dpi),
-                    z,
-                    layout: Default::default(),
-                }
+                wgpu_glyph::VerticalAlign::Top
+            };
+            let h_align = if center_horizontally {
+                wgpu_glyph::HorizontalAlign::Center
+            } else {
+                wgpu_glyph::HorizontalAlign::Left
+            };
+            let section = wgpu_glyph::VariedSection {
+                text: parts,
+                screen_position: (x, y),
+                bounds: (w, h),
+                z,
+                layout: wgpu_glyph::Layout::Wrap {
+                    line_breaker: Default::default(),
+                    v_align,
+                    h_align,
+                },
             };
             self.glyph_brush.queue(section);
         }

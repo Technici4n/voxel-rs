@@ -8,6 +8,7 @@ use voxel_rs_common::debug::DebugInfo;
 use wgpu_glyph::Scale;
 use winit::dpi::LogicalPosition;
 
+//pub mod rewrite;
 pub mod widgets;
 
 // TODO: rewrite ui because it's very badly designed
@@ -54,7 +55,7 @@ impl Ui {
 
         // Always draw debug info
         {
-            layers.push(self.draw_debug_info(debug_info.get_debug_info()));
+            //layers.push(self.draw_debug_info(debug_info.get_debug_info()));
         }
 
         // Draw menu
@@ -234,10 +235,14 @@ pub struct RectanglePrimitive {
 
 #[derive(Debug, Clone)]
 pub struct TextPrimitive {
-    pub layout: quint::Layout,
+    pub x: i32,
+    pub y: i32,
+    pub w: Option<i32>,
+    pub h: Option<i32>,
     pub parts: Vec<TextPart>,
     pub z: f32,
-    pub centered: bool,
+    pub center_horizontally: bool,
+    pub center_vertically: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -267,7 +272,20 @@ impl PrimitiveBuffer {
         self.rectangle.push(RectanglePrimitive { color, layout, z });
     }
 
-    pub fn draw_text(
+    pub fn draw_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: [f32; 4], z: f32) {
+        self.rectangle.push(RectanglePrimitive {
+            color,
+            layout: quint::Layout {
+                x: x as f32,
+                y: y as f32,
+                width: w as f32,
+                height: h as f32,
+            },
+            z,
+        });
+    }
+
+    /*pub fn draw_text(
         &mut self,
         parts: Vec<TextPart>,
         layout: quint::Layout,
@@ -280,6 +298,24 @@ impl PrimitiveBuffer {
             z,
             centered,
         })
+    }*/
+
+    pub fn draw_text_simple(&mut self, x: i32, y: i32, h: i32, text: String, color: [f32; 4], z: f32) {
+        self.text.push(TextPrimitive {
+            x,
+            y,
+            w: None,
+            h: Some(h),
+            parts: vec![TextPart {
+                text,
+                font_size: Scale::uniform(20.0),
+                color,
+                font: None,
+            }],
+            z,
+            center_horizontally: false,
+            center_vertically: true,
+        });
     }
 
     pub fn draw_triangles(&mut self, vertices: Vec<[f32; 3]>, indices: Vec<u32>, color: [f32; 4]) {
