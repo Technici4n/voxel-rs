@@ -26,7 +26,7 @@ use voxel_rs_common::{
     worldgen::DefaultWorldGenerator,
 };
 use voxel_rs_common::world::HighestOpaqueBlock;
-use voxel_rs_common::time::{AverageTimeCounter, BreakdownCounter};
+use voxel_rs_common::time::BreakdownCounter;
 
 mod light;
 mod worldgen;

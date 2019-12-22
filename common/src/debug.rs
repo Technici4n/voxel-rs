@@ -74,10 +74,11 @@ pub struct WorkerPerf {
     pub micros_per_iter: f32,
     pub iter_per_sec: f32,
     pub efficiency: f32,
+    pub pending: usize,
 }
 
 /// Send a debug info worker perf
-pub fn send_worker_perf(section: impl ToString, id: impl ToString, name: impl ToString, micros_per_iter: f32, iter_per_sec: f32) {
+pub fn send_worker_perf(section: impl ToString, id: impl ToString, name: impl ToString, micros_per_iter: f32, iter_per_sec: f32, pending: usize) {
     DEBUG_INFO.read().unwrap().as_ref().map(|sender| {
         sender
             .send(DebugInfoUnit {
@@ -88,6 +89,7 @@ pub fn send_worker_perf(section: impl ToString, id: impl ToString, name: impl To
                     micros_per_iter,
                     iter_per_sec,
                     efficiency: micros_per_iter / 1_000_000.0 * iter_per_sec,
+                    pending,
                 }),
             })
             .unwrap()

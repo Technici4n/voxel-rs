@@ -138,6 +138,6 @@ fn start_worker_thread<Input: Send, Output: Send, State: WorkerState<Input, Outp
         }
 
         // Send perf report
-        send_worker_perf("Workers", &name, &name, timing.average_time_micros() as f32, timing.average_iter_per_sec());
+        send_worker_perf("Workers", &name, &name, timing.average_time_micros() as f32, timing.average_iter_per_sec(), queued_chunks.len());
     }
 }

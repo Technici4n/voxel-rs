@@ -8,8 +8,8 @@ pub fn render_debug_info(gui: &mut super::Gui, debug_info: &mut DebugInfo) {
     let x = 4;
     let mut y = 4;
     for (section, (displayed, id, messages)) in debug_info {
-        gui.text(x, y, ELEMENT_HEIGHT, format!("{} debug info", section.to_uppercase()), [1.0, 1.0, 1.0, 1.0], 0.03);
-        if gui.button(*id, x, y, 400, ELEMENT_HEIGHT) {
+        let section_text = format!("{} debug info", section.to_uppercase());
+        if gui.button(*id, x, y, 400, ELEMENT_HEIGHT).text(section_text, [1.0, 1.0, 1.0, 1.0]).build() {
             *displayed = !*displayed;
         }
         y += ELEMENT_OFFSET;
@@ -23,7 +23,14 @@ pub fn render_debug_info(gui: &mut super::Gui, debug_info: &mut DebugInfo) {
                         }
                     },
                     DebugInfoPart::WorkerPerf(perf) => {
-                        let text = format!("{:22} | {:6.1} ms/iter | {:5.0} iter/s | {:3.0}% efficiency", perf.name, perf.micros_per_iter/1000.0, perf.iter_per_sec, perf.efficiency * 100.0);
+                        let text = format!(
+                            "{:22} | {:6.1} ms/iter | {:5.0} iter/s | {:3.0}% efficiency | {:7} pending",
+                            perf.name,
+                            perf.micros_per_iter/1000.0,
+                            perf.iter_per_sec,
+                            perf.efficiency * 100.0,
+                            perf.pending,
+                        );
                         gui.text(x + 10, y, ELEMENT_HEIGHT, text, [1.0, 1.0, 1.0, 1.0], 0.02);
                         y += ELEMENT_HEIGHT;
                     },

@@ -99,6 +99,12 @@ impl BreakdownCounter {
         let d = now - self.last_time;
         self.last_time = now;
 
+        if i == 0 {
+            self.times.push_back((now, Vec::with_capacity(self.times.back().map(|x| x.1.len()).unwrap_or_default())));
+        }
+        self.times.back_mut().unwrap().1.push(d);
+
+
         if i < self.total_micros.len() {
             self.total_micros[i] += d.as_micros();
         } else {
