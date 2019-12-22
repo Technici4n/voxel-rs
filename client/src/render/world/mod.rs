@@ -193,7 +193,7 @@ impl WorldRenderer {
         }
 
         Self {
-            meshing_worker: MeshingWorker::new(MeshingState::new(block_meshes)),
+            meshing_worker: MeshingWorker::new(MeshingState::new(block_meshes), "Meshing".to_owned()),
             uniform_view_proj,
             uniform_model,
             chunk_index_buffers: MultiBuffer::with_capacity(device, 1000, wgpu::BufferUsage::INDEX),

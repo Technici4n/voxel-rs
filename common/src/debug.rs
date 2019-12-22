@@ -9,14 +9,21 @@ lazy_static! {
 struct DebugInfoUnit {
     pub section: String,
     pub id: String,
-    pub message: String,
+    pub part: DebugInfoPart,
+}
+
+#[derive(Debug, Clone)]
+pub enum DebugInfoPart {
+    Message(String),
+    WorkerPerf(WorkerPerf),
+    PerfBreakdown(String, Vec<(String, f64)>)
 }
 
 /// Helper struct allowing multiple threads to easily show debug info.
 /// There can only be one active `DebugInfo` at any time.
 pub struct DebugInfo {
     receiver: Receiver<DebugInfoUnit>,
-    sections: BTreeMap<String, (bool, u32, BTreeMap<String, String>)>,
+    sections: BTreeMap<String, (bool, u32, BTreeMap<String, DebugInfoPart>)>,
     next_id: u32,
 }
 
@@ -33,7 +40,7 @@ impl DebugInfo {
     }
 
     /// Get the debug info
-    pub fn get_debug_info(&mut self) -> &mut BTreeMap<String, (bool, u32, BTreeMap<String, String>)> {
+    pub fn get_debug_info(&mut self) -> &mut BTreeMap<String, (bool, u32, BTreeMap<String, DebugInfoPart>)> {
         let Self { ref mut next_id, .. } = self;
         while let Ok(diu) = self.receiver.try_recv() {
             let (_, _, inner_map) = self.sections
@@ -42,23 +49,59 @@ impl DebugInfo {
                     *next_id += 1;
                     (false, *next_id - 1, BTreeMap::new())
                 });
-            let stored_message = inner_map
-                .entry(diu.id)
-                .or_insert_with(String::new);
-            *stored_message = diu.message;
+            inner_map.insert(diu.id, diu.part);
         }
         &mut self.sections
     }
 }
 
-/// Send debug info to the current `DebugInfo` if there is one
+/// Send a debug info message to the current `DebugInfo` if there is one
 pub fn send_debug_info(section: impl ToString, id: impl ToString, message: impl ToString) {
     DEBUG_INFO.read().unwrap().as_ref().map(|sender| {
         sender
             .send(DebugInfoUnit {
                 section: section.to_string(),
                 id: id.to_string(),
-                message: message.to_string(),
+                part: DebugInfoPart::Message(message.to_string()),
+            })
+            .unwrap()
+    });
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkerPerf {
+    pub name: String,
+    pub micros_per_iter: f32,
+    pub iter_per_sec: f32,
+    pub efficiency: f32,
+}
+
+/// Send a debug info worker perf
+pub fn send_worker_perf(section: impl ToString, id: impl ToString, name: impl ToString, micros_per_iter: f32, iter_per_sec: f32) {
+    DEBUG_INFO.read().unwrap().as_ref().map(|sender| {
+        sender
+            .send(DebugInfoUnit {
+                section: section.to_string(),
+                id: id.to_string(),
+                part: DebugInfoPart::WorkerPerf(WorkerPerf {
+                    name: name.to_string(),
+                    micros_per_iter,
+                    iter_per_sec,
+                    efficiency: micros_per_iter / 1_000_000.0 * iter_per_sec,
+                }),
+            })
+            .unwrap()
+    });
+}
+
+/// Send a debug info performance breakdown
+pub fn send_perf_breakdown(section: impl ToString, id: impl ToString, name: impl ToString, breakdown: Vec<(String, f64)>) {
+    DEBUG_INFO.read().unwrap().as_ref().map(|sender| {
+        sender
+            .send(DebugInfoUnit {
+                section: section.to_string(),
+                id: id.to_string(),
+                part: DebugInfoPart::PerfBreakdown(name.to_string(), breakdown),
             })
             .unwrap()
     });

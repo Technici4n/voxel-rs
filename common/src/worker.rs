@@ -1,5 +1,8 @@
+use crate::debug::send_worker_perf;
+use crate::time::AverageTimeCounter;
 use crate::world::chunk::ChunkPos;
 use std::sync::mpsc::{Sender, Receiver, channel};
+use std::time::Instant;
 use std::marker::PhantomData;
 use std::collections::HashMap;
 
@@ -28,13 +31,13 @@ enum ToOtherThread<Input: Send> {
 }
 
 impl<Input: Send + 'static, Output: Send + 'static, State: WorkerState<Input, Output> + Send + 'static> Worker<Input, Output, State> {
-    /// Create a new `Worker` with the given state.
-    pub fn new(state: State) -> Self {
+    /// Create a new `Worker` with the given state and the given name.
+    pub fn new(state: State, name: String) -> Self {
         let (sender1, receiver1) = channel();
         let (sender2, receiver2) = channel();
 
         std::thread::spawn(move || {
-            start_worker_thread(sender2, receiver1, state);
+            start_worker_thread(sender2, receiver1, state, name);
         });
 
         Self {
@@ -75,8 +78,10 @@ fn start_worker_thread<Input: Send, Output: Send, State: WorkerState<Input, Outp
     sender: Sender<Output>,
     receiver: Receiver<ToOtherThread<Input>>,
     mut state: State,
+    name: String,
 ) {
-    // TODO: add timing
+    let mut timing = AverageTimeCounter::new();
+
     let mut queued_chunks: HashMap<ChunkPos, Input> = HashMap::new();
     let mut player_positions: Vec<ChunkPos> = Vec::new();
     loop {
@@ -120,11 +125,19 @@ fn start_worker_thread<Input: Send, Output: Send, State: WorkerState<Input, Outp
         // TODO: process multiple chunks one after the other if necessary
         if let Some(&next_chunk) = queued_chunks_vec.iter().next() {
             let input = queued_chunks.remove(&next_chunk).unwrap();
+
+            let t1 = Instant::now();
             let output = state.compute(next_chunk, input);
+            let t2 = Instant::now();
+            timing.add_time(t2 - t1);
+
             if let Err(_) = sender.send(output) {
                 // The sender disconnected
                 return;
             }
         }
+
+        // Send perf report
+        send_worker_perf("Workers", &name, &name, timing.average_time_micros() as f32, timing.average_iter_per_sec());
     }
 }

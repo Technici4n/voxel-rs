@@ -12,7 +12,7 @@ use voxel_rs_common::physics::player::PhysicsPlayer;
 use voxel_rs_common::world::chunk::ChunkPosXZ;
 use voxel_rs_common::{
     data::load_data,
-    debug::send_debug_info,
+    debug::{send_debug_info, send_perf_breakdown},
     network::{
         messages::{ToClient, ToServer},
         Server, ServerEvent,
@@ -26,7 +26,7 @@ use voxel_rs_common::{
     worldgen::DefaultWorldGenerator,
 };
 use voxel_rs_common::world::HighestOpaqueBlock;
-use voxel_rs_common::time::AverageTimeCounter;
+use voxel_rs_common::time::{AverageTimeCounter, BreakdownCounter};
 
 mod light;
 mod worldgen;
@@ -63,6 +63,8 @@ impl Default for PlayerData {
 pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     info!("Starting server");
 
+    let mut server_timing = BreakdownCounter::new();
+
     // Load data
     let game_data = load_data("data".into())?;
 
@@ -70,9 +72,10 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
         WorldGenerationState::new(
             game_data.blocks.clone(),
             Box::new(DefaultWorldGenerator::new(&game_data.blocks.clone())),
-        )
+        ),
+        "World Generation".to_owned(),
     );
-    let light_worker = ChunkLightingWorker::new(ChunkLightingState::new());
+    let light_worker = ChunkLightingWorker::new(ChunkLightingState::new(), "Lighting".to_owned());
 
     let mut world = World::new();
     let mut players = HashMap::new();
@@ -81,12 +84,12 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
     let mut generating_chunks = HashSet::new();
     // Pending light updates
     let mut update_lightning_chunks = HashSet::new();
-    let mut server_timing = AverageTimeCounter::new();
 
     info!("Server initialized successfully! Starting server loop");
     loop {
+        server_timing.start_frame();
+
         // Handle messages
-        let loop_start = Instant::now();
         loop {
             match server.receive_event() {
                 ServerEvent::NoEvent => break,
@@ -241,6 +244,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 },
             }
         }
+        server_timing.record_part("Network events");
 
         // Receive generated chunks
         for chunk in world_generator.get_processed().into_iter() {
@@ -271,11 +275,14 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 }
             }
         }
+        server_timing.record_part("Receive generated chunks");
 
         // Receive lighted chunks
         for light_chunk in light_worker.get_processed().into_iter() {
             world.set_light_chunk(light_chunk);
+            // TODO: send to player???
         }
+        server_timing.record_part("Receive lighted chunks");
 
         // Send light updates
         for chunk_pos in update_lightning_chunks.drain() {
@@ -308,9 +315,12 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 light_worker.enqueue(chunk_pos, data);
             }
         }
+        server_timing.record_part("Send light updates to worker");
 
         // Tick game
         physics_simulation.step_simulation(Instant::now(), &world);
+        server_timing.record_part("Update physics");
+
         // Send updates to players
         for (&player, _) in players.iter() {
             server.send(
@@ -318,6 +328,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                 ToClient::UpdatePhysics((*physics_simulation.get_state()).clone()),
             );
         }
+        server_timing.record_part("Send physics updates to players");
 
         // Send chunks to players
         let mut player_positions = Vec::new();
@@ -359,6 +370,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             data.loaded_chunks
                 .retain(|chunk_pos| render_distance.is_chunk_visible(player_chunk, *chunk_pos));
         }
+        server_timing.record_part("Send chunks to players");
 
         // Update player positions for worldgen
         let player_pos = player_positions.iter().map(|x| &x.0).cloned().collect::<Vec<_>>();
@@ -399,6 +411,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
             light.remove(chunk_pos);
             false
         });
+        server_timing.record_part("Drop far chunks");
 
         send_debug_info("Chunks", "server",
                         format!(
@@ -410,8 +423,6 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         ));
 
         // Nothing else to do for now :-)
-
-        server_timing.add_time(Instant::now() - loop_start);
-        send_debug_info("Server", "timing", format!("Average server loop time: {} microseconds", server_timing.average_time_micros()));
+        send_perf_breakdown("Server", "mainloop", "Server main loop", server_timing.extract_part_averages());
     }
 }
