@@ -17,6 +17,8 @@ impl Plane {
     }
 }
 
+const FOV: f64 = 90.0f64 * 2.0 * std::f64::consts::PI / 360.0;
+
 /// The player's frustum
 #[derive(Debug, Clone, Copy)]
 pub struct Frustum {
@@ -40,8 +42,7 @@ impl Frustum {
 
     /// Get the view/projection matrix associated with this frustum
     pub fn get_view_projection(&self, aspect_ratio: f64) -> Matrix4<f64> {
-        // TODO: remove hardcoded constants
-        let proj = Perspective3::new(aspect_ratio, (60.0f64).to_radians(), 0.1, 3000.0);
+        let proj = Perspective3::new(aspect_ratio, FOV, 0.1, 3000.0);
         proj.as_matrix() * self.get_view_matrix()
     }
 
@@ -53,8 +54,7 @@ impl Frustum {
     }
 
     pub fn get_planes(&self, aspect_ratio: f64) -> [[Plane; 2]; 3] {
-        // TODO: remove hardcoded constants
-        let (fovy, znear, zfar) = ((60.0f64).to_radians(), 0.1, 3000.0);
+        let (fovy, znear, zfar) = (FOV, 0.1, 3000.0);
         let t = (fovy / 2.0).tan();
         let h_near = t * 2.0 * znear;
         let w_near = h_near * aspect_ratio;
