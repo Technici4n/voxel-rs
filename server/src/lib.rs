@@ -296,7 +296,7 @@ pub fn launch_server(mut server: Box<dyn Server>) -> Result<()> {
                         highest_opaque_blocks.push(
                             (*world.highest_opaque_block
                                 .entry(pos)
-                                .or_insert_with(|| HighestOpaqueBlock::new(pos)))
+                                .or_insert_with(|| Arc::new(HighestOpaqueBlock::new(pos))))
                                 .clone(),
                         );
                     }

@@ -8,7 +8,7 @@ use voxel_rs_common::collections::zero_initialized_vec;
 /// The chunk-specific data that is needed to generate light for it.
 pub struct ChunkLightingData {
     pub chunks: Vec<Option<Arc<Chunk>>>,
-    pub highest_opaque_blocks: Vec<HighestOpaqueBlock>,
+    pub highest_opaque_blocks: Vec<Arc<HighestOpaqueBlock>>,
 }
 
 pub struct ChunkLightingState {

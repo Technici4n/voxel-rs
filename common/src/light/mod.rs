@@ -19,7 +19,7 @@ impl LightData {
 /// Take a 3x3x3 chunks bloc and 3x3 HighestOpaqueBlock and compute the light by using a BFS
 pub fn compute_light(
     chunks: Vec<Option<Arc<Chunk>>>,
-    highest_opaque_blocks: Vec<HighestOpaqueBlock>,
+    highest_opaque_blocks: Vec<Arc<HighestOpaqueBlock>>,
     queue: &mut FastBFSQueue,
     light_data: &mut [u8],
     opaque: &mut [bool],

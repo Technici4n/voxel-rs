@@ -143,7 +143,7 @@ impl CompressedLightChunk {
 pub struct World {
     pub chunks: HashMap<ChunkPos, Arc<Chunk>>,
     pub light: HashMap<ChunkPos, Arc<LightChunk>>,
-    pub highest_opaque_block: HashMap<ChunkPosXZ, HighestOpaqueBlock>,
+    pub highest_opaque_block: HashMap<ChunkPosXZ, Arc<HighestOpaqueBlock>>,
 }
 
 /// This data structure contains the y position of the highest opaque block
@@ -230,10 +230,10 @@ impl World {
     /// Return if they must have a large light update over the 3x3 chunk column
     pub fn update_highest_opaque_block(&mut self, chunk_pos: ChunkPos) -> bool {
         let chunk_pos_xz: ChunkPosXZ = chunk_pos.clone().into();
-        let mut highest_opaque_block = self
+        let mut highest_opaque_block = (**self
             .highest_opaque_block
             .entry(chunk_pos_xz)
-            .or_insert_with(|| HighestOpaqueBlock::new(chunk_pos_xz))
+            .or_insert_with(|| Arc::new(HighestOpaqueBlock::new(chunk_pos_xz))))
             .clone();
         let mut check = false;
         let mut scan_all_chunk = false;
@@ -316,7 +316,7 @@ impl World {
             }
         }
         self.highest_opaque_block
-            .insert(chunk_pos_xz, highest_opaque_block);
+            .insert(chunk_pos_xz, Arc::new(highest_opaque_block));
         return true;
     }
 }
