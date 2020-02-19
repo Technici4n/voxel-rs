@@ -25,9 +25,10 @@ use nalgebra::Vector3;
 use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::data::vox::VoxelModel;
-use voxel_rs_common::debug::{send_debug_info, DebugInfo};
+use voxel_rs_common::debug::{send_debug_info, send_perf_breakdown, DebugInfo};
 use voxel_rs_common::item::{Item, ItemMesh};
 use voxel_rs_common::physics::simulation::{ClientPhysicsSimulation, PhysicsState, ServerState};
+use voxel_rs_common::time::BreakdownCounter;
 use winit::event::{ElementState, MouseButton};
 use crate::gui::Gui;
 
@@ -51,6 +52,7 @@ pub struct SinglePlayer {
     yaw_pitch: YawPitch,
     debug_info: DebugInfo,
     start_time: Instant,
+    client_timing: BreakdownCounter,
 }
 
 impl SinglePlayer {
@@ -133,6 +135,7 @@ impl SinglePlayer {
                 yaw_pitch: Default::default(),
                 debug_info: DebugInfo::new_current(),
                 start_time: Instant::now(),
+                client_timing: BreakdownCounter::new(),
             }),
             encoder.finish(),
         ))
@@ -149,6 +152,7 @@ impl State for SinglePlayer {
         _seconds_delta: f64,
         _device: &mut wgpu::Device,
     ) -> Result<StateTransition> {
+        self.client_timing.start_frame();
         let mut chunks_to_mesh = HashSet::new();
         // Handle server messages
         loop {
@@ -179,15 +183,19 @@ impl State for SinglePlayer {
                 ClientEvent::Connected => {}
             }
         }
+        self.client_timing.record_part("Network events");
 
         // Collect input
         let frame_input =
             input_state.get_physics_input(self.yaw_pitch, self.ui.should_update_camera());
         // Send input to server
         self.client.send(ToServer::UpdateInput(frame_input));
+        self.client_timing.record_part("Collect and send input");
+
         // Update physics
         self.physics_simulation
             .step_simulation(frame_input, Instant::now(), &self.world);
+        self.client_timing.record_part("Update physics");
 
         let p = self.physics_simulation.get_camera_position();
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
@@ -200,6 +208,7 @@ impl State for SinglePlayer {
                 self.world_renderer.update_chunk(&self.world, chunk_pos);
             }
         }
+        self.client_timing.record_part("Send chunks to meshing");
 
         // Debug current player position, yaw and pitch
         send_debug_info(
@@ -241,6 +250,7 @@ impl State for SinglePlayer {
                 false
             }
         });
+        self.client_timing.record_part("Drop far chunks");
 
         flags.hide_and_center_cursor = self.ui.should_capture_mouse();
 
@@ -299,6 +309,7 @@ impl State for SinglePlayer {
         } else {
             send_debug_info("Player", "pointedat", "Pointed block: None");
         }
+        self.client_timing.record_part("Raytrace");
 
         // Begin rendering
         let mut encoder =
@@ -344,6 +355,7 @@ impl State for SinglePlayer {
             &models_to_draw,
             &self.world,
         );
+        self.client_timing.record_part("Render chunks");
 
         crate::render::clear_depth(&mut encoder, buffers);
 
@@ -361,6 +373,9 @@ impl State for SinglePlayer {
             &mut self.gui,
             self.ui.should_capture_mouse(),
         );
+        self.client_timing.record_part("Render UI");
+
+        send_perf_breakdown("Client performance", "mainloop", "Client main loop", self.client_timing.extract_part_averages());
 
         Ok((StateTransition::KeepCurrent, encoder.finish()))
     }
