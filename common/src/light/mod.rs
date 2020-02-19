@@ -147,16 +147,15 @@ pub fn compute_light(
             let (x, y, z, ll) = *queue.pop();
             for i in 0..6 {
                 let (nx, ny, nz) = (x as isize + DX[i], y as isize + DY[i], z as isize + DZ[i]);
-                let s =
-                    (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
                 if MIN_VAL <= nx
                     && nx < MAX_VAL
                     && MIN_VAL <= ny
                     && ny < MAX_VAL
                     && MIN_VAL <= nz
                     && nz < MAX_VAL
-                    && !*opaque.get_unchecked(s as usize)
                 {
+                    let s = (nx as usize) * csize * csize * 9 + (ny as usize) * csize * 3 + (nz as usize);
+                    if *opaque.get_unchecked(s as usize) { continue; }
                     let ref_light = light_data.get_unchecked_mut(s as usize);
                     if *ref_light < ll - 1 {
                         *ref_light = ll - 1;
