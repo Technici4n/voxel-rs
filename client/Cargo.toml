@@ -26,7 +26,7 @@ glsl-to-spirv = "0.1"
 image = "0.22"
 texture_packer = "0.17"
 wgpu = "0.4"
-winit = "0.20.0"
+winit = "0.21"
 
 # Gui
 quint = { path = "../quint" }
