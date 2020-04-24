@@ -221,7 +221,6 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     ThemeChanged(_) => (),  // TODO: handle this
                 }
             },
-            RedrawRequested(_) => (), // TODO: handle this
             DeviceEvent { event, .. } => {
                 if !window_data.focused {
                     return;
@@ -234,7 +233,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 }
             }
             /* MAIN LOOP TICK */
-            EventsCleared => {
+            MainEventsCleared => {
                 // If the window was resized, update the SwapChain and the window data
                 if window_resized {
                     info!("The window was resized, adjusting buffers...");
@@ -341,6 +340,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     }
                 }
             }
+            RedrawRequested(_) => (), // TODO: handle this
             LoopDestroyed => {
                 // TODO: cleanup relevant stuff
             }
