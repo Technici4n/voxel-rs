@@ -71,7 +71,7 @@ pub trait State {
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
     /// Cursor moved
-    fn handle_cursor_movement(&mut self, logical_position: LogicalPosition<u32>);
+    fn handle_cursor_movement(&mut self, logical_position: LogicalPosition<f64>);
     /// Mouse clicked
     fn handle_mouse_state_changes(&mut self, changes: Vec<(MouseButton, ElementState)>);
     /// Key pressed
