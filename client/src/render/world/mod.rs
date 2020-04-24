@@ -248,7 +248,7 @@ impl WorldRenderer {
                 height: win_h,
             } = data.physical_window_size;
             win_w / win_h
-        };
+        } as f64;
 
         let view_mat = frustum.get_view_matrix();
         let planes = frustum.get_planes(aspect_ratio);

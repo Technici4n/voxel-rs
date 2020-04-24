@@ -349,8 +349,8 @@ impl<'a> UiRenderer {
                 encoder,
                 buffers.texture_buffer,
                 //create_default_depth_stencil_attachment(buffers.depth_buffer),
-                data.physical_window_size.width.round() as u32,
-                data.physical_window_size.height.round() as u32,
+                data.physical_window_size.width,
+                data.physical_window_size.height,
             )
             .expect("couldn't draw queued glyphs");
     }

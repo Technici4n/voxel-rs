@@ -27,9 +27,9 @@ pub enum StateTransition {
 #[derive(Debug, Clone)]
 pub struct WindowData {
     /// Logical size of the window. See [the winit documentation](winit::dpi).
-    pub logical_window_size: LogicalSize,
+    pub logical_window_size: LogicalSize<u32>,
     /// Physical size of the window.
-    pub physical_window_size: PhysicalSize,
+    pub physical_window_size: PhysicalSize<u32>,
     /// HiDpi factor of the window.
     pub hidpi_factor: f64,
     /// `true` if the window is currently focused
@@ -71,7 +71,7 @@ pub trait State {
     /// Mouse motion
     fn handle_mouse_motion(&mut self, settings: &Settings, delta: (f64, f64));
     /// Cursor moved
-    fn handle_cursor_movement(&mut self, logical_position: LogicalPosition);
+    fn handle_cursor_movement(&mut self, logical_position: LogicalPosition<f64>);
     /// Mouse clicked
     fn handle_mouse_state_changes(&mut self, changes: Vec<(MouseButton, ElementState)>);
     /// Key pressed
@@ -92,8 +92,8 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let window = Window::new(&event_loop).expect("Failed to create window");
     window.set_title(&window_title);
     // Create the Surface, i.e. the render target of the program
-    let hidpi_factor = window.hidpi_factor();
-    let physical_window_size = window.inner_size().to_physical(hidpi_factor);
+    let hidpi_factor = window.scale_factor();
+    let physical_window_size = window.inner_size();
     info!("Creating the swap chain");
     let surface = wgpu::Surface::create(&window);
     // Get the Device and the render Queue
@@ -113,8 +113,8 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         format: COLOR_FORMAT,
-        width: physical_window_size.width.round() as u32,
-        height: physical_window_size.height.round() as u32,
+        width: physical_window_size.width,
+        height: physical_window_size.height,
         present_mode: wgpu::PresentMode::NoVsync,
     };
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
@@ -152,9 +152,9 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let mut depth_texture_view = depth_texture.create_default_view();
 
     let mut window_data = {
-        let logical_window_size = window.inner_size();
-        let hidpi_factor = window.hidpi_factor();
-        let physical_window_size = logical_window_size.to_physical(hidpi_factor);
+        let physical_window_size = window.inner_size();
+        let hidpi_factor = window.scale_factor();
+        let logical_window_size = physical_window_size.to_logical(hidpi_factor);
         WindowData {
             logical_window_size,
             physical_window_size,
@@ -190,7 +190,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
             WindowEvent { event, .. } => {
                 use winit::event::WindowEvent::*;
                 match event {
-                    Resized(_) | HiDpiFactorChanged(_) => window_resized = true,
+                    Resized(_) | ScaleFactorChanged { .. } => window_resized = true,
                     Moved(_) => (),
                     CloseRequested | Destroyed => *control_flow = ControlFlow::Exit,
                     DroppedFile(_) | HoveredFile(_) | HoveredFileCancelled => (),
@@ -204,7 +204,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                             key_state_changes.push((input.scancode, input.state));
                         }
                     }
-                    CursorMoved { position, .. } => state.handle_cursor_movement(position),
+                    CursorMoved { position, .. } => state.handle_cursor_movement(position.to_logical(hidpi_factor)),
                     CursorEntered { .. } | CursorLeft { .. } | MouseWheel { .. } => (),
                     MouseInput {
                         button,
@@ -217,10 +217,11 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                         }
                     }
                     // weird events
-                    TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) => (),
-                    ModifiersChanged { .. } | RedrawRequested => (), // TODO: handle these
+                    TouchpadPressure { .. } | AxisMotion { .. } | Touch(..)=> (),
+                    ThemeChanged(_) => (),  // TODO: handle this
                 }
-            }
+            },
+            RedrawRequested(_) => (), // TODO: handle this
             DeviceEvent { event, .. } => {
                 if !window_data.focused {
                     return;
@@ -228,6 +229,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 use winit::event::DeviceEvent::*;
                 match event {
                     MouseMotion { delta } => state.handle_mouse_motion(&settings, delta),
+                    ModifiersChanged { .. } => (), // TODO: handle these,
                     _ => (),
                 }
             }
@@ -237,15 +239,12 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 if window_resized {
                     info!("The window was resized, adjusting buffers...");
                     // Update window data
-                    window_data.logical_window_size = window.inner_size();
-                    window_data.hidpi_factor = window.hidpi_factor();
-                    let phys = window_data
-                        .logical_window_size
-                        .to_physical(window_data.hidpi_factor);
-                    window_data.physical_window_size = phys;
+                    window_data.physical_window_size = window.inner_size();
+                    window_data.hidpi_factor = window.scale_factor();
+                    window_data.logical_window_size = window_data.physical_window_size.to_logical(window_data.hidpi_factor);
                     // Update SwapChain
-                    sc_desc.width = phys.width.round() as u32;
-                    sc_desc.height = phys.height.round() as u32;
+                    sc_desc.width = window_data.physical_window_size.width;
+                    sc_desc.height = window_data.physical_window_size.height;
                     swap_chain = device.create_swap_chain(&surface, &sc_desc);
                     // TODO: remove copy/paste
                     // Update depth buffer
@@ -289,8 +288,8 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     let sz = window_data.logical_window_size;
                     window
                         .set_cursor_position(winit::dpi::LogicalPosition {
-                            x: sz.width / 2.0,
-                            y: sz.height / 2.0,
+                            x: sz.width / 2,
+                            y: sz.height / 2,
                         })
                         .expect("Failed to center cursor"); // TODO: warn instead of panic ?
                 } else {
