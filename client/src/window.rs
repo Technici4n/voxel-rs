@@ -217,8 +217,8 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                         }
                     }
                     // weird events
-                    TouchpadPressure { .. } | AxisMotion { .. } | Touch(..)=> (),
-                    ModifiersChanged { .. } | ThemeChanged(_) => (),  // TODO: handle these
+                    TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) | ThemeChanged(_) => (),
+                    ModifiersChanged { .. } => (),  // TODO: handle this
                 }
             },
             DeviceEvent { event, .. } => {
