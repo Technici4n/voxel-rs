@@ -218,7 +218,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     }
                     // weird events
                     TouchpadPressure { .. } | AxisMotion { .. } | Touch(..)=> (),
-                    ThemeChanged(_) => (),  // TODO: handle this
+                    ModifiersChanged { .. } | ThemeChanged(_) => (),  // TODO: handle these
                 }
             },
             DeviceEvent { event, .. } => {
@@ -228,7 +228,6 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 use winit::event::DeviceEvent::*;
                 match event {
                     MouseMotion { delta } => state.handle_mouse_motion(&settings, delta),
-                    ModifiersChanged { .. } => (), // TODO: handle these,
                     _ => (),
                 }
             }
