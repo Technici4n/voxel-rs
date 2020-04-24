@@ -36,7 +36,7 @@ impl Ui {
         }
     }
 
-    pub fn cursor_moved(&mut self, p: LogicalPosition<f64>) {
+    pub fn cursor_moved(&mut self, p: LogicalPosition<u32>) {
         self.ui.set_cursor_position(quint::Position {
             x: p.x as f32,
             y: p.y as f32,

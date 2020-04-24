@@ -386,7 +386,7 @@ impl State for SinglePlayer {
         }
     }
 
-    fn handle_cursor_movement(&mut self, logical_position: winit::dpi::LogicalPosition<f64>) {
+    fn handle_cursor_movement(&mut self, logical_position: winit::dpi::LogicalPosition<u32>) {
         self.ui.cursor_moved(logical_position);
         let (x, y) = logical_position.into();
         self.gui.update_mouse_position(x, y);
