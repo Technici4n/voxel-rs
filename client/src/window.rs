@@ -27,7 +27,7 @@ pub enum StateTransition {
 #[derive(Debug, Clone)]
 pub struct WindowData {
     /// Logical size of the window. See [the winit documentation](winit::dpi).
-    pub logical_window_size: LogicalSize<u32>,
+    pub logical_window_size: LogicalSize<f64>,
     /// Physical size of the window.
     pub physical_window_size: PhysicalSize<u32>,
     /// HiDpi factor of the window.
@@ -287,8 +287,8 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     let sz = window_data.logical_window_size;
                     window
                         .set_cursor_position(winit::dpi::LogicalPosition {
-                            x: sz.width / 2,
-                            y: sz.height / 2,
+                            x: sz.width / 2.0,
+                            y: sz.height / 2.0,
                         })
                         .expect("Failed to center cursor"); // TODO: warn instead of panic ?
                 } else {
