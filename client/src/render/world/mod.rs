@@ -247,7 +247,7 @@ impl WorldRenderer {
                 width: win_w,
                 height: win_h,
             } = data.physical_window_size;
-            win_w / win_h
+            win_w as f64 / win_h as f64
         };
 
         let view_mat = frustum.get_view_matrix();
