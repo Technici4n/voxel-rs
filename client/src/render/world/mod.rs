@@ -4,6 +4,7 @@ use super::buffers::MultiBuffer;
 use super::frustum::Frustum;
 use super::init::{create_default_pipeline, load_glsl_shader, ShaderStage};
 use super::world::meshing_worker::{MeshingState, MeshingWorker};
+use super::{ to_u8_slice, buffer_from_slice };
 use crate::texture::load_image;
 use crate::window::WindowBuffers;
 use image::{ImageBuffer, Rgba};
@@ -63,10 +64,12 @@ impl WorldRenderer {
 
         // Create uniform buffers
         let uniform_view_proj = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
         let uniform_model = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
@@ -136,6 +139,7 @@ impl WorldRenderer {
 
         // Create target buffer and pipeline
         let target_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: 8 * std::mem::size_of::<SkyboxVertex>() as u64,
             usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
         });
@@ -182,9 +186,9 @@ impl WorldRenderer {
 
         // Mesh models
         let mut model_index_buffers =
-            MultiBuffer::with_capacity(device, 0, wgpu::BufferUsage::INDEX);
+            MultiBuffer::with_capacity(device, 1, wgpu::BufferUsage::INDEX);
         let mut model_vertex_buffers =
-            MultiBuffer::with_capacity(device, 0, wgpu::BufferUsage::VERTEX);
+            MultiBuffer::with_capacity(device, 1, wgpu::BufferUsage::VERTEX);
         for mesh_id in 0..models.get_number_of_ids() {
             let (vertices, indices) =
                 self::model::mesh_model(models.get_value_by_id(mesh_id).unwrap());
@@ -266,9 +270,11 @@ impl WorldRenderer {
         .into();
 
         // Update view_proj matrix
-        let src_buffer = device
-            .create_buffer_mapped(4, wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(&view_proj);
+        let src_buffer = buffer_from_slice(
+            device,
+            wgpu::BufferUsage::COPY_SRC,
+            to_u8_slice(&view_proj)
+        );
         encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_view_proj, 0, 64);
 
         // Draw all the chunks
@@ -276,8 +282,8 @@ impl WorldRenderer {
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.chunk_pipeline);
             rpass.set_bind_group(0, &self.chunk_bind_group, &[]);
-            rpass.set_vertex_buffers(0, &[(&self.chunk_vertex_buffers.get_buffer(), 0)]);
-            rpass.set_index_buffer(&self.chunk_index_buffers.get_buffer(), 0);
+            rpass.set_vertex_buffer(0, &self.chunk_vertex_buffers.get_buffer(), 0, 0);
+            rpass.set_index_buffer(&self.chunk_index_buffers.get_buffer(), 0, 0);
             let mut count = 0;
             for chunk_pos in self.chunk_index_buffers.keys() {
                 if !enable_culling || Frustum::contains_chunk(&planes, &view_mat, chunk_pos) {
@@ -303,9 +309,10 @@ impl WorldRenderer {
         // Draw the skybox
         {
             // Update model buffer
-            let src_buffer = device
-                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&[
+            let src_buffer = buffer_from_slice(
+                device,
+                wgpu::BufferUsage::COPY_SRC,
+                to_u8_slice(&[
                     1.0,
                     0.0,
                     0.0,
@@ -322,13 +329,14 @@ impl WorldRenderer {
                     frustum.position.y as f32,
                     frustum.position.z as f32,
                     1.0,
-                ]);
+                ])
+            );
             encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.skybox_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
-            rpass.set_vertex_buffers(0, &[(&self.skybox_vertex_buffer, 0)]);
-            rpass.set_index_buffer(&self.skybox_index_buffer, 0);
+            rpass.set_vertex_buffer(0, &self.skybox_vertex_buffer, 0, 0);
+            rpass.set_index_buffer(&self.skybox_index_buffer, 0, 0);
             rpass.draw_indexed(0..36, 0, 0..1);
         }
 
@@ -336,9 +344,11 @@ impl WorldRenderer {
         if let Some((target_pos, target_face)) = pointed_block {
             // Generate the vertices
             // TODO: maybe check if they changed since last frame
-            let src_buffer = device
-                .create_buffer_mapped(8, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&create_target_vertices(target_face));
+            let src_buffer = buffer_from_slice(
+                device,
+                wgpu::BufferUsage::COPY_SRC,
+                to_u8_slice(&create_target_vertices(target_face))
+            );
             encoder.copy_buffer_to_buffer(
                 &src_buffer,
                 0,
@@ -347,9 +357,10 @@ impl WorldRenderer {
                 8 * std::mem::size_of::<SkyboxVertex>() as u64,
             );
             // Update model buffer
-            let src_buffer = device
-                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&[
+            let src_buffer = buffer_from_slice(
+                device,
+                wgpu::BufferUsage::COPY_SRC,
+                to_u8_slice(&[
                     1.0,
                     0.0,
                     0.0,
@@ -366,12 +377,13 @@ impl WorldRenderer {
                     target_pos.py as f32,
                     target_pos.pz as f32,
                     1.0,
-                ]);
+                ])
+            );
             encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.target_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
-            rpass.set_vertex_buffers(0, &[(&self.target_vertex_buffer, 0)]);
+            rpass.set_vertex_buffer(0, &self.target_vertex_buffer, 0, 0);
             rpass.draw(0..8, 0..1);
         }
 
@@ -392,16 +404,18 @@ impl WorldRenderer {
             ));
             let transformation_matrix: Matrix4<f32> = nalgebra::convert(transform);
             // Update model buffer
-            let src_buffer = device
-                .create_buffer_mapped(4, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(transformation_matrix.as_ref());
+            let src_buffer = buffer_from_slice(
+                device,
+                wgpu::BufferUsage::COPY_SRC,
+                to_u8_slice(transformation_matrix.as_ref())
+            );
             encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.uniform_model, 0, 64);
             // Draw model
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.model_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
-            rpass.set_vertex_buffers(0, &[(&self.model_vertex_buffers.get_buffer(), 0)]);
-            rpass.set_index_buffer(&self.model_index_buffers.get_buffer(), 0);
+            rpass.set_vertex_buffer(0, &self.model_vertex_buffers.get_buffer(), 0, 0);
+            rpass.set_index_buffer(&self.model_index_buffers.get_buffer(), 0, 0);
             let (index_pos, index_len) = self
                 .model_index_buffers
                 .get_pos_len(&model.mesh_id)
@@ -482,21 +496,23 @@ const CHUNK_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 6] = [
 
 const CHUNK_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> =
     wgpu::BindGroupLayoutDescriptor {
+        label: None,
         bindings: &[
-            wgpu::BindGroupLayoutBinding {
+            wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
                 ty: wgpu::BindingType::UniformBuffer { dynamic: false },
             },
-            wgpu::BindGroupLayoutBinding {
+            wgpu::BindGroupLayoutEntry {
                 binding: 1,
                 visibility: wgpu::ShaderStage::FRAGMENT,
-                ty: wgpu::BindingType::Sampler,
+                ty: wgpu::BindingType::Sampler { comparison: true },
             },
-            wgpu::BindGroupLayoutBinding {
+            wgpu::BindGroupLayoutEntry {
                 binding: 2,
                 visibility: wgpu::ShaderStage::FRAGMENT,
                 ty: wgpu::BindingType::SampledTexture {
+                    component_type: wgpu::TextureComponentType::Float, // TODO: This right?
                     multisampled: false,
                     dimension: wgpu::TextureViewDimension::D2,
                 },
@@ -521,10 +537,11 @@ fn create_chunk_bind_group(
         mipmap_filter: wgpu::FilterMode::Linear,
         lod_min_clamp: 0.0,
         lod_max_clamp: 5.0,
-        compare_function: wgpu::CompareFunction::Always,
+        compare: wgpu::CompareFunction::Always,
     });
 
     device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
         layout,
         bindings: &[
             wgpu::Binding {
@@ -563,14 +580,15 @@ const SKYBOX_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 1] =
 
 const SKYBOX_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> =
     wgpu::BindGroupLayoutDescriptor {
+        label: None,
         bindings: &[
-            wgpu::BindGroupLayoutBinding {
+            wgpu::BindGroupLayoutEntry {
                 // view proj
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
                 ty: wgpu::BindingType::UniformBuffer { dynamic: false },
             },
-            wgpu::BindGroupLayoutBinding {
+            wgpu::BindGroupLayoutEntry {
                 // model
                 binding: 1,
                 visibility: wgpu::ShaderStage::VERTEX,
@@ -587,6 +605,7 @@ fn create_vpm_bind_group(
     uniform_model: &wgpu::Buffer,
 ) -> wgpu::BindGroup {
     device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: None,
         layout,
         bindings: &[
             wgpu::Binding {

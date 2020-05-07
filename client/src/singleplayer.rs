@@ -100,7 +100,7 @@ impl SinglePlayer {
         let ui_renderer = UiRenderer::new(device);
 
         let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         let world_renderer = WorldRenderer::new(
             device,
@@ -313,7 +313,7 @@ impl State for SinglePlayer {
 
         // Begin rendering
         let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         crate::render::clear_color_and_depth(&mut encoder, buffers);
 

@@ -44,5 +44,5 @@ fn main() -> Result<()> {
     window::open_window(
         settings,
         Box::new(singleplayer::SinglePlayer::new_factory(Box::new(client))),
-    );
+    )
 }

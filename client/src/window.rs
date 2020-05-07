@@ -1,8 +1,9 @@
 use crate::{input::InputState, settings::Settings};
 use anyhow::Result;
-use log::info;
+use log::{info, warn};
 use std::time::Instant;
 use wgpu::Device;
+use futures::executor::block_on;
 use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
 use winit::event::{ElementState, MouseButton};
 use winit::event_loop::ControlFlow;
@@ -97,29 +98,30 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     info!("Creating the swap chain");
     let surface = wgpu::Surface::create(&window);
     // Get the Device and the render Queue
-    let adapter = wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
+    let adapter = block_on(wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance, // TODO: configure this?
-        backends: wgpu::BackendBit::DX12,
-    })
+        compatible_surface: Some(&surface),
+    }, wgpu::BackendBit::all()))
     .expect("Failed to create adapter");
     // TODO: device should be immutable
-    let (mut device, mut queue) = adapter.request_device(&wgpu::DeviceDescriptor {
+    let (mut device, mut queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         extensions: wgpu::Extensions {
             anisotropic_filtering: false,
         },
         limits: wgpu::Limits::default(),
-    });
+    }));
     // Create the SwapChain
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         format: COLOR_FORMAT,
         width: physical_window_size.width,
         height: physical_window_size.height,
-        present_mode: wgpu::PresentMode::NoVsync,
+        present_mode: wgpu::PresentMode::Mailbox,
     };
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
     info!("Creating the multisampled texture buffer");
     let mut msaa_texture_descriptor = wgpu::TextureDescriptor {
+        label: None,
         size: wgpu::Extent3d {
             width: sc_desc.width,
             height: sc_desc.height,
@@ -136,6 +138,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let mut msaa_texture_view = msaa_texture.create_default_view();
     info!("Creating the depth buffer");
     let mut depth_texture_descriptor = wgpu::TextureDescriptor {
+        label: None,
         size: wgpu::Extent3d {
             width: sc_desc.width,
             height: sc_desc.height,
@@ -284,12 +287,13 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 if window_flags.hide_and_center_cursor && window_data.focused {
                     window.set_cursor_visible(false);
                     let sz = window_data.logical_window_size;
-                    window
-                        .set_cursor_position(winit::dpi::LogicalPosition {
-                            x: sz.width / 2.0,
-                            y: sz.height / 2.0,
-                        })
-                        .expect("Failed to center cursor"); // TODO: warn instead of panic ?
+                    match window.set_cursor_position(winit::dpi::LogicalPosition {
+                        x: sz.width / 2.0,
+                        y: sz.height / 2.0,
+                    }) {
+                        Err(err) => warn!("Failed to center cursor. ({:?})", err),
+                        _ => ()
+                    };
                 } else {
                     window.set_cursor_visible(true);
                 }
@@ -311,12 +315,12 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 }
 
                 // Render frame
-                let frame = swap_chain.get_next_texture();
+                let swap_chain_output = swap_chain.get_next_texture().expect("Failed to unwrap swap chain output.");
                 let (state_transition, commands) = state
                     .render(
                         &settings,
                         WindowBuffers {
-                            texture_buffer: &frame.view,
+                            texture_buffer: &swap_chain_output.view,
                             multisampled_texture_buffer: &msaa_texture_view,
                             depth_buffer: &depth_texture_view,
                         },
