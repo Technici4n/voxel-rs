@@ -1,6 +1,7 @@
 use anyhow::Result;
 use log::{error, info};
 use std::path::Path;
+use futures::executor::block_on;
 use voxel_rs_common::network::dummy;
 use voxel_rs_server::launch_server;
 

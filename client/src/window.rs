@@ -291,11 +291,19 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                         x: sz.width / 2.0,
                         y: sz.height / 2.0,
                     }) {
-                        Err(err) => warn!("Failed to center cursor. ({:?})", err),
+                        Err(err) => warn!("Failed to center cursor ({:?})", err),
                         _ => ()
                     };
+                    match window.set_cursor_grab(true) {
+                        Err(err) => warn!("Failed to grab cursor ({:?})", err),
+                        _ => ()
+                    }
                 } else {
                     window.set_cursor_visible(true);
+                    match window.set_cursor_grab(false) {
+                        Err(err) => warn!("Failed to ungrab cursor ({:?})", err),
+                        _ => ()
+                    }
                 }
 
                 // Transition if necessary
