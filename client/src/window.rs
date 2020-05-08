@@ -41,7 +41,7 @@ pub struct WindowData {
 #[derive(Debug, Clone)]
 pub struct WindowFlags {
     /// `true` if the cursor should be hidden and centered.
-    pub hide_and_center_cursor: bool,
+    pub grab_cursor: bool,
     /// Window title
     pub window_title: String,
 }
@@ -169,7 +169,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let mut input_state = InputState::new();
 
     let mut window_flags = WindowFlags {
-        hide_and_center_cursor: false,
+        grab_cursor: false,
         window_title,
     };
 
@@ -284,16 +284,9 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
 
                 // Update window flags
                 window.set_title(&window_flags.window_title);
-                if window_flags.hide_and_center_cursor && window_data.focused {
+                if window_flags.grab_cursor && window_data.focused {
                     window.set_cursor_visible(false);
                     let sz = window_data.logical_window_size;
-                    match window.set_cursor_position(winit::dpi::LogicalPosition {
-                        x: sz.width / 2.0,
-                        y: sz.height / 2.0,
-                    }) {
-                        Err(err) => warn!("Failed to center cursor ({:?})", err),
-                        _ => ()
-                    };
                     match window.set_cursor_grab(true) {
                         Err(err) => warn!("Failed to grab cursor ({:?})", err),
                         _ => ()

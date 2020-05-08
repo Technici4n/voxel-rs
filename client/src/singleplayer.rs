@@ -252,7 +252,7 @@ impl State for SinglePlayer {
         });
         self.client_timing.record_part("Drop far chunks");
 
-        flags.hide_and_center_cursor = self.ui.should_capture_mouse();
+        flags.grab_cursor = self.ui.should_capture_mouse();
 
         send_debug_info(
             "Chunks",
