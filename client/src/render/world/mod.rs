@@ -259,7 +259,7 @@ impl WorldRenderer {
         let view_proj_mat = frustum.get_view_projection(aspect_ratio);
         let opengl_to_wgpu = nalgebra::Matrix4::from([
             [1.0, 0.0, 0.0, 0.0],
-            [0.0, -1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 0.5, 0.0],
             [0.0, 0.0, 0.5, 1.0],
         ]);

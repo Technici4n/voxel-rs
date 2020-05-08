@@ -5,7 +5,7 @@ authors = ["Technici4n", "Azercoco"]
 edition = "2018"
 
 [[bin]]
-name = "client"
+name = "voxel_rs_client"
 path = "./src/main.rs"
 
 [dependencies]
@@ -24,8 +24,8 @@ futures = "0.3"
 
 # Graphics
 glsl-to-spirv = "0.1"
-image = "0.22"
-texture_packer = "0.17"
+image = "0.23"
+texture_packer = "0.21"
 wgpu = "0.5"
 wgpu-types = "0.5"
 winit = "0.22"
