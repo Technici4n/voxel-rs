@@ -512,7 +512,7 @@ const CHUNK_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> =
                 binding: 2,
                 visibility: wgpu::ShaderStage::FRAGMENT,
                 ty: wgpu::BindingType::SampledTexture {
-                    component_type: wgpu::TextureComponentType::Float, // TODO: This right?
+                    component_type: wgpu::TextureComponentType::Uint,
                     multisampled: false,
                     dimension: wgpu::TextureViewDimension::D2,
                 },
