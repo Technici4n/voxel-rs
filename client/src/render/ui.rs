@@ -1,5 +1,6 @@
 //! Ui rendering
 
+use super::{ buffer_from_slice, to_u8_slice };
 use super::buffers::DynamicBuffer;
 use super::init::ShaderStage;
 use crate::ui::PrimitiveBuffer;
@@ -24,7 +25,8 @@ impl<'a> UiRenderer {
         // Load fonts
         let default_font: &'static [u8] =
             include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
-        let mut glyph_brush_builder = wgpu_glyph::GlyphBrushBuilder::using_font_bytes(default_font);
+        let mut glyph_brush_builder = wgpu_glyph::GlyphBrushBuilder::using_font_bytes(default_font)
+            .expect("Failed to load default font.");
         log::info!("Loading fonts from assets/fonts/list.toml");
         let mut fonts = HashMap::new();
         let font_list = std::fs::read_to_string("assets/fonts/list.toml")
@@ -47,13 +49,15 @@ impl<'a> UiRenderer {
 
         // Create uniform buffer
         let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
 
         // Create bind group layout
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            bindings: &[wgpu::BindGroupLayoutBinding {
+            label: None,
+            bindings: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
                 ty: wgpu::BindingType::UniformBuffer { dynamic: false },
@@ -62,6 +66,7 @@ impl<'a> UiRenderer {
 
         // Create bind group
         let uniforms_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: None,
             layout: &uniform_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
@@ -319,9 +324,11 @@ impl<'a> UiRenderer {
                 0.5,
                 1.0,
             ];
-            let src_buffer = device
-                .create_buffer_mapped(16, wgpu::BufferUsage::COPY_SRC)
-                .fill_from_slice(&transformation_matrix[..]);
+            let src_buffer = buffer_from_slice(
+                device,
+                wgpu::BufferUsage::COPY_SRC,
+                to_u8_slice(&transformation_matrix[..])
+            );
             encoder.copy_buffer_to_buffer(&src_buffer, 0, &self.transform_buffer, 0, 16 * 4);
             // Update vertex buffer
             self.vertex_buffer.upload(device, encoder, &rect_vertices);
@@ -332,8 +339,8 @@ impl<'a> UiRenderer {
                 let mut rpass = super::render::create_default_render_pass(encoder, buffers);
                 rpass.set_pipeline(&self.pipeline);
                 rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
-                rpass.set_vertex_buffers(0, &[(&self.vertex_buffer.get_buffer(), 0)]);
-                rpass.set_index_buffer(&self.index_buffer.get_buffer(), 0);
+                rpass.set_vertex_buffer(0, &self.vertex_buffer.get_buffer(), 0, 0);
+                rpass.set_index_buffer(&self.index_buffer.get_buffer(), 0, 0);
                 rpass.draw_indexed(0..(self.index_buffer.len() as u32), 0, 0..1);
             }
         }

@@ -14,8 +14,8 @@ ron = "0.5"
 serde = "1.0"
 
 # Image loading
-image = "0.22"
-texture_packer = "0.17"
+image = "0.23"
+texture_packer = "0.21"
 
 # Math
 nalgebra = "0.18"

@@ -5,8 +5,8 @@ use crate::window::WindowBuffers;
 /// Create an attachment for the depth buffer that doesn't clear it.
 pub fn create_default_depth_stencil_attachment(
     depth_buffer: &wgpu::TextureView,
-) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
-    wgpu::RenderPassDepthStencilAttachmentDescriptor {
+) -> wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase<&wgpu::TextureView> {
+    wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase {
         attachment: depth_buffer,
         depth_load_op: wgpu::LoadOp::Load,
         depth_store_op: wgpu::StoreOp::Store,
@@ -64,8 +64,8 @@ fn create_clear_color_attachment(
 
 fn create_clear_depth_attachment(
     buffers: WindowBuffers,
-) -> wgpu::RenderPassDepthStencilAttachmentDescriptor<&wgpu::TextureView> {
-    wgpu::RenderPassDepthStencilAttachmentDescriptor {
+) -> wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase<&wgpu::TextureView> {
+    wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase {
         attachment: buffers.depth_buffer,
         depth_load_op: wgpu::LoadOp::Clear,
         depth_store_op: wgpu::StoreOp::Store,
@@ -90,4 +90,20 @@ pub fn clear_depth(encoder: &mut wgpu::CommandEncoder, buffers: WindowBuffers) {
         color_attachments: &[],
         depth_stencil_attachment: Some(create_clear_depth_attachment(buffers)),
     });
+}
+
+/// Convert a vector to a buffer compatible slice of u8
+pub fn to_u8_slice<T: Copy>(v: &[T]) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(v.as_ptr() as *const u8, v.len() * std::mem::size_of::<T>()) }
+}
+
+/// Helper to create a buffer from an existing slice.
+pub fn buffer_from_slice(device: &wgpu::Device, usage: wgpu::BufferUsage, data: &[u8]) -> wgpu::Buffer {
+    let buffer_mapped = device.create_buffer_mapped(&wgpu::BufferDescriptor {
+        label: None,
+        size: data.len() as u64,
+        usage
+    });
+    buffer_mapped.data.copy_from_slice(&data);
+    buffer_mapped.finish()
 }

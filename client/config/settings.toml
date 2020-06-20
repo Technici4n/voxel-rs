@@ -1,0 +1,3 @@
+window_size = [1600, 900]
+invert_mouse = false
+render_distance = [0, 0, 0, 0, 0, 0]

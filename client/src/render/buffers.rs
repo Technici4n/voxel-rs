@@ -2,6 +2,9 @@
 
 use std::collections::HashMap;
 use std::hash::Hash;
+use futures::executor::block_on;
+
+use super::{ buffer_from_slice, to_u8_slice };
 
 /// A buffer that will automatically resize itself when necessary
 pub struct DynamicBuffer<T: Copy> {
@@ -22,6 +25,7 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
         usage |= wgpu::BufferUsage::COPY_DST;
         Self {
             buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                label: None,
                 size: (initial_capacity * std::mem::size_of::<T>()) as u64,
                 usage,
             }),
@@ -46,15 +50,18 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
 
         if data.len() > self.capacity {
             self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                label: None,
                 size: (data.len() * std::mem::size_of::<T>()) as u64,
                 usage: self.usage,
             });
             self.capacity = data.len();
         }
 
-        let src_buffer = device
-            .create_buffer_mapped(data.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(data);
+        let src_buffer = buffer_from_slice(
+            device,
+            wgpu::BufferUsage::COPY_SRC,
+            to_u8_slice(data)
+        );
 
         encoder.copy_buffer_to_buffer(
             &src_buffer,
@@ -96,8 +103,12 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         initial_capacity: usize,
         mut usage: wgpu::BufferUsage,
     ) -> Self {
+        // We crash on Vulkan if buffer capacity is 0
+        assert!(initial_capacity > 0);
+
         usage |= wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::COPY_SRC;
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: (initial_capacity * std::mem::size_of::<T>()) as u64,
             usage,
         });
@@ -171,9 +182,11 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
             self.segments.len() - 1
         });
         // Copy data into the buffer
-        let src_buffer = device
-            .create_buffer_mapped(data.len(), wgpu::BufferUsage::COPY_SRC)
-            .fill_from_slice(data);
+        let src_buffer = buffer_from_slice(
+            device,
+            wgpu::BufferUsage::COPY_SRC,
+            to_u8_slice(data)
+        );
         encoder.copy_buffer_to_buffer(
             &src_buffer,
             0,
@@ -222,6 +235,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         );
         // Create new buffer and copy data
         let new_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
             size: (new_len * std::mem::size_of::<T>()) as u64,
             usage: self.usage,
         });
@@ -323,18 +337,17 @@ mod tests {
     fn test_multi_buffer() {
         use wgpu::*;
 
-        let adapter = Adapter::request(&RequestAdapterOptions {
+        let adapter = block_on(Adapter::request(&RequestAdapterOptions {
+            compatible_surface: None,
             power_preference: PowerPreference::HighPerformance,
-            backends: BackendBit::PRIMARY,
-        })
-        .unwrap();
-        let (device, mut queue) = adapter.request_device(&DeviceDescriptor {
+        }, BackendBit::PRIMARY)).unwrap();
+        let (device, mut queue) = block_on(adapter.request_device(&DeviceDescriptor {
             extensions: Extensions {
                 anisotropic_filtering: false,
             },
             limits: Limits::default(),
-        });
-        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { todo: 0 });
+        }));
+        let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         // Create initial buffer
         let mut multi_buffer = MultiBuffer::with_capacity(&device, 10, BufferUsage::NONE);

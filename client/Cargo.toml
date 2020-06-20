@@ -5,7 +5,7 @@ authors = ["Technici4n", "Azercoco"]
 edition = "2018"
 
 [[bin]]
-name = "client"
+name = "voxel_rs_client"
 path = "./src/main.rs"
 
 [dependencies]
@@ -20,17 +20,19 @@ log = "0.4"
 ron = "0.5"
 serde = "1.0"
 toml = "0.5"
+futures = "0.3"
 
 # Graphics
 glsl-to-spirv = "0.1"
-image = "0.22"
-texture_packer = "0.17"
-wgpu = "0.4"
+image = "0.23"
+texture_packer = "0.21"
+wgpu = "0.5"
+wgpu-types = "0.5"
 winit = "0.22"
 
 # Gui
 quint = { path = "../quint" }
-wgpu_glyph = "0.5"
+wgpu_glyph = "0.8"
 
 # Math
 nalgebra = "0.18"

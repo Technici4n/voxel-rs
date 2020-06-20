@@ -96,6 +96,10 @@ pub fn create_default_pipeline(
             module: &fragment_shader_module,
             entry_point: "main",
         }),
+        vertex_state: wgpu::VertexStateDescriptor {
+            index_format: wgpu::IndexFormat::Uint32,
+            vertex_buffers: &[vertex_buffer_descriptor],
+        },
         rasterization_state: Some(if cull_back_faces {
             RASTERIZER_WITH_CULLING
         } else {
@@ -104,8 +108,6 @@ pub fn create_default_pipeline(
         primitive_topology,
         color_states: &DEFAULT_COLOR_STATE_DESCRIPTOR,
         depth_stencil_state: Some(DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR),
-        index_format: wgpu::IndexFormat::Uint32,
-        vertex_buffers: &[vertex_buffer_descriptor],
         sample_count: crate::window::SAMPLE_COUNT,
         sample_mask: 0xFFFFFFFF,
         alpha_to_coverage_enabled: false,

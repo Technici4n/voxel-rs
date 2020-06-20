@@ -100,7 +100,7 @@ impl SinglePlayer {
         let ui_renderer = UiRenderer::new(device);
 
         let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         let world_renderer = WorldRenderer::new(
             device,
@@ -252,7 +252,7 @@ impl State for SinglePlayer {
         });
         self.client_timing.record_part("Drop far chunks");
 
-        flags.hide_and_center_cursor = self.ui.should_capture_mouse();
+        flags.grab_cursor = self.ui.should_capture_mouse();
 
         send_debug_info(
             "Chunks",
@@ -313,7 +313,7 @@ impl State for SinglePlayer {
 
         // Begin rendering
         let mut encoder =
-            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { todo: 0 });
+            device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
         crate::render::clear_color_and_depth(&mut encoder, buffers);
 

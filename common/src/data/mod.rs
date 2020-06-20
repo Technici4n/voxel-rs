@@ -90,9 +90,13 @@ pub fn load_data(data_directory: PathBuf) -> Result<Data> {
     };*/
 
     // TODO : load every .vox in the model folder
-    let model_tree = load_voxel_model("data/model/tree.vox").unwrap();
+    let model_tree = load_voxel_model(
+        data_directory.join("model/tree.vox").to_str().unwrap()
+    ).unwrap();
     models.register("tree".to_owned(), model_tree)?;
-    let model_knight = load_voxel_model("data/model/chr_knight.vox").unwrap();
+    let model_knight = load_voxel_model(
+        data_directory.join("model/chr_knight.vox").to_str().unwrap()
+    ).unwrap();
     models.register("knight".to_owned(), model_knight)?;
 
     // Load items
