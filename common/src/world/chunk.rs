@@ -27,7 +27,9 @@ impl ChunkPos {
     }
 
     /// Squared euclidian distance to other chunk
+    #[inline(always)]
     pub fn squared_euclidian_distance(self, other: ChunkPos) -> u64 {
+        #[inline(always)]
         fn square(x: i64) -> u64 {
             (x * x) as u64
         }

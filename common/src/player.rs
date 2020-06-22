@@ -36,7 +36,7 @@ impl Default for PlayerInput {
 pub struct PlayerId(pub(crate) u16);
 
 /// The render distance of a player
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 pub struct RenderDistance {
     pub x_max: u64,
     pub x_min: u64,
@@ -122,4 +122,39 @@ impl Default for RenderDistance {
             z_min: 1,
         }
     }
+}
+
+/// All the visible chunks for a given `RenderDistance` sorted by distance
+pub struct CloseChunks {
+    /// The chunks
+    close_chunks: Vec<ChunkPos>,
+    /// The `RenderDistance` for which the chunks are valid
+    render_distance: RenderDistance,
+}
+
+impl CloseChunks {
+    pub fn new(render_distance: &RenderDistance) -> Self {
+        Self {
+            close_chunks: get_close_chunks(render_distance),
+            render_distance: *render_distance,
+        }
+    }
+
+    pub fn update(&mut self, render_distance: &RenderDistance) {
+        if *render_distance != self.render_distance {
+            self.close_chunks = get_close_chunks(render_distance);
+            self.render_distance = *render_distance;
+        }
+    }
+
+    pub fn get_close_chunks(&self) -> &Vec<ChunkPos> {
+        &self.close_chunks
+    }
+}
+
+fn get_close_chunks(render_distance: &RenderDistance) -> Vec<ChunkPos> {
+    let origin = ChunkPos::from([0, 0, 0]);
+    let mut adjacent_positions: Vec<_> = render_distance.iterate_around_player(origin).collect();
+    adjacent_positions.sort_by_key(|pos| origin.squared_euclidian_distance(*pos));
+    adjacent_positions
 }

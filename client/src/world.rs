@@ -3,7 +3,7 @@ use std::sync::Arc;
 use voxel_rs_common::{
     block::BlockMesh,
     physics::BlockContainer,
-    player::RenderDistance,
+    player::{CloseChunks, RenderDistance},
     world::{BlockPos, chunk::{ChunkPos, Chunk}, LightChunk},
 };
 use crate::render::WorldRenderer;
@@ -19,6 +19,8 @@ pub struct World {
     chunks: HashMap<ChunkPos, ClientChunk>,
     /// The meshing worker
     meshing_worker: MeshingWorker,
+    /// The chunks the player can see
+    close_chunks: CloseChunks,
     /// The renderer
     renderer: WorldRenderer,
 }
@@ -29,6 +31,7 @@ impl World {
         Self {
             chunks: HashMap::new(),
             meshing_worker: MeshingWorker::new(block_meshes),
+            close_chunks: CloseChunks::new(&RenderDistance::default()),
             renderer,
         }
     }
@@ -85,10 +88,9 @@ impl World {
 
     /// Start the meshing of a few chunks
     pub fn enqueue_chunks_for_meshing(&mut self, player_chunk: ChunkPos, render_distance: &RenderDistance) {
-        let mut adjacent_positions: Vec<_> = render_distance.iterate_around_player(player_chunk).collect();
-        // TODO: make sure this is not a bottleneck
-        adjacent_positions.sort_by_key(|pos| player_chunk.squared_euclidian_distance(*pos));
-        for pos in adjacent_positions {
+        self.close_chunks.update(render_distance);
+        for pos in self.close_chunks.get_close_chunks() {
+            let pos = pos.offset_by_pos(player_chunk);
             if let Some(mut client_chunk) = self.chunks.get(&pos) {
                 if client_chunk.needs_remesh && !client_chunk.is_in_meshing_queue {
                     let res = self.meshing_worker.enqueue(self.create_chunk_mesh_data(pos));
