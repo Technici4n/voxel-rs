@@ -6,7 +6,7 @@ use voxel_rs_common::{
     network::{messages::ToClient, messages::ToServer, Client, ClientEvent},
     player::RenderDistance,
     registry::Registry,
-    world::{BlockPos, World},
+    world::BlockPos,
 };
 
 use crate::input::YawPitch;
@@ -20,6 +20,7 @@ use crate::{
     settings::Settings,
     ui::Ui,
     window::{State, StateTransition, WindowData, WindowFlags},
+    world::World,
 };
 use nalgebra::Vector3;
 use std::collections::HashSet;
@@ -39,7 +40,6 @@ pub struct SinglePlayer {
     ui_renderer: UiRenderer,
     gui: Gui,
     world: World,
-    world_renderer: WorldRenderer,
     #[allow(dead_code)] // TODO: remove this
     block_registry: Registry<Block>,
     item_registry: Registry<Item>,
@@ -106,7 +106,6 @@ impl SinglePlayer {
             device,
             &mut encoder,
             data.texture_atlas,
-            data.meshes,
             &data.models,
         );
 
@@ -116,8 +115,7 @@ impl SinglePlayer {
                 ui: Ui::new(),
                 ui_renderer,
                 gui: Gui::new(),
-                world: World::new(),
-                world_renderer,
+                world: World::new(data.meshes.clone(), world_renderer),
                 block_registry: data.blocks,
                 model_registry: data.models,
                 item_registry: data.items,
@@ -153,25 +151,13 @@ impl State for SinglePlayer {
         _device: &mut wgpu::Device,
     ) -> Result<StateTransition> {
         self.client_timing.start_frame();
-        let mut chunks_to_mesh = HashSet::new();
         // Handle server messages
         loop {
             match self.client.receive_event() {
                 ClientEvent::NoEvent => break,
                 ClientEvent::ServerMessage(message) => match message {
                     ToClient::Chunk(chunk, light_chunk) => {
-                        // TODO: make sure this only happens once
-                        let chunk_pos = chunk.pos;
-                        self.world.set_chunk(chunk);
-                        self.world.set_light_chunk(light_chunk);
-                        // Queue chunks for meshing
-                        for i in -1..=1 {
-                            for j in -1..=1 {
-                                for k in -1..=1 {
-                                    chunks_to_mesh.insert(chunk_pos.offset(i, j, k));
-                                }
-                            }
-                        }
+                        self.world.add_chunk(chunk, light_chunk);
                     }
                     ToClient::UpdatePhysics(server_state) => {
                         self.physics_simulation.receive_server_update(server_state);
@@ -199,16 +185,6 @@ impl State for SinglePlayer {
 
         let p = self.physics_simulation.get_camera_position();
         let player_chunk = BlockPos::from(p).containing_chunk_pos();
-        // Send current position to meshing
-        self.world_renderer.update_position(player_chunk);
-        // Send chunk updates to meshing
-        for chunk_pos in chunks_to_mesh.into_iter() {
-            if self.world.has_chunk(chunk_pos) {
-                assert_eq!(self.world.has_light_chunk(chunk_pos), true);
-                self.world_renderer.update_chunk(&self.world, chunk_pos);
-            }
-        }
-        self.client_timing.record_part("Send chunks to meshing");
 
         // Debug current player position, yaw and pitch
         send_debug_info(
@@ -229,40 +205,16 @@ impl State for SinglePlayer {
         );
 
         // Remove chunks that are too far
-        // damned borrow checker :(
-        let Self {
-            ref mut world,
-            ref mut world_renderer,
-            ref render_distance,
-            ..
-        } = self;
-        let World {
-            ref mut chunks,
-            ref mut light,
-            ..
-        } = world;
-        chunks.retain(|chunk_pos, _| {
-            if render_distance.is_chunk_visible(player_chunk, *chunk_pos) {
-                true
-            } else {
-                world_renderer.remove_chunk(*chunk_pos);
-                light.remove(chunk_pos);
-                false
-            }
-        });
+        self.world.remove_far_chunks(player_chunk, &self.render_distance);
         self.client_timing.record_part("Drop far chunks");
 
-        flags.grab_cursor = self.ui.should_capture_mouse();
+        // Send chunks to meshing
+        self.world.enqueue_chunks_for_meshing(player_chunk, &self.render_distance);
+        self.client_timing.record_part("Send chunks to meshing");
 
-        send_debug_info(
-            "Chunks",
-            "client",
-            format!(
-                "Client loaded chunks = {}\nClient loaded light chunks = {}",
-                self.world.chunks.len(),
-                self.world.light.len()
-            ),
-        );
+        send_debug_info("Chunks", "clientloaded", format!("Client loaded {} chunks", self.world.num_loaded_chunks()));
+
+        flags.grab_cursor = self.ui.should_capture_mouse();
 
         if self.ui.should_exit() {
             //Ok(StateTransition::ReplaceCurrent(Box::new(crate::mainmenu::MainMenu::new)))
@@ -344,7 +296,7 @@ impl State for SinglePlayer {
             rot_y: item_rotation,
         });
         // Draw chunks
-        self.world_renderer.render(
+        self.world.render_chunks(
             device,
             &mut encoder,
             buffers,
@@ -353,7 +305,6 @@ impl State for SinglePlayer {
             input_state.enable_culling,
             pointed_block,
             &models_to_draw,
-            &self.world,
         );
         self.client_timing.record_part("Render chunks");
 

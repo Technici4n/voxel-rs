@@ -3,17 +3,18 @@
 //! A `Camera` defines how a player's entity reacts to that player's inputs.
 
 use crate::{
-    debug::send_debug_info, physics::player::PhysicsPlayer, player::PlayerInput, world::World,
+    debug::send_debug_info, physics::player::PhysicsPlayer, player::PlayerInput,
 };
+use super::BlockContainer;
 use nalgebra::Vector3;
 
 /// The default camera. It doesn't let you go inside blocks unless you are already inside blocks.
 // TODO: use better integrator (RK4 ?)
-pub fn default_camera(
+pub fn default_camera<BC: BlockContainer>(
     player: &mut PhysicsPlayer,
     input: PlayerInput,
     seconds_delta: f64,
-    world: &World,
+    world: &BC,
 ) {
     // Unit vector in the `angle` direction
     fn movement_direction(yaw: f64, angle: f64) -> Vector3<f64> {

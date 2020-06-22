@@ -3,13 +3,11 @@
 use super::buffers::MultiBuffer;
 use super::frustum::Frustum;
 use super::init::{create_default_pipeline, load_glsl_shader, ShaderStage};
-use super::world::meshing_worker::{MeshingState, MeshingWorker};
 use super::{ to_u8_slice, buffer_from_slice };
 use crate::texture::load_image;
 use crate::window::WindowBuffers;
 use image::{ImageBuffer, Rgba};
 use nalgebra::{Matrix4, Similarity3, Translation3, UnitQuaternion, Vector3};
-use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::registry::Registry;
@@ -21,11 +19,11 @@ mod meshing_worker;
 mod model;
 mod skybox;
 pub use self::model::Model;
+pub use self::meshing::ChunkMeshData;
+pub use self::meshing_worker::{ChunkMesh, MeshingWorker};
 
 /// All the state necessary to render the world.
 pub struct WorldRenderer {
-    // Chunk meshing
-    meshing_worker: MeshingWorker,
     // View-projection matrix
     uniform_view_proj: wgpu::Buffer,
     // Model matrix
@@ -55,7 +53,6 @@ impl WorldRenderer {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         texture_atlas: ImageBuffer<Rgba<u8>, Vec<u8>>,
-        block_meshes: Vec<BlockMesh>,
         models: &Registry<VoxelModel>,
     ) -> Self {
         // Load texture atlas
@@ -197,7 +194,6 @@ impl WorldRenderer {
         }
 
         Self {
-            meshing_worker: MeshingWorker::new(MeshingState::new(block_meshes), "Meshing".to_owned()),
             uniform_view_proj,
             uniform_model,
             chunk_index_buffers: MultiBuffer::with_capacity(device, 1000, wgpu::BufferUsage::INDEX),
@@ -230,20 +226,7 @@ impl WorldRenderer {
         enable_culling: bool,
         pointed_block: Option<(BlockPos, usize)>,
         models: &[model::Model],
-        world: &World,
     ) {
-        //============= RECEIVE CHUNK MESHES =============//
-        for (pos, vertices, indices) in self.meshing_worker.get_processed() {
-            if world.has_chunk(pos) {
-                if vertices.len() > 0 && indices.len() > 0 {
-                    self.chunk_vertex_buffers
-                        .update(device, encoder, pos, &vertices[..]);
-                    self.chunk_index_buffers
-                        .update(device, encoder, pos, &indices[..]);
-                }
-            }
-        }
-
         //============= RENDER =============//
         // TODO: what if win_h is 0 ?
         let aspect_ratio = {
@@ -432,17 +415,22 @@ impl WorldRenderer {
         }
     }
 
-    pub fn update_chunk(&mut self, world: &World, pos: ChunkPos) {
-        self.meshing_worker
-            .enqueue(pos, self::meshing::ChunkMeshData::create_from_world(world, pos));
+    pub fn update_chunk_mesh(
+        &mut self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        chunk_mesh: ChunkMesh,
+    ) {
+        let (pos, vertices, indices) = chunk_mesh;
+        if vertices.len() > 0 && indices.len() > 0 {
+            self.chunk_vertex_buffers
+                .update(device, encoder, pos, &vertices[..]);
+            self.chunk_index_buffers
+                .update(device, encoder, pos, &indices[..]);
+        }
     }
 
-    pub fn update_position(&mut self, player_pos: ChunkPos) {
-        self.meshing_worker.update_player_pos(vec![player_pos]);
-    }
-
-    pub fn remove_chunk(&mut self, pos: ChunkPos) {
-        self.meshing_worker.dequeue(pos);
+    pub fn remove_chunk_mesh(&mut self, pos: ChunkPos) {
         self.chunk_vertex_buffers.remove(&pos);
         self.chunk_index_buffers.remove(&pos);
     }

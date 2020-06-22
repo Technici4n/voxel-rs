@@ -1,4 +1,4 @@
-use crate::world::World;
+use super::BlockContainer;
 use nalgebra::Vector3;
 
 #[derive(Debug, Clone)]
@@ -61,8 +61,7 @@ impl AABB {
     }
 
     /// Return true if the box intersect some block
-    // TODO: use BlockRegistry
-    pub fn intersect_world(&self, world: &World) -> bool {
+    pub fn intersect_world<BC: BlockContainer>(&self, world: &BC) -> bool {
         let min_x = self.pos.x.floor() as i64;
         let max_x = (self.pos.x + self.size_x).ceil() as i64;
         let min_y = self.pos.y.floor() as i64;
@@ -73,7 +72,7 @@ impl AABB {
         for i in min_x..max_x {
             for j in min_y..max_y {
                 for k in min_z..max_z {
-                    if world.get_block((i, j, k).into()) != 0 {
+                    if world.is_block_full((i, j, k).into()) {
                         return true;
                     }
                 }
@@ -84,7 +83,7 @@ impl AABB {
 
     /// Try to move the box in the world and stop the movement if it goes trough a block
     /// Return the actual deplacement
-    pub fn move_check_collision(&mut self, world: &World, delta: Vector3<f64>) -> Vector3<f64> {
+    pub fn move_check_collision<BC: BlockContainer>(&mut self, world: &BC, delta: Vector3<f64>) -> Vector3<f64> {
         if self.intersect_world(world) {
             self.pos += delta;
             return delta;
@@ -184,7 +183,7 @@ impl AABB {
     }
 
     /// Check whether the bounding box is touching the ground
-    pub fn is_on_the_ground(&mut self, world: &World) -> bool {
+    pub fn is_on_the_ground<BC: BlockContainer>(&mut self, world: &BC) -> bool {
         self.pos.y -= 0.0021;
         let would_intersect_down = self.intersect_world(world);
         self.pos.y += 0.0021;

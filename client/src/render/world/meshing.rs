@@ -6,8 +6,8 @@ use voxel_rs_common::{
     block::BlockMesh,
     collections::zero_initialized_vec,
     world::chunk::{Chunk, ChunkPos, CHUNK_SIZE},
-    world::World,
 };
+use crate::world::World;
 
 #[derive(Clone, Copy, Default)]
 pub struct Quad {
@@ -60,37 +60,6 @@ pub struct ChunkMeshData {
     pub light_chunk: Arc<LightChunk>,
     /// The light chunks that are adjacent to the current light chunk
     pub all_light_chunks: [Option<Arc<LightChunk>>; 27],
-}
-
-impl ChunkMeshData {
-    /// Extract the data from the world. Panics if the world doesn't contain the current chunk and the current light chunk
-    pub fn create_from_world(world: &World, pos: ChunkPos) -> Self {
-        let chunk = world
-            .get_chunk(pos)
-            .expect("no chunk at current position to create ChunkMeshData");
-        let light_chunk = world
-            .get_light_chunk(pos)
-            .expect("no light chunk at current position to create ChunkMeshData");
-        let mut all_chunks: [Option<Arc<Chunk>>; 27] = Default::default();
-        let mut all_light_chunks: [Option<Arc<LightChunk>>; 27] = Default::default();
-        for i in 0..3 {
-            for j in 0..3 {
-                for k in 0..3 {
-                    let np = pos.offset(i - 1, j - 1, k - 1);
-                    let idx = (i * 9 + j * 3 + k) as usize;
-                    all_chunks[idx] = world.get_chunk(np);
-                    all_light_chunks[idx] = world.get_light_chunk(np);
-                }
-            }
-        }
-
-        Self {
-            chunk,
-            light_chunk,
-            all_chunks,
-            all_light_chunks,
-        }
-    }
 }
 
 /// Greedy meshing : compressed adjacent quads, return the number of uncompressed and compressed quads

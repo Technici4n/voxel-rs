@@ -1,8 +1,8 @@
 use crate::{
     physics::camera::default_camera,
     physics::player::PhysicsPlayer,
+    physics::BlockContainer,
     player::{PlayerId, PlayerInput},
-    world::World,
 };
 use nalgebra::Vector3;
 use std::{
@@ -25,7 +25,7 @@ pub struct PhysicsState {
 impl PhysicsState {
     /// Step the full physics simulation.
     /// For now, it just moves all connected players.
-    pub fn step_simulation(&mut self, input: &Input, dt: Duration, world: &World) {
+    pub fn step_simulation<BC: BlockContainer>(&mut self, input: &Input, dt: Duration, world: &BC) {
         let seconds_delta = dt.as_secs_f64();
         for (&id, input) in input.player_inputs.iter() {
             let player = self.players.entry(id).or_insert(Default::default());
@@ -98,7 +98,7 @@ impl ClientPhysicsSimulation {
     }
 
     /// Step the simulation according to the current input and time
-    pub fn step_simulation(&mut self, input: PlayerInput, time: Instant, world: &World) {
+    pub fn step_simulation<BC: BlockContainer>(&mut self, input: PlayerInput, time: Instant, world: &BC) {
         // Recompute simulation if necessary
         if self.needs_recomputing {
             self.needs_recomputing = false;
@@ -174,7 +174,7 @@ impl ServerPhysicsSimulation {
     }
 
     /// Step the simulation according to the current input and time
-    pub fn step_simulation(&mut self, time: Instant, world: &World) {
+    pub fn step_simulation<BC: BlockContainer>(&mut self, time: Instant, world: &BC) {
         self.server_state.physics_state.step_simulation(
             &self.server_state.input,
             time - self.server_state.server_time,

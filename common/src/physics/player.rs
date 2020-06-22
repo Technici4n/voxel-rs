@@ -1,5 +1,6 @@
 use crate::physics::aabb::AABB;
-use crate::world::{BlockPos, World};
+use crate::world::BlockPos;
+use super::BlockContainer;
 use nalgebra::Vector3;
 
 const PLAYER_SIDE: f64 = 0.8;
@@ -23,16 +24,16 @@ impl PhysicsPlayer {
 
     /// Ray trace to find the pointed block. Return the position of the block and the face (x/-x/y/-y/z/-z)
     // TODO: use block registry
-    pub fn get_pointed_at(
+    pub fn get_pointed_at<BC: BlockContainer>(
         &self,
         dir: Vector3<f64>,
         mut max_dist: f64,
-        world: &World,
+        world: &BC,
     ) -> Option<(BlockPos, usize)> {
         let dir = dir.normalize();
         let mut pos = self.get_camera_position();
         // Check current block first
-        let was_inside = world.get_block(BlockPos::from(pos)) != 0;
+        let was_inside = world.is_block_full(BlockPos::from(pos));
         let dirs = [
             Vector3::new(-1.0, 0.0, 0.0),
             Vector3::new(1.0, 0.0, 0.0),
@@ -77,7 +78,7 @@ impl PhysicsPlayer {
                 max_dist -= curr_min;
                 pos += curr_min * dir;
                 let block_pos = BlockPos::from(pos);
-                if world.get_block(block_pos) != 0 {
+                if world.is_block_full(block_pos) {
                     return Some((block_pos, face));
                 }
             }
