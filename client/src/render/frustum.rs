@@ -2,7 +2,7 @@ use crate::input::YawPitch;
 use nalgebra::{Matrix4, Perspective3, Vector3, Vector4};
 use voxel_rs_common::world::chunk::{ChunkPos, CHUNK_SIZE};
 
-/// A plane in the 3d space, i.e. all points (x, y, z) such that ax + by + bc = d.
+/// A plane in the 3d space, i.e. all points (x, y, z) such that ax + by + cz = d.
 #[derive(Debug, Copy, Clone)]
 pub struct Plane {
     /// (a, b, c)
