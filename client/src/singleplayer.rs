@@ -138,20 +138,8 @@ impl SinglePlayer {
             encoder.finish(),
         ))
     }
-}
 
-impl State for SinglePlayer {
-    fn update(
-        &mut self,
-        _settings: &mut Settings,
-        input_state: &InputState,
-        _data: &WindowData,
-        flags: &mut WindowFlags,
-        _seconds_delta: f64,
-        _device: &mut wgpu::Device,
-    ) -> Result<StateTransition> {
-        self.client_timing.start_frame();
-        // Handle server messages
+    fn handle_server_messages(&mut self) {
         loop {
             match self.client.receive_event() {
                 ClientEvent::NoEvent => break,
@@ -169,6 +157,22 @@ impl State for SinglePlayer {
                 ClientEvent::Connected => {}
             }
         }
+    }
+}
+
+impl State for SinglePlayer {
+    fn update(
+        &mut self,
+        _settings: &mut Settings,
+        input_state: &InputState,
+        _data: &WindowData,
+        flags: &mut WindowFlags,
+        _seconds_delta: f64,
+        _device: &mut wgpu::Device,
+    ) -> Result<StateTransition> {
+        self.client_timing.start_frame();
+        // Handle server messages
+        self.handle_server_messages();
         self.client_timing.record_part("Network events");
 
         // Collect input
