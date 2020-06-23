@@ -7,8 +7,7 @@ use voxel_rs_common::{
     world::{BlockPos, chunk::{ChunkPos, Chunk}, LightChunk},
 };
 use crate::render::WorldRenderer;
-use crate::render::world::MeshingWorker;
-use crate::render::world::ChunkMeshData;
+use crate::render::world::{ChunkMeshData, MeshingWorker, start_meshing_worker};
 
 /// Client-side world.
 /// It is currently responsible for:
@@ -30,7 +29,7 @@ impl World {
     pub fn new(block_meshes: Vec<BlockMesh>, renderer: WorldRenderer) -> Self {
         Self {
             chunks: HashMap::new(),
-            meshing_worker: MeshingWorker::new(block_meshes),
+            meshing_worker: start_meshing_worker(block_meshes),
             close_chunks: CloseChunks::new(&RenderDistance::default()),
             renderer,
         }
@@ -65,7 +64,7 @@ impl World {
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
     ) {
-        while let Some(mesh) = self.meshing_worker.get_mesh() {
+        while let Some(mesh) = self.meshing_worker.get_result() {
             if let Some(client_chunk) = self.chunks.get_mut(&mesh.0) {
                 client_chunk.is_in_meshing_queue = false;
                 self.renderer.update_chunk_mesh(device, encoder, mesh);
@@ -91,7 +90,7 @@ impl World {
         self.close_chunks.update(render_distance);
         for pos in self.close_chunks.get_close_chunks() {
             let pos = pos.offset_by_pos(player_chunk);
-            if let Some(mut client_chunk) = self.chunks.get(&pos) {
+            if let Some(client_chunk) = self.chunks.get(&pos) {
                 if client_chunk.needs_remesh && !client_chunk.is_in_meshing_queue {
                     let res = self.meshing_worker.enqueue(self.create_chunk_mesh_data(pos));
                     match res {

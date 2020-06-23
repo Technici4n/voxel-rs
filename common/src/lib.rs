@@ -10,5 +10,6 @@ pub mod player;
 pub mod registry;
 pub mod time;
 pub mod worker;
+pub mod worker2;
 pub mod world;
 pub mod worldgen;

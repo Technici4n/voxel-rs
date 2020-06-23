@@ -20,7 +20,7 @@ mod model;
 mod skybox;
 pub use self::model::Model;
 pub use self::meshing::ChunkMeshData;
-pub use self::meshing_worker::{ChunkMesh, MeshingWorker};
+pub use self::meshing_worker::{ChunkMesh, MeshingWorker, start_meshing_worker};
 
 /// All the state necessary to render the world.
 pub struct WorldRenderer {
