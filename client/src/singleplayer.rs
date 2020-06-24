@@ -23,7 +23,6 @@ use crate::{
     world::World,
 };
 use nalgebra::Vector3;
-use std::collections::HashSet;
 use std::time::Instant;
 use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::{send_debug_info, send_perf_breakdown, DebugInfo};

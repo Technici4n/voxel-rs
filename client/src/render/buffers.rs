@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 use std::hash::Hash;
-use futures::executor::block_on;
 
 use super::{ buffer_from_slice, to_u8_slice };
 
@@ -331,6 +330,7 @@ struct MultiBufferSegment {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::executor::block_on;
 
     // TODO: test on all backends
     #[test]
@@ -341,7 +341,7 @@ mod tests {
             compatible_surface: None,
             power_preference: PowerPreference::HighPerformance,
         }, BackendBit::PRIMARY)).unwrap();
-        let (device, mut queue) = block_on(adapter.request_device(&DeviceDescriptor {
+        let (device, _queue) = block_on(adapter.request_device(&DeviceDescriptor {
             extensions: Extensions {
                 anisotropic_filtering: false,
             },

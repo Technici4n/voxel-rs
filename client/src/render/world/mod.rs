@@ -12,7 +12,7 @@ use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::registry::Registry;
 use voxel_rs_common::world::chunk::ChunkPos;
-use voxel_rs_common::world::{BlockPos, World};
+use voxel_rs_common::world::BlockPos;
 
 mod meshing;
 mod meshing_worker;
@@ -658,7 +658,7 @@ fn create_target_vertices(face: usize) -> Vec<SkyboxVertex> {
                         id[i] = 0;
                         let v2 = vpos(id[0], id[1], id[2], face);
                         id[i] = 1;
-                        vertices.extend([v1, v2].into_iter());
+                        vertices.extend([v1, v2].iter());
                     }
                 }
             }

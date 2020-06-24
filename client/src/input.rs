@@ -67,7 +67,6 @@ impl InputState {
 
     /// Process a keyboard input, returning whether the state of the key changed or not
     pub fn process_keyboard_input(&mut self, input: KeyboardInput) -> bool {
-        self.modifiers_state = input.modifiers;
         let previous_state = self.keys.get(&input.scancode).cloned();
         self.keys.insert(input.scancode, input.state);
         if let &Some(ElementState::Pressed) = &previous_state {
@@ -94,12 +93,15 @@ impl InputState {
         &mut self,
         state: ElementState,
         button: MouseButton,
-        modifiers: ModifiersState,
     ) -> bool {
-        self.modifiers_state = modifiers;
         let previous_state = self.mouse_buttons.get(&button).cloned();
         self.mouse_buttons.insert(button, state);
         previous_state != Some(state)
+    }
+
+    /// Update the modifiers
+    pub fn set_modifiers_state(&mut self, modifiers_state: ModifiersState) {
+        self.modifiers_state = modifiers_state;
     }
 
     pub fn _get_modifiers_state(&self) -> ModifiersState {

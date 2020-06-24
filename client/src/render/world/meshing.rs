@@ -5,9 +5,8 @@ use voxel_rs_common::world::LightChunk;
 use voxel_rs_common::{
     block::BlockMesh,
     collections::zero_initialized_vec,
-    world::chunk::{Chunk, ChunkPos, CHUNK_SIZE},
+    world::chunk::{Chunk, CHUNK_SIZE},
 };
-use crate::world::World;
 
 #[derive(Clone, Copy, Default)]
 pub struct Quad {

@@ -120,8 +120,8 @@ impl<'a> ButtonBuilder<'a> {
         // Draw the shadow
         gui.primitives.draw_rect(x + 3, y + 3, w, h, [0.0, 0.0, 0.0, 1.0], 0.02);
         // Draw the button
-        let mut draw_pos;
-        let mut button_color;
+        let draw_pos;
+        let button_color;
         if gui.hot_item == id {
             if gui.active_item == id {
                 // Hot and active

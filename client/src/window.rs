@@ -4,7 +4,7 @@ use log::{info, warn};
 use std::time::Instant;
 use wgpu::Device;
 use futures::executor::block_on;
-use winit::dpi::{LogicalPosition, LogicalSize, PhysicalSize};
+use winit::dpi::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event::{ElementState, MouseButton};
 use winit::event_loop::ControlFlow;
 use winit::window::Window;
@@ -104,7 +104,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     }, wgpu::BackendBit::all()))
     .expect("Failed to create adapter");
     // TODO: device should be immutable
-    let (mut device, mut queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
+    let (mut device, queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
         extensions: wgpu::Extensions {
             anisotropic_filtering: false,
         },
@@ -212,16 +212,15 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     MouseInput {
                         button,
                         state: element_state,
-                        modifiers,
                         ..
                     } => {
-                        if input_state.process_mouse_input(element_state, button, modifiers) {
+                        if input_state.process_mouse_input(element_state, button) {
                             mouse_state_changes.push((button, element_state));
                         }
                     }
                     // weird events
                     TouchpadPressure { .. } | AxisMotion { .. } | Touch(..) | ThemeChanged(_) => (),
-                    ModifiersChanged { .. } => (),  // TODO: handle this
+                    ModifiersChanged(modifiers_state) => input_state.set_modifiers_state(modifiers_state),
                 }
             },
             DeviceEvent { event, .. } => {
@@ -286,16 +285,21 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 window.set_title(&window_flags.window_title);
                 if window_flags.grab_cursor && window_data.focused {
                     window.set_cursor_visible(false);
-                    let sz = window_data.logical_window_size;
+                    let PhysicalSize { width, height } = window_data.physical_window_size;
+                    let center_pos = PhysicalPosition { x : width / 2, y : height / 2 };
                     match window.set_cursor_grab(true) {
                         Err(err) => warn!("Failed to grab cursor ({:?})", err),
-                        _ => ()
+                        _ => (),
+                    }
+                    match window.set_cursor_position(center_pos) {
+                        Err(err) => warn!("Failed to center cursor ({:?})", err),
+                        _ => (),
                     }
                 } else {
                     window.set_cursor_visible(true);
                     match window.set_cursor_grab(false) {
                         Err(err) => warn!("Failed to ungrab cursor ({:?})", err),
-                        _ => ()
+                        _ => (),
                     }
                 }
 

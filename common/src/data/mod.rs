@@ -220,7 +220,7 @@ fn load_textures(
         packer.pack_own(
             format!("{}", i),
             ImageImporter::import_from_file(path).expect("Failed to read texture to pack"),
-        );
+        ).expect("Failed to pack textures");
     }
 
     let mut texture_buffer: ImageBuffer<Rgba<u8>, Vec<u8>> =
@@ -229,7 +229,7 @@ fn load_textures(
         &ImageExporter::export(&packer).expect("Failed to export texture from packer"),
         0,
         0,
-    );
+    ).expect("Failed to copy texture atlas to buffer");
     texture_buffer
         .save("atlas.png")
         .expect("Failed to save texture atlas");

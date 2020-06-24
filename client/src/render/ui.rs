@@ -156,8 +156,8 @@ impl<'a> UiRenderer {
             let b_index = a_index + 1;
             let c_index = b_index + 1;
             let d_index = c_index + 1;
-            rect_vertices.extend([a, b, c, d].into_iter());
-            rect_indices.extend([b_index, a_index, c_index, b_index, c_index, d_index].into_iter());
+            rect_vertices.extend([a, b, c, d].iter());
+            rect_indices.extend([b_index, a_index, c_index, b_index, c_index, d_index].iter());
         }
         // Triangles
         for TrianglesPrimitive {
@@ -291,10 +291,10 @@ impl<'a> UiRenderer {
                 color: COLOR,
             };
             let voffset = rect_vertices.len() as u32;
-            rect_vertices.extend([v1, v2, v3, v4, v5, v6, v7, v8].into_iter());
+            rect_vertices.extend([v1, v2, v3, v4, v5, v6, v7, v8].iter());
             rect_indices.extend(
                 [0, 1, 2, 1, 2, 3, 4, 5, 6, 5, 6, 7]
-                    .into_iter()
+                    .iter()
                     .map(|id| id + voffset),
             );
         }
