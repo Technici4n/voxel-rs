@@ -3,7 +3,7 @@ use voxel_rs_common::{
     registry::Registry,
     world::{Chunk, ChunkPos, WorldGenerator},
 };
-use voxel_rs_common::worker2::{WorkerState, Worker};
+use voxel_rs_common::worker::{WorkerState, Worker};
 
 static WORLDGEN_QUEUE_SIZE: usize = 20;
 

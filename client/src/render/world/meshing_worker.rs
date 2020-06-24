@@ -3,7 +3,7 @@ use super::meshing::{greedy_meshing, ChunkMeshData};
 use crate::render::world::ChunkVertex;
 use voxel_rs_common::block::BlockMesh;
 use voxel_rs_common::world::ChunkPos;
-use voxel_rs_common::worker2::{WorkerState, Worker};
+use voxel_rs_common::worker::{WorkerState, Worker};
 
 pub type ChunkMesh = (ChunkPos, Vec<ChunkVertex>, Vec<u32>);
 pub type MeshingWorker = Worker<ChunkMeshData, ChunkMesh, MeshingState>;

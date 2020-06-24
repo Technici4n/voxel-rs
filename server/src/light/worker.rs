@@ -1,7 +1,7 @@
 use voxel_rs_common::{
     collections::zero_initialized_vec,
     world::{Chunk, CHUNK_SIZE, LightChunk},
-    worker2::{Worker, WorkerState},
+    worker::{Worker, WorkerState},
 };
 use super::HighestOpaqueBlock;
 use super::sunlight::{FastBFSQueue, compute_light};
