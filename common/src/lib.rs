@@ -3,7 +3,6 @@ pub mod collections;
 pub mod data;
 pub mod debug;
 pub mod item;
-pub mod light;
 pub mod network;
 pub mod physics;
 pub mod player;

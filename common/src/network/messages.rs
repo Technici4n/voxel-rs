@@ -3,7 +3,7 @@ use crate::{
     physics::simulation::ServerState,
     player::PlayerId,
     player::{PlayerInput, RenderDistance},
-    world::{chunk::Chunk, LightChunk},
+    world::{Chunk, LightChunk},
 };
 use nalgebra::Vector3;
 use std::sync::Arc;

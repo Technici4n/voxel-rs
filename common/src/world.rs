@@ -1,4 +1,69 @@
-use crate::block::BlockId;
+use crate::{
+    block::{Block, BlockId},
+    registry::Registry,
+};
+use nalgebra::Vector3;
+
+/// The position of a block in the world.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct BlockPos {
+    pub px: i64,
+    pub py: i64,
+    pub pz: i64,
+}
+
+impl BlockPos {
+    #[inline(always)]
+    pub fn containing_chunk_pos(self) -> ChunkPos {
+        ChunkPos {
+            px: self.px.div_euclid(CHUNK_SIZE as i64),
+            py: self.py.div_euclid(CHUNK_SIZE as i64),
+            pz: self.pz.div_euclid(CHUNK_SIZE as i64),
+        }
+    }
+
+    #[inline(always)]
+    pub fn pos_in_containing_chunk(self) -> (u32, u32, u32) {
+        (
+            self.px.rem_euclid(CHUNK_SIZE as i64) as u32,
+            self.py.rem_euclid(CHUNK_SIZE as i64) as u32,
+            self.pz.rem_euclid(CHUNK_SIZE as i64) as u32,
+        )
+    }
+}
+
+impl From<(i64, i64, i64)> for BlockPos {
+    fn from((px, py, pz): (i64, i64, i64)) -> Self {
+        Self { px, py, pz }
+    }
+}
+
+impl From<(f64, f64, f64)> for BlockPos {
+    fn from((px, py, pz): (f64, f64, f64)) -> Self {
+        Self {
+            px: px.floor() as i64,
+            py: py.floor() as i64,
+            pz: pz.floor() as i64,
+        }
+    }
+}
+
+impl From<Vector3<f64>> for BlockPos {
+    fn from(vec: Vector3<f64>) -> Self {
+        Self {
+            px: vec[0].floor() as i64,
+            py: vec[1].floor() as i64,
+            pz: vec[2].floor() as i64,
+        }
+    }
+}
+
+/// A world generator
+pub trait WorldGenerator {
+    /// Generate the chunk at position `pos`. The result must always be the same,
+    /// independently of the previous calls to this function!
+    fn generate_chunk(&mut self, pos: ChunkPos, block_registry: &Registry<Block>) -> Chunk;
+}
 
 /// Number of blocks along an axis of the chunk
 pub const CHUNK_SIZE: u32 = 32;
@@ -49,7 +114,7 @@ impl From<[i64; 3]> for ChunkPos {
     }
 }
 
-/// Chunk position but only along XZ axis, used for highest block position
+/// Chunk position but only along XZ axis
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ChunkPosXZ {
     pub px: i64,
@@ -91,6 +156,7 @@ impl From<ChunkPos> for ChunkPosXZ {
         }
     }
 }
+
 
 /// An RLE-compressed chunk
 #[derive(Debug, Clone)]
@@ -145,7 +211,7 @@ impl CompressedChunk {
 #[derive(Debug, Clone)]
 pub struct Chunk {
     pub pos: ChunkPos,
-    pub(super) data: Vec<BlockId>,
+    pub data: Vec<BlockId>,
 }
 
 impl Chunk {
@@ -198,6 +264,82 @@ impl Chunk {
     pub fn fill(&mut self, block: BlockId) {
         for i in 0..(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize {
             self.data[i] = block;
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct LightChunk {
+    pub light: Vec<u8>,
+    pub pos: ChunkPos,
+}
+
+impl LightChunk {
+    pub fn new(pos: ChunkPos) -> Self {
+        let mut light = Vec::new();
+        light.resize((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize, 15);
+        Self { light, pos }
+    }
+
+    /// Get light at some position
+    #[inline(always)]
+    pub fn get_light_at(&self, (px, py, pz): (u32, u32, u32)) -> u8 {
+        self.light[(px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize]
+    }
+
+    /// Get light at some position without bound checking
+    #[inline(always)]
+    pub  unsafe fn get_light_at_unsafe(&self, (px, py, pz): (u32, u32, u32)) -> u8 {
+        *self.light.get_unchecked((px * CHUNK_SIZE * CHUNK_SIZE + py * CHUNK_SIZE + pz) as usize)
+    }
+}
+
+/// An RLE-compressed chunk
+// TODO: merge Chunk and LightChunk implementations ? Also Compressed versions ?
+#[derive(Debug, Clone)]
+pub struct CompressedLightChunk {
+    pub pos: ChunkPos,
+    pub data: Vec<(u16, u8)>,
+}
+
+impl CompressedLightChunk {
+    /// Compress `chunk` using RLE
+    pub fn from_chunk(chunk: &LightChunk) -> Self {
+        let mut compressed_data = Vec::new();
+        let mut current_block = chunk.light[0];
+        let mut current_block_count = 0;
+        for i in 0..(CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize {
+            if chunk.light[i] != current_block {
+                compressed_data.push((current_block_count, current_block));
+                current_block = chunk.light[i];
+                current_block_count = 0;
+            }
+            current_block_count += 1;
+        }
+
+        compressed_data.push((current_block_count, current_block));
+
+        Self {
+            pos: chunk.pos,
+            data: compressed_data,
+        }
+    }
+
+    /// Recover original chunk
+    pub fn to_chunk(&self) -> LightChunk {
+        let mut light = unsafe { crate::collections::zero_initialized_vec((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE) as usize) };
+
+        let mut i = 0;
+        for &(len, block) in self.data.iter() {
+            for el in &mut light[(i as usize)..((i+len) as usize)] {
+                *el = block;
+            }
+            i += len;
+        }
+
+        LightChunk {
+            pos: self.pos,
+            light,
         }
     }
 }

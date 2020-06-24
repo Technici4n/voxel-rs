@@ -1,6 +1,6 @@
 use crate::block::Block;
 use crate::registry::Registry;
-use crate::world::chunk::{Chunk, CHUNK_SIZE, ChunkPosXZ};
+use crate::world::{Chunk, CHUNK_SIZE, ChunkPosXZ};
 use crate::worldgen::perlin;
 use std::collections::HashMap;
 

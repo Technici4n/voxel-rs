@@ -1,5 +1,5 @@
-use crate::world::chunk::{Chunk, CHUNK_SIZE};
-use crate::world::HighestOpaqueBlock;
+use voxel_rs_common::world::{Chunk, CHUNK_SIZE};
+use super::HighestOpaqueBlock;
 use std::sync::Arc;
 
 // TODO : Add block that are source of light

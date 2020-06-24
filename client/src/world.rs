@@ -4,7 +4,7 @@ use voxel_rs_common::{
     block::BlockMesh,
     physics::BlockContainer,
     player::{CloseChunks, RenderDistance},
-    world::{BlockPos, chunk::{ChunkPos, Chunk}, LightChunk},
+    world::{BlockPos, ChunkPos, Chunk, LightChunk},
 };
 use crate::render::WorldRenderer;
 use crate::render::world::{ChunkMeshData, MeshingWorker, start_meshing_worker};

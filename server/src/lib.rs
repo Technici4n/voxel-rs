@@ -18,7 +18,7 @@ use voxel_rs_common::{
     physics::simulation::ServerPhysicsSimulation,
     player::{CloseChunks, RenderDistance},
     world::{
-        chunk::ChunkPos,
+        ChunkPos,
         BlockPos,
     },
     worldgen::DefaultWorldGenerator,

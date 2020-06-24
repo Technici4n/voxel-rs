@@ -1,4 +1,4 @@
-use crate::world::chunk::ChunkPos;
+use crate::world::ChunkPos;
 use serde::Deserialize;
 
 /// The input of a player

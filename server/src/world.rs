@@ -8,15 +8,15 @@ use voxel_rs_common::{
     physics::BlockContainer,
     registry::Registry,
     world::{
-        chunk::{Chunk, ChunkPos, ChunkPosXZ},
+        Chunk, ChunkPos, ChunkPosXZ,
         BlockPos,
-        HighestOpaqueBlock,
         LightChunk,
-        WorldGenerator
+        WorldGenerator,
     },
 };
 use crate::{
-    light::{ChunkLightingData, ChunkLightingWorker, start_lighting_worker},
+    light::HighestOpaqueBlock,
+    light::worker::{ChunkLightingData, ChunkLightingWorker, start_lighting_worker},
     worldgen::{WorldGenerationWorker, start_worldgen_worker},
 };
 use lazy_static::lazy_static;

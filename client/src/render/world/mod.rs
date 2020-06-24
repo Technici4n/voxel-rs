@@ -11,8 +11,7 @@ use nalgebra::{Matrix4, Similarity3, Translation3, UnitQuaternion, Vector3};
 use voxel_rs_common::data::vox::VoxelModel;
 use voxel_rs_common::debug::send_debug_info;
 use voxel_rs_common::registry::Registry;
-use voxel_rs_common::world::chunk::ChunkPos;
-use voxel_rs_common::world::BlockPos;
+use voxel_rs_common::world::{BlockPos, ChunkPos};
 
 mod meshing;
 mod meshing_worker;

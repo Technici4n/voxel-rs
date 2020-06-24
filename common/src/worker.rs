@@ -1,6 +1,6 @@
 use crate::debug::send_worker_perf;
 use crate::time::AverageTimeCounter;
-use crate::world::chunk::ChunkPos;
+use crate::world::ChunkPos;
 use std::sync::mpsc::{Sender, Receiver, channel};
 use std::time::Instant;
 use std::marker::PhantomData;

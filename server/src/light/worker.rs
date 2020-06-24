@@ -1,9 +1,11 @@
-use voxel_rs_common::light::{FastBFSQueue, compute_light};
-use voxel_rs_common::world::{LightChunk, HighestOpaqueBlock};
-use voxel_rs_common::world::chunk::{Chunk, CHUNK_SIZE};
+use voxel_rs_common::{
+    collections::zero_initialized_vec,
+    world::{Chunk, CHUNK_SIZE, LightChunk},
+    worker2::{Worker, WorkerState},
+};
+use super::HighestOpaqueBlock;
+use super::sunlight::{FastBFSQueue, compute_light};
 use std::sync::Arc;
-use voxel_rs_common::worker2::{Worker, WorkerState};
-use voxel_rs_common::collections::zero_initialized_vec;
 
 static LIGHTING_QUEUE_SIZE: usize = 20;
 

@@ -1,8 +1,7 @@
 use voxel_rs_common::{
     block::Block,
     registry::Registry,
-    world::chunk::{Chunk, ChunkPos},
-    world::WorldGenerator,
+    world::{Chunk, ChunkPos, WorldGenerator},
 };
 use voxel_rs_common::worker2::{WorkerState, Worker};
 

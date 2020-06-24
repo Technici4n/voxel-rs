@@ -5,7 +5,7 @@ use voxel_rs_common::world::LightChunk;
 use voxel_rs_common::{
     block::BlockMesh,
     collections::zero_initialized_vec,
-    world::chunk::{Chunk, CHUNK_SIZE},
+    world::{Chunk, CHUNK_SIZE},
 };
 
 #[derive(Clone, Copy, Default)]
