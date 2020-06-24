@@ -1,9 +1,15 @@
 use voxel_rs_common::light::{FastBFSQueue, compute_light};
 use voxel_rs_common::world::{LightChunk, HighestOpaqueBlock};
-use voxel_rs_common::world::chunk::{Chunk, ChunkPos, CHUNK_SIZE};
+use voxel_rs_common::world::chunk::{Chunk, CHUNK_SIZE};
 use std::sync::Arc;
-use voxel_rs_common::worker::{Worker, WorkerState};
+use voxel_rs_common::worker2::{Worker, WorkerState};
 use voxel_rs_common::collections::zero_initialized_vec;
+
+static LIGHTING_QUEUE_SIZE: usize = 20;
+
+pub fn start_lighting_worker() -> ChunkLightingWorker {
+    Worker::new(ChunkLightingState::new(), LIGHTING_QUEUE_SIZE, "Light".into())
+}
 
 /// The chunk-specific data that is needed to generate light for it.
 pub struct ChunkLightingData {
@@ -18,7 +24,7 @@ pub struct ChunkLightingState {
 }
 
 impl ChunkLightingState {
-    pub fn new() -> Self {
+    pub(self) fn new() -> Self {
         Self {
             queue_reuse: FastBFSQueue::new(),
             light_data_reuse: unsafe { zero_initialized_vec((CHUNK_SIZE * CHUNK_SIZE * CHUNK_SIZE * 27) as usize) },
@@ -28,7 +34,8 @@ impl ChunkLightingState {
 }
 
 impl WorkerState<ChunkLightingData, Arc<LightChunk>> for ChunkLightingState {
-    fn compute(&mut self, pos: ChunkPos, data: ChunkLightingData) -> Arc<LightChunk> {
+    fn compute(&mut self, data: ChunkLightingData) -> Arc<LightChunk> {
+        let pos = data.chunks[9+3+1].as_ref().expect("No middle chunk").pos;
         Arc::new(LightChunk {
             light: compute_light(
                 data.chunks,

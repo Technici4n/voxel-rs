@@ -149,15 +149,41 @@ pub struct World {
 /// This data structure contains the y position of the highest opaque block
 #[derive(Clone)]
 pub struct HighestOpaqueBlock {
-    pub pos: ChunkPosXZ,
     pub y: [i64; (CHUNK_SIZE * CHUNK_SIZE) as usize],
 }
 
 impl HighestOpaqueBlock {
-    pub fn new(pos: ChunkPosXZ) -> Self {
+    pub fn new() -> Self {
         Self {
-            pos,
-            y: [-100; (CHUNK_SIZE * CHUNK_SIZE) as usize],
+            y: [-i64::min_value(); (CHUNK_SIZE * CHUNK_SIZE) as usize],
+        }
+    }
+
+    pub fn from_chunk(chunk: &Arc<Chunk>) -> Self {
+        let mut hob = Self {
+            y: [-i64::min_value(); (CHUNK_SIZE * CHUNK_SIZE) as usize],
+        };
+        for i in 0..CHUNK_SIZE {
+            for k in 0..CHUNK_SIZE {
+                for j in (0..CHUNK_SIZE).rev() {
+                    // TODO: use BlockRegistry
+                    if chunk.get_block_at((i, j, k)) != 0 {
+                        hob.y[(i*CHUNK_SIZE + k) as usize] = j as i64 + chunk.pos.py * CHUNK_SIZE as i64;
+                        break;
+                    }
+                }
+            }
+        }
+        hob
+    }
+
+    /// Merge with other HighestOpaqueBlock
+    pub fn merge(&mut self, other: &HighestOpaqueBlock) {
+        for i in 0..CHUNK_SIZE {
+            for k in 0..CHUNK_SIZE {
+                let idx = (i*CHUNK_SIZE + k) as usize;
+                self.y[idx] = Ord::max(self.y[idx], other.y[idx]);
+            }
         }
     }
 }
@@ -233,7 +259,7 @@ impl World {
         let mut highest_opaque_block = (**self
             .highest_opaque_block
             .entry(chunk_pos_xz)
-            .or_insert_with(|| Arc::new(HighestOpaqueBlock::new(chunk_pos_xz))))
+            .or_insert_with(|| Arc::new(HighestOpaqueBlock::new())))
             .clone();
         let mut check = false;
         let mut scan_all_chunk = false;
