@@ -1,5 +1,5 @@
 [workspace]
-members = ["client", "common", "quint", "server"]
+members = ["client", "common", "network", "quint", "server"]
 
 [profile.release]
 debug = true
