@@ -11,7 +11,7 @@ lazy_static::lazy_static! {
 
 pub fn serialize_packet<P: Serialize>(target: &mut Vec<u8>, packet: &P) -> bincode::Result<()> {
     // Resize the buffer
-    let content_size = bincode::serialized_size(packet)? as usize;
+    let content_size = BINCODE_OPTIONS.serialized_size(packet)? as usize;
     if content_size > MAX_PACKET_CONTENT {
         return Err(Box::new(bincode::ErrorKind::SizeLimit));
     }
@@ -48,6 +48,9 @@ pub fn deserialize_packet<P: DeserializeOwned>(source: &mut [u8]) -> bincode::Re
     }
     let checksum = crc32::checksum_ieee(&source[..]).to_le_bytes();
     for i in 0..4 {
+        source[i] = packet_checksum[i];
+    }
+    for i in 0..4 {
         if checksum[i] != packet_checksum[i] {
             return Err(Box::new(bincode::ErrorKind::DeserializeAnyNotSupported)); // Actually, invalid checksum
         }
@@ -55,3 +58,20 @@ pub fn deserialize_packet<P: DeserializeOwned>(source: &mut [u8]) -> bincode::Re
     BINCODE_OPTIONS.deserialize_from(&source[HEADER_SIZE..])
 }
 
+
+#[test]
+fn test_ser_de() {
+    let msg1 = ToServerPacket::Message {
+        salts_xor: 1194876546,
+        messages: vec![
+            Message::ReliableAcks {
+                first_sequence: 0,
+                acks: BitSet::new().into(),
+            },
+        ]
+    };
+    let mut v = Vec::new();
+    serialize_packet(&mut v, &msg1).unwrap();
+    let msg2 = deserialize_packet(&mut v[..]).unwrap();
+    assert_eq!(msg1, msg2);
+}
