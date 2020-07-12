@@ -31,8 +31,8 @@ impl Sender {
     pub fn new() -> Self {
         Self {
             reliable_packets: VecDeque::new(),
-            next_sequence: 0,
-            earliest_unacked_sequence: 0,
+            next_sequence: 1,
+            earliest_unacked_sequence: 1,
         }
     }
 
@@ -94,13 +94,13 @@ impl Receiver {
         Self {
             received: vec![None; RELIABLE_BUFFER_SIZE],
             received_sequences: [0; RELIABLE_BUFFER_SIZE],
-            next_sequence: 0,
+            next_sequence: 1,
         }
     }
 
     pub fn get_message(&mut self) -> Option<Vec<u8>> {
         let next_idx = self.next_sequence as usize % RELIABLE_BUFFER_SIZE;
-        if self.received[next_idx].is_some() && self.received_sequences[next_idx] != self.next_sequence {
+        if self.received[next_idx].is_some() && self.received_sequences[next_idx] == self.next_sequence {
             self.next_sequence += 1;
             self.received[next_idx].take()
         } else {

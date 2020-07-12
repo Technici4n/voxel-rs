@@ -47,6 +47,7 @@ pub struct DummySocketConfig {
     pub max_jitter: Duration,
 }
 
+#[allow(dead_code)]
 pub const NO_LOSS_CONFIG: DummySocketConfig = DummySocketConfig {
     packet_loss: 0.0,
     latency: Duration::from_millis(30),
@@ -98,7 +99,7 @@ impl Socket for DummySocket {
                 arrival_time: Instant::now() + Duration::from_secs_f64(self.delay_dist.sample(&mut rng)),
                 sender: self.addr,
                 data: Vec::from(buf),
-            })
+            });
         }
         Some(())
     }

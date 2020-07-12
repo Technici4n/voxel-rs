@@ -1,17 +1,24 @@
 use std::str::FromStr;
 use std::thread;
+use std::time::Duration;
 use voxel_rs_network::{Client, Server, ServerEvent, SocketAddr, MessageDelivery};
 
 mod common;
-use self::common::{DummySocket, NO_LOSS_CONFIG};
+use self::common::{DummySocket, DummySocketConfig};
 
-// Server sends 42 to client, client sends back 43 to server, unreliable
+// Server sends 42 to client, client sends back 43 to server, ordered
 #[test]
-fn test_connection_no_loss() {
+fn test_connection_with_loss() {
+    let config = DummySocketConfig {
+        packet_loss: 0.8,
+        latency: Duration::from_millis(100),
+        max_jitter: Duration::from_millis(100),
+    };
+    let sleep_duration = Duration::from_millis(20);
     let client_addr = SocketAddr::from_str("127.0.0.1:42").unwrap();
     let server_addr = SocketAddr::from_str("127.0.0.1:43").unwrap();
     thread::spawn(move || {
-        let client_socket = DummySocket::new(client_addr, NO_LOSS_CONFIG);
+        let client_socket = DummySocket::new(client_addr, config);
         let mut client = Client::new(client_socket, server_addr);
         client.connect();
 
@@ -24,13 +31,14 @@ fn test_connection_no_loss() {
                 }
             }
             if send_back {
-                client.send_message(vec![43], MessageDelivery::Unreliable);
+                client.send_message(vec![43], MessageDelivery::Ordered);
             }
+            thread::sleep(sleep_duration);
         }
     });
 
     let server_thread = thread::spawn(move || {
-        let server_socket = DummySocket::new(server_addr, NO_LOSS_CONFIG);
+        let server_socket = DummySocket::new(server_addr, config);
         let mut server = Server::new(server_socket);
 
         loop {
@@ -50,8 +58,9 @@ fn test_connection_no_loss() {
                 }
             }
             if let Some(id) = send_back_id {
-                server.send_message(id, vec![42], MessageDelivery::Unreliable);
+                server.send_message(id, vec![42], MessageDelivery::Ordered);
             }
+            thread::sleep(sleep_duration);
         }
     });
 
