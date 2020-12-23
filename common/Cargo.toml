@@ -18,4 +18,4 @@ image = "0.23"
 texture_packer = "0.21"
 
 # Math
-nalgebra = "0.18"
+nalgebra = "0.23"

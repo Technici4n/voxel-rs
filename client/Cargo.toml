@@ -36,4 +36,4 @@ quint = { path = "../quint" }
 wgpu_glyph = "0.8"
 
 # Math
-nalgebra = "0.18"
+nalgebra = "0.23"
