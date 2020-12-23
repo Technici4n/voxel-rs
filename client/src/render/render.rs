@@ -1,19 +1,22 @@
 //! Helpers for renderer passes
 
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use crate::window::WindowBuffers;
 
 /// Create an attachment for the depth buffer that doesn't clear it.
 pub fn create_default_depth_stencil_attachment(
     depth_buffer: &wgpu::TextureView,
-) -> wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase<&wgpu::TextureView> {
-    wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase {
+) -> wgpu::RenderPassDepthStencilAttachmentDescriptor {
+    wgpu::RenderPassDepthStencilAttachmentDescriptor {
         attachment: depth_buffer,
-        depth_load_op: wgpu::LoadOp::Load,
-        depth_store_op: wgpu::StoreOp::Store,
-        clear_depth: 0.0, // TODO: use debugging depth ?
-        stencil_load_op: wgpu::LoadOp::Load,
-        stencil_store_op: wgpu::StoreOp::Store,
-        clear_stencil: 0,
+        depth_ops: Some(wgpu::Operations {
+            load: wgpu::LoadOp::Load,
+            store: true
+        }),
+        stencil_ops: Some(wgpu::Operations {
+            load: wgpu::LoadOp::Load,
+            store: true
+        })
     }
 }
 
@@ -26,9 +29,10 @@ pub fn create_default_render_pass<'a>(
         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
             attachment: buffers.multisampled_texture_buffer,
             resolve_target: None,
-            load_op: wgpu::LoadOp::Load,
-            store_op: wgpu::StoreOp::Store,
-            clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: true
+            },
         }],
         depth_stencil_attachment: Some(create_default_depth_stencil_attachment(
             buffers.depth_buffer,
@@ -42,9 +46,10 @@ pub fn encode_resolve_render_pass<'a>(encoder: &mut wgpu::CommandEncoder, buffer
         color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
             attachment: buffers.multisampled_texture_buffer,
             resolve_target: Some(buffers.texture_buffer),
-            load_op: wgpu::LoadOp::Load,
-            store_op: wgpu::StoreOp::Store,
-            clear_color: wgpu::Color::GREEN, // TODO: use debugging color ?
+            ops: wgpu::Operations {
+                load: wgpu::LoadOp::Load,
+                store: true
+            },
         }],
         depth_stencil_attachment: None,
     });
@@ -56,23 +61,26 @@ fn create_clear_color_attachment(
     [wgpu::RenderPassColorAttachmentDescriptor {
         attachment: buffers.multisampled_texture_buffer,
         resolve_target: None,
-        load_op: wgpu::LoadOp::Clear,
-        store_op: wgpu::StoreOp::Store,
-        clear_color: crate::window::CLEAR_COLOR,
+        ops: wgpu::Operations {
+            load: wgpu::LoadOp::Clear(crate::window::CLEAR_COLOR),
+            store: true
+        },
     }]
 }
 
 fn create_clear_depth_attachment(
     buffers: WindowBuffers,
-) -> wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase<&wgpu::TextureView> {
-    wgpu_types::RenderPassDepthStencilAttachmentDescriptorBase {
+) -> wgpu::RenderPassDepthStencilAttachmentDescriptor {
+    wgpu::RenderPassDepthStencilAttachmentDescriptor {
         attachment: buffers.depth_buffer,
-        depth_load_op: wgpu::LoadOp::Clear,
-        depth_store_op: wgpu::StoreOp::Store,
-        clear_depth: crate::window::CLEAR_DEPTH,
-        stencil_load_op: wgpu::LoadOp::Load,
-        stencil_store_op: wgpu::StoreOp::Store,
-        clear_stencil: 0,
+        depth_ops: Some(wgpu::Operations {
+            load: wgpu::LoadOp::Clear(crate::window::CLEAR_DEPTH),
+            store: true
+        }),
+        stencil_ops: Some(wgpu::Operations {
+            load: wgpu::LoadOp::Load,
+            store: true
+        })
     }
 }
 
@@ -99,11 +107,9 @@ pub fn to_u8_slice<T: Copy>(v: &[T]) -> &[u8] {
 
 /// Helper to create a buffer from an existing slice.
 pub fn buffer_from_slice(device: &wgpu::Device, usage: wgpu::BufferUsage, data: &[u8]) -> wgpu::Buffer {
-    let buffer_mapped = device.create_buffer_mapped(&wgpu::BufferDescriptor {
+    device.create_buffer_init(&BufferInitDescriptor {
         label: None,
-        size: data.len() as u64,
-        usage
-    });
-    buffer_mapped.data.copy_from_slice(&data);
-    buffer_mapped.finish()
+        usage,
+        contents: &data
+    })
 }

@@ -2,15 +2,15 @@
 
 use super::{ buffer_from_slice, to_u8_slice };
 use super::buffers::DynamicBuffer;
-use super::init::ShaderStage;
+use super::init::{load_glsl_shader, ShaderStage};
 use crate::ui::PrimitiveBuffer;
 use crate::window::{WindowBuffers, WindowData};
 use std::collections::{BTreeMap, HashMap};
-use wgpu_glyph::FontId;
+use wgpu_glyph::{FontId, ab_glyph::FontVec};
 
 pub struct UiRenderer {
     // Glyph rendering
-    glyph_brush: wgpu_glyph::GlyphBrush<'static, ()>,
+    glyph_brush: wgpu_glyph::GlyphBrush<(), FontVec>,
     fonts: HashMap<String, FontId>,
     // Rectangle rendering
     transform_buffer: wgpu::Buffer,
@@ -23,10 +23,10 @@ pub struct UiRenderer {
 impl<'a> UiRenderer {
     pub fn new(device: &mut wgpu::Device) -> Self {
         // Load fonts
-        let default_font: &'static [u8] =
-            include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf");
-        let mut glyph_brush_builder = wgpu_glyph::GlyphBrushBuilder::using_font_bytes(default_font)
-            .expect("Failed to load default font.");
+        let default_font = FontVec::try_from_vec(
+            include_bytes!("../../../assets/fonts/IBMPlexMono-Regular.ttf").to_vec()
+        ).expect("Failed to load default font.");
+        let mut glyph_brush_builder = wgpu_glyph::GlyphBrushBuilder::using_font(default_font);
         log::info!("Loading fonts from assets/fonts/list.toml");
         let mut fonts = HashMap::new();
         let font_list = std::fs::read_to_string("assets/fonts/list.toml")
@@ -36,11 +36,12 @@ impl<'a> UiRenderer {
         for (font_name, font_file) in font_files.into_iter() {
             use std::io::Read;
             log::info!("Loading font {} from file {}", font_name, font_file);
-            let mut font_bytes = Vec::new();
+            let mut font_bytes = vec![];
             let mut file = std::fs::File::open(font_file).expect("Couldn't open font file");
             file.read_to_end(&mut font_bytes)
                 .expect("Couldn't read font file");
-            fonts.insert(font_name, glyph_brush_builder.add_font_bytes(font_bytes));
+            let font = FontVec::try_from_vec(font_bytes).expect("Couldn't read font file");
+            fonts.insert(font_name, glyph_brush_builder.add_font(font));
         }
         log::info!("Fonts successfully loaded");
         let glyph_brush = glyph_brush_builder
@@ -49,7 +50,8 @@ impl<'a> UiRenderer {
 
         // Create uniform buffer
         let transform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
+            label: Some("ui_transform_buffer"),
+            mapped_at_creation: false,
             size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
@@ -57,10 +59,11 @@ impl<'a> UiRenderer {
         // Create bind group layout
         let uniform_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: None,
-            bindings: &[wgpu::BindGroupLayoutEntry {
+            entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                ty: wgpu::BindingType::UniformBuffer { dynamic: false, min_binding_size: None },
+                count: None
             }],
         });
 
@@ -68,26 +71,27 @@ impl<'a> UiRenderer {
         let uniforms_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: None,
             layout: &uniform_layout,
-            bindings: &[wgpu::Binding {
+            entries: &[wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: &transform_buffer,
-                    range: 0..16,
-                },
+                resource: wgpu::BindingResource::Buffer(
+                    transform_buffer.slice(0..16)
+                ),
             }],
         });
 
         // Create shader modules
-        let vertex_shader =
-            super::init::load_glsl_shader(ShaderStage::Vertex, "assets/shaders/gui-rect.vert");
-        let fragment_shader =
-            super::init::load_glsl_shader(ShaderStage::Fragment, "assets/shaders/gui-rect.frag");
+        let vertex_shader_bytes = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/gui-rect.vert");
+        let vertex_shader = wgpu::util::make_spirv(&vertex_shader_bytes);
+        let fragment_shader_bytes = load_glsl_shader(ShaderStage::Fragment, "assets/shaders/gui-rect.frag");
+        let fragment_shader = wgpu::util::make_spirv(&fragment_shader_bytes);
+
+        log::trace!("Creating pipeline.");
 
         let pipeline = super::init::create_default_pipeline(
             device,
             &uniform_layout,
-            &vertex_shader,
-            &fragment_shader,
+            vertex_shader,
+            fragment_shader,
             wgpu::PrimitiveTopology::TriangleList,
             wgpu::VertexBufferDescriptor {
                 stride: std::mem::size_of::<UiVertex>() as u64,
@@ -96,6 +100,8 @@ impl<'a> UiRenderer {
             },
             false,
         );
+
+        log::trace!("Created pipeline.");
 
         Self {
             glyph_brush,
@@ -191,18 +197,17 @@ impl<'a> UiRenderer {
             }
             // Get font IDs
             let Self { ref fonts, .. } = &self;
-            let parts = parts
+            let parts: Vec<wgpu_glyph::Text> = parts
                 .iter()
-                .map(|part| wgpu_glyph::SectionText {
-                    text: &part.text,
-                    scale: part.font_size,
-                    color: part.color,
-                    font_id: part
+                .map(|part| wgpu_glyph::Text::new(&part.text)
+                    .with_scale(part.font_size)
+                    .with_color(part.color)
+                    .with_font_id(part
                         .font
                         .clone()
                         .and_then(|f| fonts.get(&f).cloned())
-                        .unwrap_or_default(),
-                })
+                        .unwrap_or_default())
+                )
                 .collect();
             // Calculate positions
             let mut x = x as f32;
@@ -236,17 +241,15 @@ impl<'a> UiRenderer {
             } else {
                 wgpu_glyph::HorizontalAlign::Left
             };
-            let section = wgpu_glyph::VariedSection {
-                text: parts,
-                screen_position: (x, y),
-                bounds: (w, h),
-                z,
-                layout: wgpu_glyph::Layout::Wrap {
+            let section = wgpu_glyph::Section::default()
+                .with_screen_position((x, y))
+                .with_bounds((w, h))
+                .with_layout(wgpu_glyph::Layout::Wrap {
                     line_breaker: Default::default(),
                     v_align,
                     h_align,
-                },
-            };
+                })
+                .with_text(parts);
             self.glyph_brush.queue(section);
         }
         // Crosshair
@@ -339,8 +342,8 @@ impl<'a> UiRenderer {
                 let mut rpass = super::render::create_default_render_pass(encoder, buffers);
                 rpass.set_pipeline(&self.pipeline);
                 rpass.set_bind_group(0, &self.uniforms_bind_group, &[]);
-                rpass.set_vertex_buffer(0, &self.vertex_buffer.get_buffer(), 0, 0);
-                rpass.set_index_buffer(&self.index_buffer.get_buffer(), 0, 0);
+                rpass.set_vertex_buffer(0, self.vertex_buffer.get_buffer().slice(..));
+                rpass.set_index_buffer(self.index_buffer.get_buffer().slice(..));
                 rpass.draw_indexed(0..(self.index_buffer.len() as u32), 0, 0..1);
             }
         }
@@ -350,9 +353,11 @@ impl<'a> UiRenderer {
 
         // Draw text
         // TODO: use depth buffer
+        let mut staging_belt = wgpu::util::StagingBelt::new(128);
         self.glyph_brush
             .draw_queued(
                 device,
+                &mut staging_belt,
                 encoder,
                 buffers.texture_buffer,
                 //create_default_depth_stencil_attachment(buffers.depth_buffer),

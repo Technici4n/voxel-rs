@@ -56,15 +56,17 @@ impl WorldRenderer {
     ) -> Self {
         // Load texture atlas
         let texture_atlas = load_image(device, encoder, texture_atlas);
-        let texture_atlas_view = texture_atlas.create_default_view();
+        let texture_atlas_view = texture_atlas.create_view(&wgpu::TextureViewDescriptor::default());
 
         // Create uniform buffers
         let uniform_view_proj = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
             label: None,
             size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
         });
         let uniform_model = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
             label: None,
             size: 64,
             usage: (wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST),
@@ -81,15 +83,16 @@ impl WorldRenderer {
 
         // Create chunk pipeline
         let chunk_pipeline = {
-            let vertex_shader = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/world.vert");
-            let fragment_shader =
-                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/world.frag");
+            let vertex_shader_bytes = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/world.vert");
+            let vertex_shader = wgpu::util::make_spirv(&vertex_shader_bytes);
+            let fragment_shader_bytes = load_glsl_shader(ShaderStage::Fragment, "assets/shaders/world.frag");
+            let fragment_shader = wgpu::util::make_spirv(&fragment_shader_bytes);
 
             create_default_pipeline(
                 device,
                 &chunk_bind_group_layout,
-                &vertex_shader,
-                &fragment_shader,
+                vertex_shader,
+                fragment_shader,
                 wgpu::PrimitiveTopology::TriangleList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<ChunkVertex>() as u64,
@@ -114,15 +117,16 @@ impl WorldRenderer {
 
         // Create skybox pipeline
         let skybox_pipeline = {
-            let vertex_shader = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/skybox.vert");
-            let fragment_shader =
-                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/skybox.frag");
+            let vertex_shader_bytes = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/skybox.vert");
+            let vertex_shader = wgpu::util::make_spirv(&vertex_shader_bytes);
+            let fragment_shader_bytes = load_glsl_shader(ShaderStage::Fragment, "assets/shaders/skybox.frag");
+            let fragment_shader = wgpu::util::make_spirv(&fragment_shader_bytes);
 
             create_default_pipeline(
                 device,
                 &vpm_bind_group_layout,
-                &vertex_shader,
-                &fragment_shader,
+                vertex_shader,
+                fragment_shader,
                 wgpu::PrimitiveTopology::TriangleList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<SkyboxVertex>() as u64,
@@ -135,20 +139,22 @@ impl WorldRenderer {
 
         // Create target buffer and pipeline
         let target_vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            mapped_at_creation: false,
             label: None,
             size: 8 * std::mem::size_of::<SkyboxVertex>() as u64,
             usage: wgpu::BufferUsage::VERTEX | wgpu::BufferUsage::COPY_DST,
         });
         let target_pipeline = {
-            let vertex_shader = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/target.vert");
-            let fragment_shader =
-                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/target.frag");
+            let vertex_shader_bytes = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/target.vert");
+            let vertex_shader = wgpu::util::make_spirv(&vertex_shader_bytes);
+            let fragment_shader_bytes = load_glsl_shader(ShaderStage::Fragment, "assets/shaders/target.frag");
+            let fragment_shader = wgpu::util::make_spirv(&fragment_shader_bytes);
 
             create_default_pipeline(
                 device,
                 &vpm_bind_group_layout,
-                &vertex_shader,
-                &fragment_shader,
+                vertex_shader,
+                fragment_shader,
                 wgpu::PrimitiveTopology::LineList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<SkyboxVertex>() as u64,
@@ -161,15 +167,16 @@ impl WorldRenderer {
 
         // Create model pipeline
         let model_pipeline = {
-            let vertex_shader = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/model.vert");
-            let fragment_shader =
-                load_glsl_shader(ShaderStage::Fragment, "assets/shaders/model.frag");
+            let vertex_shader_bytes = load_glsl_shader(ShaderStage::Vertex, "assets/shaders/model.vert");
+            let vertex_shader = wgpu::util::make_spirv(&vertex_shader_bytes);
+            let fragment_shader_bytes = load_glsl_shader(ShaderStage::Fragment, "assets/shaders/model.frag");
+            let fragment_shader = wgpu::util::make_spirv(&fragment_shader_bytes);
 
             create_default_pipeline(
                 device,
                 &vpm_bind_group_layout,
-                &vertex_shader,
-                &fragment_shader,
+                vertex_shader,
+                fragment_shader,
                 wgpu::PrimitiveTopology::TriangleList,
                 wgpu::VertexBufferDescriptor {
                     stride: std::mem::size_of::<RgbVertex>() as u64,
@@ -264,8 +271,8 @@ impl WorldRenderer {
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.chunk_pipeline);
             rpass.set_bind_group(0, &self.chunk_bind_group, &[]);
-            rpass.set_vertex_buffer(0, &self.chunk_vertex_buffers.get_buffer(), 0, 0);
-            rpass.set_index_buffer(&self.chunk_index_buffers.get_buffer(), 0, 0);
+            rpass.set_vertex_buffer(0, self.chunk_vertex_buffers.get_buffer().slice(..));
+            rpass.set_index_buffer(self.chunk_index_buffers.get_buffer().slice(..));
             let mut count = 0;
             for chunk_pos in self.chunk_index_buffers.keys() {
                 if !enable_culling || Frustum::contains_chunk(&planes, &view_mat, chunk_pos) {
@@ -317,8 +324,8 @@ impl WorldRenderer {
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.skybox_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
-            rpass.set_vertex_buffer(0, &self.skybox_vertex_buffer, 0, 0);
-            rpass.set_index_buffer(&self.skybox_index_buffer, 0, 0);
+            rpass.set_vertex_buffer(0, self.skybox_vertex_buffer.slice(..));
+            rpass.set_index_buffer(self.skybox_index_buffer.slice(..));
             rpass.draw_indexed(0..36, 0, 0..1);
         }
 
@@ -365,7 +372,7 @@ impl WorldRenderer {
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.target_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
-            rpass.set_vertex_buffer(0, &self.target_vertex_buffer, 0, 0);
+            rpass.set_vertex_buffer(0, self.target_vertex_buffer.slice(..));
             rpass.draw(0..8, 0..1);
         }
 
@@ -396,8 +403,8 @@ impl WorldRenderer {
             let mut rpass = super::render::create_default_render_pass(encoder, buffers);
             rpass.set_pipeline(&self.model_pipeline);
             rpass.set_bind_group(0, &self.vpm_bind_group, &[]);
-            rpass.set_vertex_buffer(0, &self.model_vertex_buffers.get_buffer(), 0, 0);
-            rpass.set_index_buffer(&self.model_index_buffers.get_buffer(), 0, 0);
+            rpass.set_vertex_buffer(0, self.model_vertex_buffers.get_buffer().slice(..));
+            rpass.set_index_buffer(self.model_index_buffers.get_buffer().slice(..));
             let (index_pos, index_len) = self
                 .model_index_buffers
                 .get_pos_len(&model.mesh_id)
@@ -484,16 +491,18 @@ const CHUNK_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 6] = [
 const CHUNK_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> =
     wgpu::BindGroupLayoutDescriptor {
         label: None,
-        bindings: &[
+        entries: &[
             wgpu::BindGroupLayoutEntry {
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                ty: wgpu::BindingType::UniformBuffer { dynamic: false, min_binding_size: None },
+                count: None
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 1,
                 visibility: wgpu::ShaderStage::FRAGMENT,
                 ty: wgpu::BindingType::Sampler { comparison: true },
+                count: None
             },
             wgpu::BindGroupLayoutEntry {
                 binding: 2,
@@ -503,6 +512,7 @@ const CHUNK_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> =
                     multisampled: false,
                     dimension: wgpu::TextureViewDimension::D2,
                 },
+                count: None
             },
         ],
     };
@@ -516,6 +526,7 @@ fn create_chunk_bind_group(
 ) -> wgpu::BindGroup {
     // Create texture sampler
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        label: None,
         address_mode_u: wgpu::AddressMode::ClampToEdge,
         address_mode_v: wgpu::AddressMode::ClampToEdge,
         address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -524,25 +535,25 @@ fn create_chunk_bind_group(
         mipmap_filter: wgpu::FilterMode::Linear,
         lod_min_clamp: 0.0,
         lod_max_clamp: 5.0,
-        compare: wgpu::CompareFunction::Always,
+        compare: Some(wgpu::CompareFunction::Always),
+        anisotropy_clamp: None
     });
 
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout,
-        bindings: &[
-            wgpu::Binding {
+        entries: &[
+            wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: uniform_view_proj,
-                    range: 0..64,
-                },
+                resource: wgpu::BindingResource::Buffer(
+                    uniform_view_proj.slice(0..64)
+                ),
             },
-            wgpu::Binding {
+            wgpu::BindGroupEntry {
                 binding: 1,
                 resource: wgpu::BindingResource::Sampler(&sampler),
             },
-            wgpu::Binding {
+            wgpu::BindGroupEntry {
                 binding: 2,
                 resource: wgpu::BindingResource::TextureView(texture_atlas_view),
             },
@@ -568,18 +579,20 @@ const SKYBOX_VERTEX_ATTRIBUTES: [wgpu::VertexAttributeDescriptor; 1] =
 const SKYBOX_BIND_GROUP_LAYOUT: wgpu::BindGroupLayoutDescriptor<'static> =
     wgpu::BindGroupLayoutDescriptor {
         label: None,
-        bindings: &[
+        entries: &[
             wgpu::BindGroupLayoutEntry {
                 // view proj
                 binding: 0,
                 visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                ty: wgpu::BindingType::UniformBuffer { dynamic: false, min_binding_size: None },
+                count: None
             },
             wgpu::BindGroupLayoutEntry {
                 // model
                 binding: 1,
                 visibility: wgpu::ShaderStage::VERTEX,
-                ty: wgpu::BindingType::UniformBuffer { dynamic: false },
+                ty: wgpu::BindingType::UniformBuffer { dynamic: false, min_binding_size: None },
+                count: None
             },
         ],
     };
@@ -594,20 +607,18 @@ fn create_vpm_bind_group(
     device.create_bind_group(&wgpu::BindGroupDescriptor {
         label: None,
         layout,
-        bindings: &[
-            wgpu::Binding {
+        entries: &[
+            wgpu::BindGroupEntry {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: uniform_view_proj,
-                    range: 0..64,
-                },
+                resource: wgpu::BindingResource::Buffer(
+                    uniform_view_proj.slice(0..64)
+                ),
             },
-            wgpu::Binding {
+            wgpu::BindGroupEntry {
                 binding: 1,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: uniform_model,
-                    range: 0..64,
-                },
+                resource: wgpu::BindingResource::Buffer(
+                    uniform_model.slice(0..64)
+                ),
             },
         ],
     })

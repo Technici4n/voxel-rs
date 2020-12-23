@@ -5,7 +5,7 @@ use anyhow::Result;
 use quint::{wt, Size, Style, WidgetTree};
 use std::collections::BTreeMap;
 use voxel_rs_common::debug::DebugInfo;
-use wgpu_glyph::Scale;
+use wgpu_glyph::ab_glyph::PxScale;
 use winit::dpi::LogicalPosition;
 
 //pub mod rewrite;
@@ -89,13 +89,13 @@ impl Ui {
                 vec![
                     TextPart {
                         text: format!("\n{}", section),
-                        font_size: Scale::uniform(25.0),
+                        font_size: PxScale::from(25.0),
                         color: white,
                         font: Some("medium_italic".to_owned()),
                     },
                     TextPart {
                         text: " DEBUG INFO\n".to_owned(),
-                        font_size: Scale::uniform(25.0),
+                        font_size: PxScale::from(25.0),
                         color: white,
                         font: Some("regular".to_owned()),
                     },
@@ -105,7 +105,7 @@ impl Ui {
                             .map(|(_id, m)| m)
                             .collect::<Vec<String>>()
                             .join("\n"),
-                        font_size: Scale::uniform(20.0),
+                        font_size: PxScale::from(20.0),
                         color: white,
                         font: Some("regular".to_owned()),
                     },
@@ -118,7 +118,7 @@ impl Ui {
             0,
             TextPart {
                 text: format!("VOXEL-RS\n"),
-                font_size: Scale::uniform(40.0),
+                font_size: PxScale::from(40.0),
                 color: white,
                 font: Some("medium".to_owned()),
             },
@@ -139,7 +139,7 @@ impl Ui {
                     text: vec![
                         TextPart {
                             text: text.to_owned(),
-                            font_size: Scale::uniform(50.0),
+                            font_size: PxScale::from(50.0),
                             color: [1.0, 1.0, 1.0, 1.0],
                             font: Some("arcade".to_owned()),
                         },
@@ -255,7 +255,7 @@ pub struct TrianglesPrimitive {
 #[derive(Debug, Clone)]
 pub struct TextPart {
     pub text: String,
-    pub font_size: wgpu_glyph::Scale,
+    pub font_size: PxScale,
     pub color: [f32; 4],
     pub font: Option<String>,
 }
@@ -308,7 +308,7 @@ impl PrimitiveBuffer {
             h: Some(h),
             parts: vec![TextPart {
                 text,
-                font_size: Scale::uniform(20.0),
+                font_size: PxScale::from(20.0),
                 color,
                 font: None,
             }],

@@ -96,20 +96,21 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     let hidpi_factor = window.scale_factor();
     let physical_window_size = window.inner_size();
     info!("Creating the swap chain");
-    let surface = wgpu::Surface::create(&window);
+    let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+    let surface = unsafe { instance.create_surface(&window) };
     // Get the Device and the render Queue
-    let adapter = block_on(wgpu::Adapter::request(&wgpu::RequestAdapterOptions {
+    let adapter = block_on(instance.request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance, // TODO: configure this?
         compatible_surface: Some(&surface),
-    }, wgpu::BackendBit::all()))
+    }))
     .expect("Failed to create adapter");
     // TODO: device should be immutable
     let (mut device, queue) = block_on(adapter.request_device(&wgpu::DeviceDescriptor {
-        extensions: wgpu::Extensions {
-            anisotropic_filtering: false,
-        },
+        features: wgpu::Features::empty(),
         limits: wgpu::Limits::default(),
-    }));
+        shader_validation: true
+    }, None))
+    .expect("Failed to request device");
     // Create the SwapChain
     let mut sc_desc = wgpu::SwapChainDescriptor {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -120,6 +121,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
     };
     let mut swap_chain = device.create_swap_chain(&surface, &sc_desc);
     info!("Creating the multisampled texture buffer");
+    let texture_view_descriptor = wgpu::TextureViewDescriptor::default();
     let mut msaa_texture_descriptor = wgpu::TextureDescriptor {
         label: None,
         size: wgpu::Extent3d {
@@ -127,7 +129,6 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
             height: sc_desc.height,
             depth: 1,
         },
-        array_layer_count: 1,
         mip_level_count: 1,
         sample_count: SAMPLE_COUNT,
         dimension: wgpu::TextureDimension::D2,
@@ -135,7 +136,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
     };
     let mut msaa_texture = device.create_texture(&msaa_texture_descriptor);
-    let mut msaa_texture_view = msaa_texture.create_default_view();
+    let mut msaa_texture_view = msaa_texture.create_view(&texture_view_descriptor);
     info!("Creating the depth buffer");
     let mut depth_texture_descriptor = wgpu::TextureDescriptor {
         label: None,
@@ -144,7 +145,6 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
             height: sc_desc.height,
             depth: 1,
         },
-        array_layer_count: 1,
         mip_level_count: 1,
         sample_count: SAMPLE_COUNT,
         dimension: wgpu::TextureDimension::D2,
@@ -152,7 +152,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
     };
     let mut depth_texture = device.create_texture(&depth_texture_descriptor);
-    let mut depth_texture_view = depth_texture.create_default_view();
+    let mut depth_texture_view = depth_texture.create_view(&texture_view_descriptor);
 
     let mut window_data = {
         let physical_window_size = window.inner_size();
@@ -177,7 +177,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
 
     let (mut state, cmd) =
         initial_state(&mut settings, &mut device).expect("Failed to create initial window state");
-    queue.submit(&[cmd]);
+    queue.submit(vec![cmd]);
 
     let mut previous_time = std::time::Instant::now();
 
@@ -251,12 +251,12 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                     depth_texture_descriptor.size.width = sc_desc.width;
                     depth_texture_descriptor.size.height = sc_desc.height;
                     depth_texture = device.create_texture(&depth_texture_descriptor);
-                    depth_texture_view = depth_texture.create_default_view();
+                    depth_texture_view = depth_texture.create_view(&texture_view_descriptor);
                     // Udate MSAA frame buffer
                     msaa_texture_descriptor.size.width = sc_desc.width;
                     msaa_texture_descriptor.size.height = sc_desc.height;
                     msaa_texture = device.create_texture(&msaa_texture_descriptor);
-                    msaa_texture_view = msaa_texture.create_default_view();
+                    msaa_texture_view = msaa_texture.create_view(&texture_view_descriptor);
                 }
                 window_resized = false;
 
@@ -311,7 +311,7 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                         let (new_state, cmd) = new_state(&mut settings, &mut device)
                             .expect("Failed to create next window state");
                         state = new_state;
-                        queue.submit(&[cmd]);
+                        queue.submit(vec![cmd]);
                         return;
                     }
                     StateTransition::CloseWindow => {
@@ -320,12 +320,12 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                 }
 
                 // Render frame
-                let swap_chain_output = swap_chain.get_next_texture().expect("Failed to unwrap swap chain output.");
+                let swap_chain_output = swap_chain.get_current_frame().expect("Failed to unwrap swap chain output.");
                 let (state_transition, commands) = state
                     .render(
                         &settings,
                         WindowBuffers {
-                            texture_buffer: &swap_chain_output.view,
+                            texture_buffer: &swap_chain_output.output.view,
                             multisampled_texture_buffer: &msaa_texture_view,
                             depth_buffer: &depth_texture_view,
                         },
@@ -334,14 +334,14 @@ pub fn open_window(mut settings: Settings, initial_state: StateFactory) -> ! {
                         &input_state,
                     )
                     .expect("Failed to `render` the current window state");
-                queue.submit(&[commands]);
+                queue.submit(vec![commands]);
                 match state_transition {
                     StateTransition::KeepCurrent => (),
                     StateTransition::ReplaceCurrent(new_state) => {
                         let (new_state, cmd) = new_state(&mut settings, &mut device)
                             .expect("Failed to create next window state");
                         state = new_state;
-                        queue.submit(&[cmd]);
+                        queue.submit(vec![cmd]);
                     }
                     StateTransition::CloseWindow => {
                         *control_flow = ControlFlow::Exit;

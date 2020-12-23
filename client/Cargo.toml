@@ -24,16 +24,16 @@ futures = "0.3"
 crossbeam-channel = "0.5"
 
 # Graphics
-glsl-to-spirv = "0.1"
+shaderc = "0.7"
 image = "0.23"
 texture_packer = "0.21"
-wgpu = "0.5"
-wgpu-types = "0.5"
+wgpu = "0.6"
+wgpu-types = "0.6"
 winit = "0.24"
 
 # Gui
 quint = { path = "../quint" }
-wgpu_glyph = "0.8"
+wgpu_glyph = "0.10"
 
 # Math
 nalgebra = "0.23"

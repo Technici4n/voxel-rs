@@ -1,5 +1,6 @@
 //! Skybox rendering
 
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use super::{ SkyboxVertex, to_u8_slice };
 
 const FAR: f32 = 900.0;
@@ -69,23 +70,19 @@ pub fn create_skybox(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer) {
     (
         {
             let vertices_slice = to_u8_slice(&vertices);
-            let buffer_mapped = device.create_buffer_mapped(&wgpu::BufferDescriptor {
-                label: None,
-                size: vertices_slice.len() as u64,
-                usage: wgpu::BufferUsage::VERTEX
-            });
-            buffer_mapped.data.copy_from_slice(&vertices_slice);
-            buffer_mapped.finish()
+            device.create_buffer_init(&BufferInitDescriptor {
+                label: Some("skybox_vertices"),
+                usage: wgpu::BufferUsage::COPY_SRC | wgpu::BufferUsage::VERTEX,
+                contents: &vertices_slice
+            })
         },
         {
             let indices_slice = to_u8_slice(&indices);
-            let buffer_mapped = device.create_buffer_mapped(&wgpu::BufferDescriptor {
-                label: None,
-                size: indices_slice.len() as u64,
-                usage: wgpu::BufferUsage::INDEX
-            });
-            buffer_mapped.data.copy_from_slice(&indices_slice);
-            buffer_mapped.finish()
+            device.create_buffer_init(&BufferInitDescriptor {
+                label: Some("skybox_indicies"),
+                usage: wgpu::BufferUsage::COPY_SRC | wgpu::BufferUsage::INDEX,
+                contents: &indices_slice
+            })
         }
     )
 }

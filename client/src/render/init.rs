@@ -8,19 +8,20 @@ pub enum ShaderStage {
 }
 
 /// Load a GLSL shader from a file and compile it to SPIR-V
-pub fn load_glsl_shader<P: AsRef<Path>>(stage: ShaderStage, path: P) -> Vec<u32> {
+pub fn load_glsl_shader<'a, P: AsRef<Path>>(stage: ShaderStage, path: P) -> Vec<u8> {
     let ty = match stage {
-        ShaderStage::Vertex => glsl_to_spirv::ShaderType::Vertex,
-        ShaderStage::Fragment => glsl_to_spirv::ShaderType::Fragment,
+        ShaderStage::Vertex => shaderc::ShaderKind::Vertex,
+        ShaderStage::Fragment => shaderc::ShaderKind::Fragment,
     };
     let path_display = path.as_ref().display().to_string();
     log::info!("Loading GLSL shader from {}", path_display);
     let glsl_source = std::fs::read_to_string(path).expect("Couldn't read shader from file");
 
-    wgpu::read_spirv(
-        glsl_to_spirv::compile(&glsl_source, ty).expect("Failed to compile GLSL shader"),
-    )
-    .expect("Failed to read SPIR-V")
+    let mut compiler = shaderc::Compiler::new().unwrap();
+    compiler.compile_into_spirv(&glsl_source, ty, &path_display, "main", None)
+        .expect("Couldn't compile shader.")
+        .as_binary_u8()
+        .to_vec()
 }
 
 /// Default `RasterizationStateDescriptor` with no backface culling
@@ -31,6 +32,7 @@ pub const RASTERIZER_NO_CULLING: wgpu::RasterizationStateDescriptor =
         depth_bias: 0,
         depth_bias_slope_scale: 0.0,
         depth_bias_clamp: 0.0,
+        clamp_depth: false
     };
 
 /// Default `RasterizationStateDescriptor` with backface culling
@@ -63,18 +65,20 @@ pub const DEFAULT_DEPTH_STENCIL_STATE_DESCRIPTOR: wgpu::DepthStencilStateDescrip
         format: crate::window::DEPTH_FORMAT,
         depth_write_enabled: true,
         depth_compare: wgpu::CompareFunction::Less,
-        stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
-        stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
-        stencil_read_mask: 0,
-        stencil_write_mask: 0,
+        stencil: wgpu::StencilStateDescriptor {
+            front: wgpu::StencilStateFaceDescriptor::IGNORE,
+            back: wgpu::StencilStateFaceDescriptor::IGNORE,
+            read_mask: 0,
+            write_mask: 0,
+        }
     };
 
 /// Create a default pipeline
 pub fn create_default_pipeline(
     device: &wgpu::Device,
     uniform_layout: &wgpu::BindGroupLayout,
-    vertex_shader: &[u32],
-    fragment_shader: &[u32],
+    vertex_shader: wgpu::ShaderModuleSource,
+    fragment_shader: wgpu::ShaderModuleSource,
     primitive_topology: wgpu::PrimitiveTopology,
     vertex_buffer_descriptor: wgpu::VertexBufferDescriptor,
     cull_back_faces: bool,
@@ -82,12 +86,19 @@ pub fn create_default_pipeline(
     // Shaders
     let vertex_shader_module = device.create_shader_module(vertex_shader);
     let fragment_shader_module = device.create_shader_module(fragment_shader);
+
     // Pipeline
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
         bind_group_layouts: &[uniform_layout],
+        push_constant_ranges: &[]
     });
+
+    log::trace!("Creating render pipeline.");
+
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        layout: &pipeline_layout,
+        label: None,
+        layout: Some(&pipeline_layout),
         vertex_stage: wgpu::ProgrammableStageDescriptor {
             module: &vertex_shader_module,
             entry_point: "main",

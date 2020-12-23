@@ -1,3 +1,4 @@
+use wgpu::util::{BufferInitDescriptor, DeviceExt};
 use image::{ImageBuffer, Rgba};
 use log::info;
 
@@ -56,7 +57,6 @@ pub fn load_image(
             height: image_size,
             depth: 1,
         },
-        array_layer_count: 1,
         mip_level_count: MIPMAP_LEVELS,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
@@ -69,25 +69,22 @@ pub fn load_image(
     for level in 0..MIPMAP_LEVELS {
         info!("Copying mipmap level {mipmap_level}", mipmap_level = level);
         let current_size = image_size >> level;
-        let src_buffer = {
-            let buffer_mapped = device.create_buffer_mapped(&wgpu::BufferDescriptor {
-                label: None,
-                size: mipmaps[level as usize].len() as u64,
-                usage: wgpu::BufferUsage::COPY_SRC,
-            });
-            buffer_mapped.data.copy_from_slice(&mipmaps[level as usize][..]);
-            buffer_mapped.finish()
-        };
+        let src_buffer = device.create_buffer_init(&BufferInitDescriptor {
+            label: None,
+            usage: wgpu::BufferUsage::COPY_SRC,
+            contents: &mipmaps[level as usize]
+        });
         let buffer_view = wgpu::BufferCopyView {
+            layout: wgpu::TextureDataLayout {
+                offset: 0,
+                rows_per_image: current_size,
+                bytes_per_row: 4 * current_size,
+            },
             buffer: &src_buffer,
-            offset: 0,
-            bytes_per_row: 4 * current_size,
-            rows_per_image: current_size,
         };
         let texture_view = wgpu::TextureCopyView {
             texture: &texture,
             mip_level: level,
-            array_layer: 0,
             origin: wgpu::Origin3d {
                 x: 0,
                 y: 0,

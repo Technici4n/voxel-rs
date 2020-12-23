@@ -24,6 +24,7 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
         usage |= wgpu::BufferUsage::COPY_DST;
         Self {
             buffer: device.create_buffer(&wgpu::BufferDescriptor {
+                mapped_at_creation: false,
                 label: None,
                 size: (initial_capacity * std::mem::size_of::<T>()) as u64,
                 usage,
@@ -49,6 +50,7 @@ impl<T: Copy + 'static> DynamicBuffer<T> {
 
         if data.len() > self.capacity {
             self.buffer = device.create_buffer(&wgpu::BufferDescriptor {
+                mapped_at_creation: false,
                 label: None,
                 size: (data.len() * std::mem::size_of::<T>()) as u64,
                 usage: self.usage,
@@ -108,6 +110,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         usage |= wgpu::BufferUsage::COPY_DST | wgpu::BufferUsage::COPY_SRC;
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
+            mapped_at_creation: false,
             size: (initial_capacity * std::mem::size_of::<T>()) as u64,
             usage,
         });
@@ -235,6 +238,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug, T: Copy + std::fmt::Debug + 'static
         // Create new buffer and copy data
         let new_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: None,
+            mapped_at_creation: false,
             size: (new_len * std::mem::size_of::<T>()) as u64,
             usage: self.usage,
         });
@@ -337,20 +341,21 @@ mod tests {
     fn test_multi_buffer() {
         use wgpu::*;
 
-        let adapter = block_on(Adapter::request(&RequestAdapterOptions {
+        let instance = wgpu::Instance::new(wgpu::BackendBit::PRIMARY);
+        let adapter = block_on(instance.request_adapter(&RequestAdapterOptions {
             compatible_surface: None,
             power_preference: PowerPreference::HighPerformance,
-        }, BackendBit::PRIMARY)).unwrap();
+        })).unwrap();
         let (device, _queue) = block_on(adapter.request_device(&DeviceDescriptor {
-            extensions: Extensions {
-                anisotropic_filtering: false,
-            },
+            features: wgpu::Features::empty(),
             limits: Limits::default(),
-        }));
+            shader_validation: true
+        }, None))
+        .expect("Failed to request device.");
         let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
 
         // Create initial buffer
-        let mut multi_buffer = MultiBuffer::with_capacity(&device, 10, BufferUsage::NONE);
+        let mut multi_buffer = MultiBuffer::with_capacity(&device, 10, BufferUsage::empty());
 
         let seg1 = [2u16, 3u16, 4u16];
         let seg2 = [5u16, 6u16, 7u16, 8u16];
