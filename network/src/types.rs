@@ -66,7 +66,7 @@ impl From<BitSet> for SimpleBitSet {
     fn from(bs: BitSet) -> Self {
         Self {
             last_byte_bits: (bs.len() % 8) as u8,
-            bytes: bs.as_slice().to_vec(),
+            bytes: bs.into(),
         }
     }
 }
