@@ -13,13 +13,13 @@ pub struct HighestOpaqueBlock {
 impl HighestOpaqueBlock {
     pub fn new() -> Self {
         Self {
-            y: [-i64::min_value(); (CHUNK_SIZE * CHUNK_SIZE) as usize],
+            y: [i64::MIN; (CHUNK_SIZE * CHUNK_SIZE) as usize],
         }
     }
 
     pub fn from_chunk(chunk: &Arc<Chunk>) -> Self {
         let mut hob = Self {
-            y: [-i64::min_value(); (CHUNK_SIZE * CHUNK_SIZE) as usize],
+            y: [i64::MIN; (CHUNK_SIZE * CHUNK_SIZE) as usize],
         };
         for i in 0..CHUNK_SIZE {
             for k in 0..CHUNK_SIZE {
