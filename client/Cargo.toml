@@ -15,13 +15,13 @@ voxel-rs-server = { path = "../server" }
 
 # Utilities
 anyhow = "1.0"
-env_logger = "0.7"
+env_logger = "0.8"
 log = "0.4"
-ron = "0.5"
+ron = "0.6"
 serde = "1.0"
 toml = "0.5"
 futures = "0.3"
-crossbeam-channel = "0.4"
+crossbeam-channel = "0.5"
 
 # Graphics
 glsl-to-spirv = "0.1"
@@ -29,7 +29,7 @@ image = "0.23"
 texture_packer = "0.21"
 wgpu = "0.5"
 wgpu-types = "0.5"
-winit = "0.22"
+winit = "0.24"
 
 # Gui
 quint = { path = "../quint" }
