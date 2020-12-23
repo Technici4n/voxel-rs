@@ -125,7 +125,7 @@ impl Receiver {
             set.push(self.received_sequences[idx] >= seq && self.received[idx].is_some());
         }
         // Remove final 0s
-        while let Some(last_bit) = set.last() {
+        while let Some(last_bit) = set.iter().by_val().last() {
             if !last_bit {
                 set.pop().unwrap();
             }

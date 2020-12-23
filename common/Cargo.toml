@@ -7,10 +7,10 @@ edition = "2018"
 [dependencies]
 # Utilities
 anyhow = "1.0"
-crossbeam-channel = "0.4"
+crossbeam-channel = "0.5"
 lazy_static = "1.4.0"
 log = "0.4"
-ron = "0.5"
+ron = "0.6"
 serde = "1.0"
 
 # Image loading
@@ -18,4 +18,4 @@ image = "0.23"
 texture_packer = "0.21"
 
 # Math
-nalgebra = "0.18"
+nalgebra = "0.23"
